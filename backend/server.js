@@ -1,3 +1,4 @@
+require('dotenv').config(); // EKLENDİ: .env dosyasını okumak için
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -6,7 +7,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer'); // EKLENDİ
 const crypto = require('crypto'); // EKLENDİ
 const User = require('./models/User');
-const JWT_SECRET = "cok_gizli_anahtar_kelime"; // Gerçek projede bunu .env dosyasına koyarız
+const JWT_SECRET = process.env.JWT_SECRET; // .env'den çekiliyor
 
 const auth = require('./middleware/auth');
 const { adminAuth, strictAdminAuth } = require('./middleware/adminAuth');
@@ -28,8 +29,8 @@ const app = express();
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'infokbusosyal@gmail.com', // BURAYI DOLDUR
-    pass: 'bfuf cnup hlzk mcna'       // BURAYI DOLDUR (16 haneli)
+    user: process.env.EMAIL_USER, // .env'den çekiliyor
+    pass: process.env.EMAIL_PASS  // .env'den çekiliyor
   }
 });
 // -------------------------------------
@@ -42,7 +43,7 @@ app.use((req, res, next) => {
   if (origin && origin.includes('localhost')) {
     res.header('Access-Control-Allow-Origin', origin);
   } else {
-    res.header('Access-Control-Allow-Origin', 'http://localhost:5173');
+    res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL); // .env'den çekiliyor
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
@@ -63,7 +64,7 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Bağlantısı (Kendi linkin varsa burayı değiştir)
-mongoose.connect('mongodb://localhost:27017/kbu-sosyal')
+mongoose.connect(process.env.MONGO_URI) // .env'den çekiliyor
   .then(() => console.log('MongoDB Bağlandı'))
   .catch(err => console.error('Bağlantı Hatası:', err));
 
@@ -458,11 +459,11 @@ app.post('/api/register', async (req, res) => {
     await newUser.save();
 
     // 5. Mail Gönderme (EKLENDİ)
-    const verificationLink = `http://localhost:5001/api/verify-email?token=${verificationToken}`;
+    const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`; // .env'den çekiliyor
 
     const mailOptions = {
       from: 'KBÜ Sosyal',
-      to: user.email,
+      to: email, // Düzeltme: newUser objesi yerine direkt email değişkeni
       subject: 'KBÜ Sosyal - Hesabını Doğrula',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
@@ -496,7 +497,7 @@ app.post('/api/register', async (req, res) => {
 // Mail Doğrulama Endpoint'i (GÖRSEL TASARIM - ERROR & SUCCESS)
 app.get('/api/verify-email', async (req, res) => {
   const { token } = req.query;
-  const frontendURL = "http://localhost:5173"; 
+  const frontendURL = process.env.FRONTEND_URL; // .env'den çekiliyor
 
   // --- ORTAK CSS STİLLERİ ---
   const commonStyles = `
@@ -1626,7 +1627,7 @@ app.post('/api/resend-verification', async (req, res) => {
     await user.save();
 
     // Mail Gönderme İşlemi (Register ile aynı mantık)
-    const verificationLink = `http://localhost:5001/api/verify-email?token=${newVerificationToken}`;
+    const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${newVerificationToken}`; // .env'den çekiliyor
 
     const mailOptions = {
       from: 'KBÜ Sosyal',
@@ -1658,6 +1659,7 @@ app.post('/api/resend-verification', async (req, res) => {
   }
 });
 
-app.listen(5001, () => {
-  console.log('Sunucu 5001 portunda çalışıyor...');
+const PORT = process.env.PORT || 5001; // .env'den çekiliyor veya 5001
+app.listen(PORT, () => {
+  console.log(`Sunucu ${PORT} portunda çalışıyor...`);
 });
