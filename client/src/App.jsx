@@ -1248,7 +1248,7 @@ export default function App() {
                           <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>
                         )}
                         {neutralPercent > 0 && (
-                          <div className="bg-yellow-500" style={{ width: `${neutralPercent}%` }}></div>
+                          <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>
                         )}
                         {negativePercent > 0 && (
                           <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>
