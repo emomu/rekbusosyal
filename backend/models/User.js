@@ -1,0 +1,37 @@
+const mongoose = require('mongoose');
+
+const UserSchema = new mongoose.Schema({
+  fullName: { type: String, required: true },
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  birthDate: { type: Date, required: true },
+  password: { type: String, required: true },
+  profilePicture: { type: String, default: '' }, 
+  role: { type: String, enum: ['user', 'moderator', 'club_manager', 'admin'], default: 'user' },
+  
+  // --- EKLENEN KISIM BAŞLANGIÇ ---
+  isVerified: { type: Boolean, default: false }, // Hesap onaylı mı?
+  verificationToken: { type: String }, // Onaylama linki için kod
+  // --- EKLENEN KISIM BİTİŞ ---
+
+  votedCampuses: [{
+    campusId: { type: mongoose.Schema.Types.ObjectId, ref: 'Campus' },
+    voteType: { type: String, enum: ['negative', 'neutral', 'positive'] }
+  }],
+  votedCommunities: [{
+    communityId: { type: mongoose.Schema.Types.ObjectId, ref: 'Community' },
+    voteType: { type: String, enum: ['negative', 'neutral', 'positive'] }
+  }],
+  interests: [{
+    type: String,
+    enum: ['kahve', 'yemek', 'egitim', 'eglence']
+  }],
+  bio: { type: String, default: '', maxlength: 160 },
+  isPrivate: { type: Boolean, default: false },
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  createdAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('User', UserSchema);

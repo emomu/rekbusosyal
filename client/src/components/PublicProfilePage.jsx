@@ -1,0 +1,337 @@
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { ChevronLeft, Calendar, Lock, Heart } from 'lucide-react';
+import FollowButton from './FollowButton';
+import LoadMoreButton from './LoadMoreButton';
+import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
+
+export default function PublicProfilePage({ username, onClose }) {
+  const dispatch = useDispatch();
+  const token = useSelector(state => state.auth.token);
+  const currentUserId = useSelector(state => state.auth.userId);
+  const currentUsername = useSelector(state => state.auth.username);
+  const { currentProfile, userPosts, userConfessions, postsPagination, confessionsPagination, isFollowing, followRequestPending } = useSelector(state => state.userProfile);
+
+  const [activeTab, setActiveTab] = useState('posts');
+  const [loading, setLoading] = useState(true);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingConfessions, setLoadingConfessions] = useState(false);
+
+  const isOwnProfile = currentUsername === username;
+
+  // --- Veri Çekme İşlemleri ---
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const res = await fetch(`http://localhost:5001/api/users/${username}`);
+        const data = await res.json();
+
+        if (res.ok) {
+          dispatch(setCurrentProfile(data));
+          if (currentUserId) {
+            const following = data.followers.some(f => f._id === currentUserId);
+            const pending = data.followRequests?.includes(currentUserId);
+            dispatch(setIsFollowing(following));
+            dispatch(setFollowRequestPending(pending));
+          }
+
+          if (!data.isPrivate || data.followers.some(f => f._id === currentUserId) || data._id === currentUserId) {
+            fetchUserPosts(data._id, 1);
+          }
+        }
+      } catch (err) {
+        console.error('Profil yüklenemedi:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+    return () => {
+      dispatch(clearProfile());
+    };
+  }, [username, currentUserId, dispatch]);
+
+  const fetchUserPosts = async (userId, page = 1) => {
+    try {
+      setLoadingPosts(true);
+      const res = await fetch(`http://localhost:5001/api/users/${userId}/posts?page=${page}&limit=10`);
+      const data = await res.json();
+      if (res.ok) {
+        if (page === 1) dispatch(setUserPosts(data.posts));
+        else dispatch(appendUserPosts(data.posts));
+        dispatch(setPostsPagination(data.pagination));
+      }
+    } catch (err) {
+      console.error('Postlar yüklenemedi:', err);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const fetchUserConfessions = async (userId, page = 1) => {
+    try {
+      setLoadingConfessions(true);
+      const res = await fetch(`http://localhost:5001/api/users/${userId}/confessions?page=${page}&limit=10`);
+      const data = await res.json();
+      if (res.ok) {
+        if (page === 1) dispatch(setUserConfessions(data.posts));
+        else dispatch(appendUserConfessions(data.posts));
+        dispatch(setConfessionsPagination(data.pagination));
+      }
+    } catch (err) {
+      console.error('İtiraflar yüklenemedi:', err);
+    } finally {
+      setLoadingConfessions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentProfile) return;
+    if (currentProfile.isPrivate && !isFollowing && !isOwnProfile) return;
+
+    if (activeTab === 'confessions' && userConfessions.length === 0) {
+      fetchUserConfessions(currentProfile._id, 1);
+    }
+  }, [activeTab, currentProfile, isFollowing, isOwnProfile]);
+
+  // --- Takip İşlemleri ---
+  const handleFollow = async (userId) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/users/${userId}/follow`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.status === 'pending') {
+          dispatch(setFollowRequestPending(true));
+        } else {
+          dispatch(setIsFollowing(true));
+          const profileRes = await fetch(`http://localhost:5001/api/users/${username}`);
+          const profileData = await profileRes.json();
+          dispatch(setCurrentProfile(profileData));
+        }
+      }
+    } catch (err) {
+      console.error('Takip hatası:', err);
+    }
+  };
+
+  const handleUnfollow = async (userId) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/users/${userId}/unfollow`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        dispatch(setIsFollowing(false));
+        dispatch(setFollowRequestPending(false));
+        const profileRes = await fetch(`http://localhost:5001/api/users/${username}`);
+        const profileData = await profileRes.json();
+        dispatch(setCurrentProfile(profileData));
+      }
+    } catch (err) {
+      console.error('Unfollow hatası:', err);
+    }
+  };
+
+  // --- YENİ EKLENEN: Beğeni (Like) Fonksiyonu ---
+  const handleLike = async (postId, type) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/posts/${postId}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+      });
+
+      if (res.ok) {
+        const updatedPost = await res.json();
+
+        // Hangi listede (post veya itiraf) güncelleme yapacağımızı belirliyoruz
+        if (type === 'post') {
+          // Mevcut post listesini kopyalayıp ilgili postu güncelliyoruz
+          const updatedList = userPosts.map(p => 
+            p._id === postId ? { ...p, likes: updatedPost.likes } : p
+          );
+          dispatch(setUserPosts(updatedList));
+        } else {
+          // Mevcut itiraf listesini kopyalayıp ilgili itirafı güncelliyoruz
+          const updatedList = userConfessions.map(c => 
+            c._id === postId ? { ...c, likes: updatedPost.likes } : c
+          );
+          dispatch(setUserConfessions(updatedList));
+        }
+      }
+    } catch (err) {
+      console.error('Beğeni işlemi başarısız:', err);
+    }
+  };
+
+  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-400">Yükleniyor...</div></div>;
+  if (!currentProfile) return <div className="flex items-center justify-center min-h-screen"><div className="text-gray-400">Kullanıcı bulunamadı</div></div>;
+
+  const isPrivateAndNotFollowing = currentProfile.isPrivate && !isFollowing && !isOwnProfile;
+
+  return (
+    <div className="relative min-h-screen bg-white">
+      <header className="sticky top-0 z-30 bg-white/100 backdrop-blur-md border-b border-gray-200 px-4 h-[60px] flex items-center">
+        <div className="flex items-center gap-3 w-full">
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition">
+            <ChevronLeft size={20} />
+          </button>
+          <div className="font-bold text-lg truncate">{currentProfile.fullName}</div>
+        </div>
+      </header>
+
+      <div className="bg-white p-5 border-b border-gray-100">
+        <div className="flex items-start gap-4">
+          <img
+            src={currentProfile.profilePicture || 'https://via.placeholder.com/150'}
+            alt={currentProfile.fullName}
+            className="w-16 h-16 bg-gray-200 rounded-full object-cover shrink-0"
+            onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/150'; }}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between mb-2 gap-2">
+              <div className="min-w-0">
+                <h2 className="font-bold text-base text-gray-900 truncate">{currentProfile.fullName}</h2>
+                <p className="text-gray-500 text-sm truncate">@{currentProfile.username}</p>
+              </div>
+              {!isOwnProfile && (
+                <div className="shrink-0">
+                   <FollowButton
+                    userId={currentProfile._id}
+                    isFollowing={isFollowing}
+                    isPending={followRequestPending}
+                    onFollow={handleFollow}
+                    onUnfollow={handleUnfollow}
+                  />
+                </div>
+              )}
+            </div>
+            {currentProfile.bio && <p className="text-gray-700 text-sm mb-2 leading-relaxed whitespace-pre-wrap">{currentProfile.bio}</p>}
+            <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
+              <div className="flex items-center gap-1">
+                <Calendar size={13} />
+                <span>{new Date(currentProfile.createdAt).toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' })}</span>
+              </div>
+              {currentProfile.isPrivate && (
+                <div className="flex items-center gap-1"><Lock size={13} /><span>Gizli hesap</span></div>
+              )}
+            </div>
+            <div className="flex gap-3 text-sm">
+              <div><span className="font-bold text-gray-900">{currentProfile.following?.length || 0}</span><span className="text-gray-500 ml-1">Takip</span></div>
+              <div><span className="font-bold text-gray-900">{currentProfile.followers?.length || 0}</span><span className="text-gray-500 ml-1">Takipçi</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {isPrivateAndNotFollowing ? (
+        <div className="p-12 text-center bg-gray-50/50">
+          <Lock size={40} className="mx-auto text-gray-300 mb-3" />
+          <h3 className="text-base font-bold text-gray-900 mb-2">Bu Hesap Gizli</h3>
+          <p className="text-gray-500 text-sm">Gönderileri görmek için @{currentProfile.username} kullanıcısını takip et.</p>
+        </div>
+      ) : (
+        <>
+          <div className="sticky top-[60px] z-20 bg-white flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('posts')}
+              className={`flex-1 py-4 text-sm font-medium transition ${
+                activeTab === 'posts' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              Gönderiler
+            </button>
+            <button
+              onClick={() => setActiveTab('confessions')}
+              className={`flex-1 py-4 text-sm font-medium transition ${
+                activeTab === 'confessions' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              İtiraflar
+            </button>
+          </div>
+
+          <div className="divide-y divide-gray-100 pb-10">
+            {activeTab === 'posts' && (
+              <>
+                {userPosts.length === 0 && !loadingPosts ? (
+                  <div className="p-12 text-center text-gray-400">Henüz gönderi yok</div>
+                ) : (
+                  <>
+                    {userPosts.map((post) => (
+                      <div key={post._id} className="p-5">
+                        <div className="flex items-center gap-3 mb-2">
+                          <img
+                            src={currentProfile.profilePicture || 'https://via.placeholder.com/150'}
+                            alt={currentProfile.fullName}
+                            className="w-9 h-9 bg-gray-200 rounded-full object-cover"
+                          />
+                          <div>
+                            <div className="font-bold text-sm text-gray-900">{currentProfile.username}</div>
+                            <div className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleDateString('tr-TR')}</div>
+                          </div>
+                        </div>
+                        <p className="text-gray-800 mb-3 whitespace-pre-wrap">{post.content}</p>
+                        {/* Post Beğeni Butonu */}
+                        <button 
+                          onClick={() => handleLike(post._id, 'post')}
+                          className={`flex items-center gap-1.5 transition-colors ${post.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
+                        >
+                          <Heart size={18} className={post.likes?.includes(currentUserId) ? 'fill-current' : ''} />
+                          <span className="text-xs font-medium">{post.likes?.length || 0}</span>
+                        </button>
+                      </div>
+                    ))}
+                    <LoadMoreButton onLoadMore={() => fetchUserPosts(currentProfile._id, postsPagination.currentPage + 1)} isLoading={loadingPosts} hasMore={postsPagination.hasMore} />
+                  </>
+                )}
+              </>
+            )}
+
+            {activeTab === 'confessions' && (
+              <>
+                {userConfessions.length === 0 && !loadingConfessions ? (
+                  <div className="p-12 text-center text-gray-400">Henüz itiraf yok</div>
+                ) : (
+                  <>
+                    {userConfessions.map((confession) => (
+                      <div key={confession._id} className="p-5">
+                        <div className="flex items-center gap-3 mb-2">
+                          <img
+                            src={currentProfile.profilePicture || 'https://via.placeholder.com/150'}
+                            alt={currentProfile.fullName}
+                            className="w-9 h-9 bg-gray-200 rounded-full object-cover"
+                          />
+                          <div>
+                            <div className="font-bold text-sm text-gray-900">{currentProfile.username}</div>
+                            <div className="text-xs text-gray-400">{new Date(confession.createdAt).toLocaleDateString('tr-TR')}</div>
+                          </div>
+                        </div>
+                        <p className="text-gray-800 mb-3">{confession.content}</p>
+                        {/* İtiraf Beğeni Butonu */}
+                        <button 
+                          onClick={() => handleLike(confession._id, 'confession')}
+                          className={`flex items-center gap-1.5 transition-colors ${confession.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
+                        >
+                          <Heart size={18} className={confession.likes?.includes(currentUserId) ? 'fill-current' : ''} />
+                          <span className="text-xs font-medium">{confession.likes?.length || 0}</span>
+                        </button>
+                      </div>
+                    ))}
+                    <LoadMoreButton onLoadMore={() => fetchUserConfessions(currentProfile._id, confessionsPagination.currentPage + 1)} isLoading={loadingConfessions} hasMore={confessionsPagination.hasMore} />
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
