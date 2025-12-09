@@ -77,7 +77,7 @@ app.get('/sitemap.xml', async (req, res) => {
   res.header('Content-Encoding', 'gzip');
 
   try {
-    const smStream = new SitemapStream({ hostname: process.env.FRONTEND_URL || 'https://www.kbusosyal.com' });
+    const smStream = new SitemapStream({ hostname: 'https://www.kbusosyal.com' });
     const pipeline = smStream.pipe(createGzip());
 
     // 1. STATİK SAYFALAR
