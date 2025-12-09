@@ -125,7 +125,7 @@ app.get('/sitemap.xml', async (req, res) => {
     });
 
     smStream.end();
-    streamToPromise(pipeline).pipe(res).on('error', (e) => { throw e });
+    pipeline.pipe(res).on('error', (e) => { throw e });
 
   } catch (e) {
     console.error('Sitemap Hatası:', e);
