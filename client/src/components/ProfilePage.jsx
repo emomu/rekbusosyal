@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X } from 'lucide-react';
 import { API_URL } from '../config/api';
+import MobileHeader from './MobileHeader';
 
-export default function ProfilePage() {
+export default function ProfilePage({ onMenuClick }) {
   const [profile, setProfile] = useState(null);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -260,8 +261,9 @@ export default function ProfilePage() {
 
   return (
     <>
+      <MobileHeader onMenuClick={onMenuClick} />
       {/* Header - Site temasına uygun */}
-      <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4">
+      <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4">
         <h1 className="font-bold text-lg">Ayarlar</h1>
       </header>
 

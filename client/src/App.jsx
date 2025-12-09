@@ -8,7 +8,10 @@ import AdminPanel from './components/AdminPanel';
 import InitialLoadingScreen from './components/InitialLoadingScreen';
 import LoadMoreButton from './components/LoadMoreButton';
 import { FeedShimmer, GridShimmer, CommentsShimmer } from './components/LoadingShimmer';
-import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal } from 'lucide-react';
+import { ToastContainer } from './components/Toast';
+import { useToast } from './hooks/useToast';
+import MobileHeader from './components/MobileHeader';
+import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X } from 'lucide-react';
 import { API_URL } from './config/api';
 
 // Redux actions
@@ -106,6 +109,7 @@ function AdCard({ ad, onView, onClick, onImageClick }) {
 
 export default function App() {
   const dispatch = useDispatch();
+  const toast = useToast();
 
   // Redux state'leri kullan
   const { token, userId, userRole, userInterests, isAuthenticated } = useSelector(state => state.auth);
@@ -133,6 +137,8 @@ export default function App() {
   const [currentUserInfo, setCurrentUserInfo] = useState(null);
   // Profil görünümü state
   const [viewedProfile, setViewedProfile] = useState(null);
+  // Mobile menu state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // --- YARDIMCI FONKSİYONLAR ---
 
@@ -424,7 +430,7 @@ export default function App() {
 
       if (res.status === 429) {
         const data = await res.json();
-        alert(`⏱️ ${data.error}\n${data.remainingSeconds} saniye sonra tekrar deneyebilirsin.`);
+        toast.warning(`${data.error}. ${data.remainingSeconds} saniye sonra tekrar dene.`);
         return;
       }
 
@@ -432,8 +438,14 @@ export default function App() {
         const newPost = await res.json();
         dispatch(addPost(newPost));
         dispatch(setNewPostContent(""));
+        toast.success('Post paylaşıldı!');
+      } else {
+        toast.error('Post paylaşılamadı. Lütfen tekrar dene.');
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      toast.error('Bir hata oluştu.');
+    }
   };
 
   // Yeni İtiraf Oluştur
@@ -761,7 +773,7 @@ export default function App() {
         dispatch(setSelectedCommunity(null));
         setViewedProfile(null); // <--- BU SATIRI EKLE (ÇOK ÖNEMLİ)
       }}
-      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${activeTab === id ? 'bg-black text-white' : 'hover:bg-gray-100 text-gray-700'}`}
+      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${activeTab === id ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
     >
       <Icon size={20} />
       <span className="font-medium text-sm">{label}</span>
@@ -775,7 +787,12 @@ export default function App() {
   const hasUserVotedCommunity = selectedCommunity && communityComments.some(c => c.author?._id === userId);
 
   if (!isAuthenticated) {
-    return <LoginPage onLogin={() => window.location.reload()} />;
+    return (
+      <>
+        <LoginPage onLogin={() => window.location.reload()} />
+        <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+      </>
+    );
   }
 
   // İlk yükleme ekranı
@@ -837,18 +854,190 @@ export default function App() {
         </div>
       </aside>
 
+      {/* Mobile Slide-in Menu */}
+      {isMobileMenuOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-40 animate-fade-in"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+
+          {/* Menu Panel */}
+          <div className="md:hidden fixed top-0 right-0 bottom-0 w-80 bg-white z-50 shadow-2xl animate-slide-in-right overflow-y-auto">
+            {/* Menu Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900">Menü</h2>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition"
+              >
+                <X size={24} className="text-gray-700" />
+              </button>
+            </div>
+
+            {/* User Profile Card */}
+            <div className="p-4 border-b border-gray-100">
+              <div
+                onClick={() => {
+                  dispatch(setActiveTab('publicProfil'));
+                  dispatch(setSelectedCampus(null));
+                  dispatch(setSelectedCommunity(null));
+                  setViewedProfile(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition"
+              >
+                <img
+                  src={currentUserInfo?.profilePicture || 'https://via.placeholder.com/150'}
+                  alt="Profil"
+                  className="w-12 h-12 rounded-full object-cover bg-gray-200"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 truncate">
+                    {currentUserInfo?.fullName || 'Kullanıcı'}
+                  </p>
+                  <p className="text-sm text-gray-500 truncate">
+                    @{currentUserInfo?.username || 'kullanici'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Items */}
+            <nav className="p-4 space-y-2">
+              <button
+                onClick={() => {
+                  dispatch(setActiveTab('akis'));
+                  dispatch(setSelectedCampus(null));
+                  dispatch(setSelectedCommunity(null));
+                  setViewedProfile(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                  activeTab === 'akis' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Home size={22} />
+                <span className="font-medium">Akış</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  dispatch(setActiveTab('kampusler'));
+                  dispatch(setSelectedCampus(null));
+                  dispatch(setSelectedCommunity(null));
+                  setViewedProfile(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                  activeTab === 'kampusler' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <MapPin size={22} />
+                <span className="font-medium">Kampüsler</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  dispatch(setActiveTab('itiraflar'));
+                  dispatch(setSelectedCampus(null));
+                  dispatch(setSelectedCommunity(null));
+                  setViewedProfile(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                  activeTab === 'itiraflar' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <MessageSquare size={22} />
+                <span className="font-medium">İtiraflar</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  dispatch(setActiveTab('topluluklar'));
+                  dispatch(setSelectedCampus(null));
+                  dispatch(setSelectedCommunity(null));
+                  setViewedProfile(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                  activeTab === 'topluluklar' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <User size={22} />
+                <span className="font-medium">Topluluklar</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  dispatch(setActiveTab('profil'));
+                  dispatch(setSelectedCampus(null));
+                  dispatch(setSelectedCommunity(null));
+                  setViewedProfile(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                  activeTab === 'profil' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                }`}
+              >
+                <Settings size={22} />
+                <span className="font-medium">Ayarlar</span>
+              </button>
+
+              {(userRole === 'admin' || userRole === 'moderator') && (
+                <button
+                  onClick={() => {
+                    dispatch(setActiveTab('admin'));
+                    dispatch(setSelectedCampus(null));
+                    dispatch(setSelectedCommunity(null));
+                    setViewedProfile(null);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                    activeTab === 'admin' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <Shield size={22} />
+                  <span className="font-medium">Admin Panel</span>
+                </button>
+              )}
+            </nav>
+
+            {/* Logout Button */}
+            <div className="p-4 mt-auto border-t border-gray-100">
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition font-medium"
+              >
+                <LogOut size={22} />
+                <span>Çıkış Yap</span>
+              </button>
+              <p className="text-center text-xs text-gray-400 mt-4">© 2025 KBÜ Sosyal</p>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* ORTA PANEL */}
-      <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen pb-20">
+      <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen">
 
         {/* --- AKIŞ --- */}
         {activeTab === 'akis' && !viewedProfile && (
           <>
-            <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
+            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
               Anasayfa
             </header>
 
             <div className="p-4 border-b border-gray-100 flex gap-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0"></div>
+              <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
+                <User size={20} className="text-gray-400" />
+              </div>
               <div className="flex-1">
                 <textarea
                   className="w-full resize-none outline-none text-lg placeholder-gray-400 bg-transparent"
@@ -884,11 +1073,20 @@ export default function App() {
                     return (
                       <div key={item._id} className="p-5">
                         <div className="flex items-center gap-3 mb-2">
-                          <img
-                            src={item.author?.profilePicture || 'https://via.placeholder.com/150'}
-                            className="w-9 h-9 bg-gray-200 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-                            onClick={() => setViewedProfile(item.author?.username)}
-                          />
+                          {item.author?.profilePicture ? (
+                            <img
+                              src={item.author.profilePicture}
+                              className="w-9 h-9 bg-gray-200 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+                              onClick={() => setViewedProfile(item.author?.username)}
+                            />
+                          ) : (
+                            <div
+                              className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center cursor-pointer hover:opacity-80 transition"
+                              onClick={() => setViewedProfile(item.author?.username)}
+                            >
+                              <User size={16} className="text-gray-400" />
+                            </div>
+                          )}
                           <div>
                             <div
                               className="font-bold text-sm text-gray-900 cursor-pointer hover:underline"
@@ -923,7 +1121,8 @@ export default function App() {
         {/* --- İTİRAFLAR --- */}
         {activeTab === 'itiraflar' && !viewedProfile && (
           <>
-            <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
+            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
               İtiraflar
             </header>
             <div className="p-4 border-b border-gray-100">
@@ -958,13 +1157,20 @@ export default function App() {
                         <div className="flex items-center gap-3 mb-2">
                           {item.isAnonymous ? (
                             <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center font-bold text-xs text-gray-500">?</div>
-                          ) : (
+                          ) : item.author?.profilePicture ? (
                             <img
-                              src={item.author?.profilePicture || 'https://via.placeholder.com/150'}
+                              src={item.author.profilePicture}
                               alt="Profile"
                               className="w-9 h-9 bg-gray-200 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
                               onClick={() => setViewedProfile(item.author?.username)}
                             />
+                          ) : (
+                            <div
+                              className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center cursor-pointer hover:opacity-80 transition"
+                              onClick={() => setViewedProfile(item.author?.username)}
+                            >
+                              <User size={16} className="text-gray-400" />
+                            </div>
                           )}
                           <div>
                             <div
@@ -998,7 +1204,8 @@ export default function App() {
         {/* --- KAMPÜSLER --- */}
         {activeTab === 'kampusler' && !selectedCampus && !viewedProfile && (
           <>
-            <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Kampüsler</header>
+            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Kampüsler</header>
             {isLoadingCampuses ? (
               <GridShimmer count={4} />
             ) : (
@@ -1061,7 +1268,8 @@ export default function App() {
         {/* --- KAMPÜS DETAY --- */}
         {activeTab === 'kampusler' && selectedCampus && !viewedProfile && (
           <div className="animate-in slide-in-from-right duration-300">
-            <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
+            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+            <header className="sticky top-0 md:top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
               <button onClick={() => dispatch(setSelectedCampus(null))} className="p-2 hover:bg-gray-100 rounded-full transition"><ChevronLeft /></button>
               <h2 className="font-bold text-lg">{selectedCampus.name}</h2>
             </header>
@@ -1122,11 +1330,17 @@ export default function App() {
                     return (
                       <div key={comment._id} className="p-5 hover:bg-gray-50 transition rounded-xl">
                         <div className="flex items-start gap-3 mb-2">
-                          <img
-                            src={comment.author?.profilePicture || 'https://via.placeholder.com/150'}
-                            alt={comment.author?.username}
-                            className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200"
-                          />
+                          {comment.author?.profilePicture ? (
+                            <img
+                              src={comment.author.profilePicture}
+                              alt={comment.author?.username}
+                              className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center border border-gray-200">
+                              <User size={18} className="text-gray-400" />
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1211,7 +1425,8 @@ export default function App() {
         {/* --- TOPLULUKLAR LİSTE --- */}
         {activeTab === 'topluluklar' && !selectedCommunity && !viewedProfile && (
           <>
-            <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Topluluklar</header>
+            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Topluluklar</header>
             <div className="p-6 grid gap-5">
               {communities.length > 0 ? communities.map(community => {
                 const totalVotes = (community.votes?.positive || 0) + (community.votes?.neutral || 0) + (community.votes?.negative || 0);
@@ -1275,7 +1490,8 @@ export default function App() {
         {/* --- TOPLULUK DETAY --- */}
         {activeTab === 'topluluklar' && selectedCommunity && !viewedProfile && (
           <div className="animate-in slide-in-from-right duration-300">
-            <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
+            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
+            <header className="sticky top-0 md:top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
               <button onClick={() => dispatch(setSelectedCommunity(null))} className="p-2 hover:bg-gray-100 rounded-full transition"><ChevronLeft /></button>
               <h2 className="font-bold text-lg">{selectedCommunity.name}</h2>
             </header>
@@ -1332,11 +1548,17 @@ export default function App() {
                     return (
                       <div key={comment._id} className="p-5 hover:bg-gray-50 transition rounded-xl">
                         <div className="flex items-start gap-3 mb-2">
-                          <img
-                            src={comment.author?.profilePicture || 'https://via.placeholder.com/150'}
-                            alt={comment.author?.username}
-                            className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200"
-                          />
+                          {comment.author?.profilePicture ? (
+                            <img
+                              src={comment.author.profilePicture}
+                              alt={comment.author?.username}
+                              className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center border border-gray-200">
+                              <User size={18} className="text-gray-400" />
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1418,7 +1640,7 @@ export default function App() {
         )}
 
         {/* --- PROFİL --- */}
-        {activeTab === 'profil' && !viewedProfile && <ProfilePage />}
+        {activeTab === 'profil' && !viewedProfile && <ProfilePage onMenuClick={() => setIsMobileMenuOpen(true)} />}
 
         {activeTab === 'publicProfil' && (
           <PublicProfilePage 
@@ -1483,6 +1705,8 @@ export default function App() {
         </div>
       )}
 
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
     </div>
   );
 }
