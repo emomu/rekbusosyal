@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X } from 'lucide-react';
+import { API_URL } from '../config/api';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
@@ -21,7 +22,7 @@ export default function ProfilePage() {
 
   // Profil bilgilerini çek
   useEffect(() => {
-    fetch('http://localhost:5001/api/profile', {
+    fetch('${API_URL}/api/profile', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -61,7 +62,7 @@ export default function ProfilePage() {
       const base64String = reader.result;
 
       try {
-        const res = await fetch('http://localhost:5001/api/profile/picture', {
+        const res = await fetch('${API_URL}/api/profile/picture', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -94,7 +95,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch('http://localhost:5001/api/profile/picture', {
+      const res = await fetch('${API_URL}/api/profile/picture', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -126,7 +127,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch('http://localhost:5001/api/profile/username', {
+      const res = await fetch('${API_URL}/api/profile/username', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -171,7 +172,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch('http://localhost:5001/api/profile/password', {
+      const res = await fetch('${API_URL}/api/profile/password', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -199,7 +200,7 @@ export default function ProfilePage() {
   // Bio güncelle
   const handleUpdateBio = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/profile/bio', {
+      const res = await fetch('${API_URL}/api/profile/bio', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -226,7 +227,7 @@ export default function ProfilePage() {
   const handleTogglePrivacy = async () => {
     try {
       const newPrivacy = !isPrivate;
-      const res = await fetch('http://localhost:5001/api/profile/privacy', {
+      const res = await fetch('${API_URL}/api/profile/privacy', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

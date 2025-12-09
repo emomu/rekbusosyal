@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment Variables
+.env
+.env.local
+.env.production
+backend/.env
+client/.env
+
+# Build outputs
+dist/
+build/
+client/dist/
+client/build/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Railway
+.railway/
+
+# Debug
+debug.log

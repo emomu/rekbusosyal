@@ -23,6 +23,7 @@ const Community = require('./models/Community');
 const CommunityComment = require('./models/CommunityComment');
 
 const app = express();
+const path = require('path');
 
 // --- EKLENDİ: MAIL GÖNDERİCİ AYARI ---
 // Gmail için App Password almalısın.
@@ -1658,6 +1659,22 @@ app.post('/api/resend-verification', async (req, res) => {
     res.status(500).json({ error: "Sunucu hatası." });
   }
 });
+
+// --- PRODUCTION: FRONTEND STATIC FILES SUNMA ---
+// Production'da frontend'i backend ile aynı domain'de sunuyoruz
+if (process.env.NODE_ENV === 'production') {
+  // Frontend build dosyalarını serve et
+  app.use(express.static(path.join(__dirname, '../client/dist')));
+
+  // Tüm diğer route'lar için index.html'i döndür (SPA routing için)
+  app.get('*', (req, res) => {
+    // API route'larını atla
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API endpoint bulunamadı' });
+    }
+    res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
+  });
+}
 
 const PORT = process.env.PORT || 5001; // .env'den çekiliyor veya 5001
 app.listen(PORT, () => {

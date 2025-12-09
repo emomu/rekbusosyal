@@ -9,6 +9,7 @@ import InitialLoadingScreen from './components/InitialLoadingScreen';
 import LoadMoreButton from './components/LoadMoreButton';
 import { FeedShimmer, GridShimmer, CommentsShimmer } from './components/LoadingShimmer';
 import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal } from 'lucide-react';
+import { API_URL } from './config/api';
 
 // Redux actions
 import { logout, setUserRole, addInterests } from './store/slices/authSlice';
@@ -213,7 +214,7 @@ export default function App() {
   // Reklam gösterimini izle
   const trackAdImpression = async (adId) => {
     try {
-      await fetch(`http://localhost:5001/api/advertisements/${adId}/track`, {
+      await fetch(`${API_URL}/api/advertisements/${adId}/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'impression' })
@@ -226,7 +227,7 @@ export default function App() {
   // Reklam tıklamasını izle
   const trackAdClick = async (adId) => {
     try {
-      await fetch(`http://localhost:5001/api/advertisements/${adId}/track`, {
+      await fetch(`${API_URL}/api/advertisements/${adId}/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'click' })
@@ -250,7 +251,7 @@ export default function App() {
 
         // Backend'e de kaydet
         try {
-          await fetch('http://localhost:5001/api/profile/interests', {
+          await fetch(`${API_URL}/api/profile/interests`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -286,12 +287,12 @@ export default function App() {
           // Promise.all içine istekleri ekliyoruz
           // DİKKAT: En sona 'api/profile' eklendi (api/users/ID yerine)
           const [postsRes, campusesRes, roleRes, adsRes, communitiesRes, currentUserRes] = await Promise.all([
-            fetch('http://localhost:5001/api/posts?page=1&limit=10', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('http://localhost:5001/api/campus'),
-            fetch('http://localhost:5001/api/admin/check-role', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('http://localhost:5001/api/advertisements'),
-            fetch('http://localhost:5001/api/communities', { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch('http://localhost:5001/api/profile', { headers: { 'Authorization': `Bearer ${token}` } }) // <-- DÜZELTİLEN KISIM
+            fetch(`${API_URL}/api/posts?page=1&limit=10`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${API_URL}/api/campus`),
+            fetch(`${API_URL}/api/admin/check-role`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${API_URL}/api/advertisements`),
+            fetch(`${API_URL}/api/communities`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${API_URL}/api/profile`, { headers: { 'Authorization': `Bearer ${token}` } })
           ]);
 
           // Gelen cevapları JSON'a çeviriyoruz
@@ -344,7 +345,7 @@ export default function App() {
   useEffect(() => {
     if (activeTab === 'itiraflar' && token && confessions.length === 0) {
       dispatch(setLoadingConfessions(true));
-      fetch('http://localhost:5001/api/confessions?page=1&limit=10', { headers: { 'Authorization': `Bearer ${token}` } })
+      fetch(`${API_URL}/api/confessions?page=1&limit=10`, { headers: { 'Authorization': `Bearer ${token}` } })
         .then(res => res.json())
         .then(data => {
           // Confessions pagination ile gelir
@@ -372,7 +373,7 @@ export default function App() {
     dispatch(setLoadingPosts(true));
     try {
       const nextPage = postsPagination.currentPage + 1;
-      const res = await fetch(`http://localhost:5001/api/posts?page=${nextPage}&limit=10`, {
+      const res = await fetch(`${API_URL}/api/posts?page=${nextPage}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -395,7 +396,7 @@ export default function App() {
     dispatch(setLoadingConfessions(true));
     try {
       const nextPage = confessionsPagination.currentPage + 1;
-      const res = await fetch(`http://localhost:5001/api/confessions?page=${nextPage}&limit=10`, {
+      const res = await fetch(`${API_URL}/api/confessions?page=${nextPage}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -415,7 +416,7 @@ export default function App() {
   const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;
     try {
-      const res = await fetch('http://localhost:5001/api/posts', {
+      const res = await fetch('${API_URL}/api/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ content: newPostContent })
@@ -439,7 +440,7 @@ export default function App() {
   const handleCreateConfession = async () => {
     if (!newConfessionContent.trim()) return;
     try {
-      const res = await fetch('http://localhost:5001/api/confessions', {
+      const res = await fetch('${API_URL}/api/confessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ content: newConfessionContent, isAnonymous })
@@ -462,7 +463,7 @@ export default function App() {
   // Beğeni (Like)
   const handleLike = async (postId, type) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/posts/${postId}/like`, {
+      const res = await fetch(`${API_URL}/api/posts/${postId}/like`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       });
@@ -489,7 +490,7 @@ export default function App() {
   useEffect(() => {
     if (selectedCampus) {
       dispatch(setCampusComments([]));
-      fetch(`http://localhost:5001/api/campus/${selectedCampus._id}/comments`)
+      fetch(`${API_URL}/api/campus/${selectedCampus._id}/comments`)
         .then(res => res.json())
         .then(data => dispatch(setCampusComments(data)));
     }
@@ -499,7 +500,7 @@ export default function App() {
   useEffect(() => {
     if (selectedCommunity) {
       dispatch(setCommunityComments([]));
-      fetch(`http://localhost:5001/api/community/${selectedCommunity._id}/comments`)
+      fetch(`${API_URL}/api/community/${selectedCommunity._id}/comments`)
         .then(res => res.json())
         .then(data => dispatch(setCommunityComments(data)));
     }
@@ -521,7 +522,7 @@ export default function App() {
 
   const handleVote = async (campusId, type) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/campus/${campusId}/vote`, {
+      const res = await fetch(`${API_URL}/api/campus/${campusId}/vote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, token })
@@ -544,7 +545,7 @@ export default function App() {
 
           // 3. Yorumları ANINDA yenile (Backend otomatik sistem yorumu eklediği/güncellediği için)
           // AWAIT kullanarak yorumların yüklenmesini bekle
-          const commentsRes = await fetch(`http://localhost:5001/api/campus/${campusId}/comments`);
+          const commentsRes = await fetch(`${API_URL}/api/campus/${campusId}/comments`);
           const commentsData = await commentsRes.json();
           dispatch(setCampusComments(commentsData));
         }
@@ -555,7 +556,7 @@ export default function App() {
   const handleSendComment = async () => {
     if (!commentInput.trim()) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/campus/${selectedCampus._id}/comments`, {
+      const res = await fetch(`${API_URL}/api/campus/${selectedCampus._id}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -597,7 +598,7 @@ export default function App() {
 
   const handleCommentLike = async (commentId) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/campus/comments/${commentId}/like`, {
+      const res = await fetch(`${API_URL}/api/campus/comments/${commentId}/like`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -614,7 +615,7 @@ export default function App() {
   const handleEditComment = async (commentId) => {
     if (!editingContent.trim()) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/campus/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/campus/comments/${commentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -639,7 +640,7 @@ export default function App() {
   // TOPLULUK FONKSİYONLARI (KAMPÜS İLE AYNI MANTIK)
   const handleCommunityVote = async (communityId, type) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/community/${communityId}/vote`, {
+      const res = await fetch(`${API_URL}/api/community/${communityId}/vote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, token })
@@ -658,7 +659,7 @@ export default function App() {
         if (selectedCommunity && selectedCommunity._id === communityId) {
           dispatch(setSelectedCommunity(data.community));
 
-          const commentsRes = await fetch(`http://localhost:5001/api/community/${communityId}/comments`);
+          const commentsRes = await fetch(`${API_URL}/api/community/${communityId}/comments`);
           const commentsData = await commentsRes.json();
           dispatch(setCommunityComments(commentsData));
         }
@@ -669,7 +670,7 @@ export default function App() {
   const handleCommunitySendComment = async () => {
     if (!communityCommentInput.trim()) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/community/${selectedCommunity._id}/comments`, {
+      const res = await fetch(`${API_URL}/api/community/${selectedCommunity._id}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -708,7 +709,7 @@ export default function App() {
 
   const handleCommunityCommentLike = async (commentId) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/community/comments/${commentId}/like`, {
+      const res = await fetch(`${API_URL}/api/community/comments/${commentId}/like`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -730,7 +731,7 @@ export default function App() {
   const handleEditCommunityComment = async (commentId) => {
     if (!editingContent.trim()) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/community/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/community/comments/${commentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

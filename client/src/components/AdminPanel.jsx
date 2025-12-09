@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2 } from 'lucide-react';
+import { API_URL } from '../config/api';
 
 export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState('users');
@@ -28,7 +29,7 @@ export default function AdminPanel() {
 
   const loadUsers = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/admin/users', {
+      const res = await fetch('${API_URL}/api/admin/users', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setUsers(await res.json());
@@ -37,7 +38,7 @@ export default function AdminPanel() {
 
   const loadAdvertisements = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/admin/advertisements', {
+      const res = await fetch('${API_URL}/api/admin/advertisements', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setAdvertisements(await res.json());
@@ -46,21 +47,21 @@ export default function AdminPanel() {
 
   const loadCampuses = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/campus');
+      const res = await fetch('${API_URL}/api/campus');
       if (res.ok) setCampuses(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const loadCommunities = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/communities');
+      const res = await fetch('${API_URL}/api/communities');
       if (res.ok) setCommunities(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const loadComments = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/admin/comments', {
+      const res = await fetch('${API_URL}/api/admin/comments', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setComments(await res.json());
@@ -69,7 +70,7 @@ export default function AdminPanel() {
 
   const loadPosts = async () => {
     try {
-      const res = await fetch('http://localhost:5001/api/admin/posts', {
+      const res = await fetch('${API_URL}/api/admin/posts', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setPosts(await res.json());
@@ -79,7 +80,7 @@ export default function AdminPanel() {
   // Kullanıcı rolü güncelle
   const updateUserRole = async (userId, newRole) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/users/${userId}/role`, {
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/role`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -98,7 +99,7 @@ export default function AdminPanel() {
   const deleteUser = async (userId) => {
     if (!confirm('Bu kullanıcıyı silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/users/${userId}`, {
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -113,7 +114,7 @@ export default function AdminPanel() {
   const deleteAd = async (adId) => {
     if (!confirm('Bu reklamı silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/advertisements/${adId}`, {
+      const res = await fetch(`${API_URL}/api/admin/advertisements/${adId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -128,7 +129,7 @@ export default function AdminPanel() {
   const deleteCampus = async (campusId) => {
     if (!confirm('Bu kampüsü silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/campuses/${campusId}`, {
+      const res = await fetch(`${API_URL}/api/admin/campuses/${campusId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -143,7 +144,7 @@ export default function AdminPanel() {
   const deleteCommunity = async (communityId) => {
     if (!confirm('Bu topluluğu silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/communities/${communityId}`, {
+      const res = await fetch(`${API_URL}/api/admin/communities/${communityId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -158,7 +159,7 @@ export default function AdminPanel() {
   const deleteComment = async (commentId) => {
     if (!confirm('Bu yorumu silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/admin/comments/${commentId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -173,7 +174,7 @@ export default function AdminPanel() {
   const deletePost = async (postId) => {
     if (!confirm('Bu postu silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`http://localhost:5001/api/admin/posts/${postId}`, {
+      const res = await fetch(`${API_URL}/api/admin/posts/${postId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -575,8 +576,8 @@ function CreateEditModal({ type, item, onClose, onSuccess, token }) {
     const apiType = type === 'ads' ? 'advertisements' : type;
 
     const url = item
-      ? `http://localhost:5001/api/admin/${apiType}/${item._id}`
-      : `http://localhost:5001/api/admin/${apiType}`;
+      ? `${API_URL}/api/admin/${apiType}/${item._id}`
+      : `${API_URL}/api/admin/${apiType}`;
 
     const method = item ? 'PUT' : 'POST';
 

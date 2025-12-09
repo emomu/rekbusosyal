@@ -4,6 +4,7 @@ import { ChevronLeft, Calendar, Lock, Heart } from 'lucide-react';
 import FollowButton from './FollowButton';
 import LoadMoreButton from './LoadMoreButton';
 import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
+import { API_URL } from '../config/api';
 
 export default function PublicProfilePage({ username, onClose }) {
   const dispatch = useDispatch();
@@ -24,7 +25,7 @@ export default function PublicProfilePage({ username, onClose }) {
     const fetchProfile = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`http://localhost:5001/api/users/${username}`);
+        const res = await fetch(`${API_URL}/api/users/${username}`);
         const data = await res.json();
 
         if (res.ok) {
@@ -55,7 +56,7 @@ export default function PublicProfilePage({ username, onClose }) {
   const fetchUserPosts = async (userId, page = 1) => {
     try {
       setLoadingPosts(true);
-      const res = await fetch(`http://localhost:5001/api/users/${userId}/posts?page=${page}&limit=10`);
+      const res = await fetch(`${API_URL}/api/users/${userId}/posts?page=${page}&limit=10`);
       const data = await res.json();
       if (res.ok) {
         if (page === 1) dispatch(setUserPosts(data.posts));
@@ -72,7 +73,7 @@ export default function PublicProfilePage({ username, onClose }) {
   const fetchUserConfessions = async (userId, page = 1) => {
     try {
       setLoadingConfessions(true);
-      const res = await fetch(`http://localhost:5001/api/users/${userId}/confessions?page=${page}&limit=10`);
+      const res = await fetch(`${API_URL}/api/users/${userId}/confessions?page=${page}&limit=10`);
       const data = await res.json();
       if (res.ok) {
         if (page === 1) dispatch(setUserConfessions(data.posts));
@@ -98,7 +99,7 @@ export default function PublicProfilePage({ username, onClose }) {
   // --- Takip İşlemleri ---
   const handleFollow = async (userId) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/users/${userId}/follow`, {
+      const res = await fetch(`${API_URL}/api/users/${userId}/follow`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -108,7 +109,7 @@ export default function PublicProfilePage({ username, onClose }) {
           dispatch(setFollowRequestPending(true));
         } else {
           dispatch(setIsFollowing(true));
-          const profileRes = await fetch(`http://localhost:5001/api/users/${username}`);
+          const profileRes = await fetch(`${API_URL}/api/users/${username}`);
           const profileData = await profileRes.json();
           dispatch(setCurrentProfile(profileData));
         }
@@ -120,14 +121,14 @@ export default function PublicProfilePage({ username, onClose }) {
 
   const handleUnfollow = async (userId) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/users/${userId}/unfollow`, {
+      const res = await fetch(`${API_URL}/api/users/${userId}/unfollow`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         dispatch(setIsFollowing(false));
         dispatch(setFollowRequestPending(false));
-        const profileRes = await fetch(`http://localhost:5001/api/users/${username}`);
+        const profileRes = await fetch(`${API_URL}/api/users/${username}`);
         const profileData = await profileRes.json();
         dispatch(setCurrentProfile(profileData));
       }
@@ -139,7 +140,7 @@ export default function PublicProfilePage({ username, onClose }) {
   // --- YENİ EKLENEN: Beğeni (Like) Fonksiyonu ---
   const handleLike = async (postId, type) => {
     try {
-      const res = await fetch(`http://localhost:5001/api/posts/${postId}/like`, {
+      const res = await fetch(`${API_URL}/api/posts/${postId}/like`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

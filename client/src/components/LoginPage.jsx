@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../store/slices/authSlice';
+import { API_URL } from '../config/api';
 
 const LoginPage = ({ onLogin }) => {
   const dispatch = useDispatch();
@@ -32,7 +33,7 @@ const LoginPage = ({ onLogin }) => {
       // Login formundaki 'username' alanını gönderiyoruz.
       const identifier = formData.username; 
 
-      const res = await fetch('http://localhost:5001/api/resend-verification', {
+      const res = await fetch('${API_URL}/api/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: identifier }) 
@@ -75,7 +76,7 @@ const LoginPage = ({ onLogin }) => {
     const endpoint = isLogin ? '/api/login' : '/api/register';
 
     try {
-      const res = await fetch(`http://localhost:5001${endpoint}`, {
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
