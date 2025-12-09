@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, Calendar, Lock, Heart } from 'lucide-react';
+import { ChevronLeft, Calendar, Lock } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import FollowButton from './FollowButton';
 import LoadMoreButton from './LoadMoreButton';
+import LikeButton from './LikeButton';
 import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
 import { API_URL } from '../config/api';
 
@@ -291,13 +292,11 @@ export default function PublicProfilePage({ username, onClose }) {
                         </div>
                         <p className="text-gray-800 mb-3 whitespace-pre-wrap">{post.content}</p>
                         {/* Post Beğeni Butonu */}
-                        <button 
+                        <LikeButton
+                          isLiked={post.likes?.includes(currentUserId)}
+                          likeCount={post.likes?.length || 0}
                           onClick={() => handleLike(post._id, 'post')}
-                          className={`flex items-center gap-1.5 transition-colors ${post.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
-                        >
-                          <Heart size={18} className={post.likes?.includes(currentUserId) ? 'fill-current' : ''} />
-                          <span className="text-xs font-medium">{post.likes?.length || 0}</span>
-                        </button>
+                        />
                       </div>
                     ))}
                     <LoadMoreButton onLoadMore={() => fetchUserPosts(currentProfile._id, postsPagination.currentPage + 1)} isLoading={loadingPosts} hasMore={postsPagination.hasMore} />
@@ -327,13 +326,11 @@ export default function PublicProfilePage({ username, onClose }) {
                         </div>
                         <p className="text-gray-800 mb-3">{confession.content}</p>
                         {/* İtiraf Beğeni Butonu */}
-                        <button 
+                        <LikeButton
+                          isLiked={confession.likes?.includes(currentUserId)}
+                          likeCount={confession.likes?.length || 0}
                           onClick={() => handleLike(confession._id, 'confession')}
-                          className={`flex items-center gap-1.5 transition-colors ${confession.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
-                        >
-                          <Heart size={18} className={confession.likes?.includes(currentUserId) ? 'fill-current' : ''} />
-                          <span className="text-xs font-medium">{confession.likes?.length || 0}</span>
-                        </button>
+                        />
                       </div>
                     ))}
                     <LoadMoreButton onLoadMore={() => fetchUserConfessions(currentProfile._id, confessionsPagination.currentPage + 1)} isLoading={loadingConfessions} hasMore={confessionsPagination.hasMore} />

@@ -11,6 +11,7 @@ import { FeedShimmer, GridShimmer } from './components/LoadingShimmer';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
 import MobileHeader from './components/MobileHeader';
+import LikeButton from './components/LikeButton';
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
 import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X } from 'lucide-react';
@@ -1101,10 +1102,11 @@ export default function App() {
                         </div>
                         <p className="text-gray-800 mb-3 whitespace-pre-wrap">{item.content}</p>
                         <div className="flex items-center gap-2">
-                          <button onClick={() => handleLike(item._id, 'post')} className={`flex items-center gap-1.5 transition-colors ${item.likes.includes(userId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}>
-                            <Heart size={18} className={item.likes.includes(userId) ? 'fill-current' : ''} />
-                            <span className="text-xs font-medium">{item.likes.length}</span>
-                          </button>
+                          <LikeButton
+                            isLiked={item.likes.includes(userId)}
+                            likeCount={item.likes.length}
+                            onClick={() => handleLike(item._id, 'post')}
+                          />
                         </div>
                       </div>
                     );
@@ -1185,10 +1187,11 @@ export default function App() {
                           </div>
                         </div>
                         <p className="text-gray-800 mb-3">{item.content}</p>
-                        <button onClick={() => handleLike(item._id, 'confession')} className={`flex items-center gap-1.5 transition-colors ${item.likes.includes(userId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}>
-                          <Heart size={18} className={item.likes.includes(userId) ? 'fill-current' : ''} />
-                          <span className="text-xs font-medium">{item.likes.length}</span>
-                        </button>
+                        <LikeButton
+                          isLiked={item.likes.includes(userId)}
+                          likeCount={item.likes.length}
+                          onClick={() => handleLike(item._id, 'confession')}
+                        />
                       </div>
                     );
                   })}
