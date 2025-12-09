@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer'); // EKLENDİ
+const { Resend } = require('resend'); // Resend ile değiştirildi
 const crypto = require('crypto'); // EKLENDİ
 const User = require('./models/User');
 const JWT_SECRET = process.env.JWT_SECRET; // .env'den çekiliyor
@@ -25,35 +25,15 @@ const CommunityComment = require('./models/CommunityComment');
 const app = express();
 const path = require('path');
 
-// --- EKLENDİ: MAIL GÖNDERİCİ AYARI ---
-// Gmail için App Password almalısın.
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // STARTTLS kullan (587 için false olmalı)
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false // Railway için gevşetildi
-  },
-  connectionTimeout: 60000, // 60 saniye timeout
-  greetingTimeout: 30000,
-  socketTimeout: 60000,
-  logger: false, // Railway logs için
-  debug: false
-});
+// --- Resend Email Servisi (Railway uyumlu) ---
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Transporter'ı doğrula (başlangıçta) - async yapıldı
-transporter.verify()
-  .then(() => {
-    console.log('✅ Mail server hazır (SMTP bağlantısı başarılı)');
-  })
-  .catch((error) => {
-    console.log('⚠️ Mail server bağlantısı kurulamadı:', error.message);
-    console.log('Mail gönderilemeyebilir. EMAIL_USER ve EMAIL_PASS kontrol edin.');
-  });
+// Resend API key kontrolü
+if (!process.env.RESEND_API_KEY) {
+  console.log('⚠️ RESEND_API_KEY bulunamadı. Email gönderilemeyecek.');
+} else {
+  console.log('✅ Resend email servisi hazır');
+}
 // -------------------------------------
 
 // CORS - Manuel olarak tüm header'ları ekle
@@ -466,31 +446,28 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const verificationToken = crypto.randomBytes(32).toString('hex'); // EKLENDİ
 
-    // 4. Mail Gönderme (ÖNCE MAİL GÖNDER, BAŞARILIYSA KAYDET)
+    // 4. Mail Gönderme (Resend ile)
     const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER || 'KBÜ Sosyal',
-      to: email,
-      subject: 'KBÜ Sosyal - Hesabını Doğrula',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h2 style="color: #1e3a8a;">Hoş Geldin ${fullName}!</h2>
-          <p>KBÜ Sosyal hesabını etkinleştirmek için lütfen aşağıdaki butona tıkla:</p>
-          <a href="${verificationLink}" style="background-color: #1e3a8a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Hesabımı Doğrula</a>
-          <p style="margin-top: 20px; font-size: 12px; color: #777;">Bu işlemi sen yapmadıysan, bu maili dikkate alma.</p>
-        </div>
-      `
-    };
-
-    // Mail göndermeyi Promise'e çevir
     try {
-      await transporter.sendMail(mailOptions);
-      console.log('Mail başarıyla gönderildi:', email);
+      await resend.emails.send({
+        from: 'KBÜ Sosyal <onboarding@resend.dev>',
+        to: email,
+        subject: 'KBÜ Sosyal - Hesabını Doğrula',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #1e3a8a;">Hoş Geldin ${fullName}!</h2>
+            <p>KBÜ Sosyal hesabını etkinleştirmek için lütfen aşağıdaki butona tıkla:</p>
+            <a href="${verificationLink}" style="background-color: #1e3a8a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Hesabımı Doğrula</a>
+            <p style="margin-top: 20px; font-size: 12px; color: #777;">Bu işlemi sen yapmadıysan, bu maili dikkate alma.</p>
+          </div>
+        `
+      });
+      console.log('✅ Doğrulama maili gönderildi:', email);
     } catch (mailError) {
-      console.error("Mail gönderme hatası:", mailError);
+      console.error("❌ Mail gönderme hatası:", mailError);
       return res.status(500).json({
-        error: "Mail gönderilemedi. Lütfen email ayarlarınızı kontrol edin veya daha sonra tekrar deneyin.",
+        error: "Mail gönderilemedi. Lütfen daha sonra tekrar deneyin.",
         details: process.env.NODE_ENV === 'development' ? mailError.message : undefined
       });
     }
@@ -1653,27 +1630,25 @@ app.post('/api/resend-verification', async (req, res) => {
     // Mail Gönderme İşlemi (Register ile aynı mantık)
     const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${newVerificationToken}`;
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER || 'KBÜ Sosyal',
-      to: user.email,
-      subject: 'KBÜ Sosyal - Yeni Doğrulama Linki',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-          <h2 style="color: #1e3a8a;">Tekrar Merhaba ${user.fullName}!</h2>
-          <p>Yeni doğrulama linkiniz aşağıdadır. Lütfen butona tıklayın:</p>
-          <a href="${verificationLink}" style="background-color: #1e3a8a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Hesabımı Doğrula</a>
-          <p style="margin-top: 20px; font-size: 12px; color: #777;">Bu işlemi sen yapmadıysan, bu maili dikkate alma.</p>
-        </div>
-      `
-    };
-
-    // Promise-based mail gönderme
+    // Resend ile mail gönder
     try {
-      await transporter.sendMail(mailOptions);
-      console.log('Tekrar mail gönderildi:', user.email);
+      await resend.emails.send({
+        from: 'KBÜ Sosyal <onboarding@resend.dev>',
+        to: user.email,
+        subject: 'KBÜ Sosyal - Yeni Doğrulama Linki',
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #1e3a8a;">Tekrar Merhaba ${user.fullName}!</h2>
+            <p>Yeni doğrulama linkiniz aşağıdadır. Lütfen butona tıklayın:</p>
+            <a href="${verificationLink}" style="background-color: #1e3a8a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Hesabımı Doğrula</a>
+            <p style="margin-top: 20px; font-size: 12px; color: #777;">Bu işlemi sen yapmadıysan, bu maili dikkate alma.</p>
+          </div>
+        `
+      });
+      console.log('✅ Tekrar doğrulama maili gönderildi:', user.email);
       res.json({ message: "Doğrulama maili tekrar gönderildi! Spam kutunu kontrol etmeyi unutma." });
     } catch (mailError) {
-      console.error("Mail gönderme hatası:", mailError);
+      console.error("❌ Mail gönderme hatası:", mailError);
       return res.status(500).json({
         error: "Mail gönderilemedi. Lütfen daha sonra tekrar deneyin.",
         details: process.env.NODE_ENV === 'development' ? mailError.message : undefined

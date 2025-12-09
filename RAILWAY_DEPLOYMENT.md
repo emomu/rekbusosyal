@@ -13,9 +13,8 @@ MONGO_URI=mongodb+srv://kullanici:sifre@cluster.mongodb.net/kbusosyal
 # JWT Secret (Güvenlik için rastgele bir string)
 JWT_SECRET=cok_gizli_ve_uzun_rastgele_bir_anahtar
 
-# Email Settings (Gmail App Password gerekli)
-EMAIL_USER=infokbusosyal@gmail.com
-EMAIL_PASS=xxxxxxxxxxxxxxxx
+# Resend API Key (https://resend.com/api-keys)
+RESEND_API_KEY=re_xxxxxxxxxxxxxx
 
 # Backend URL (Railway'in size verdiği URL)
 BACKEND_URL=https://your-backend-url.railway.app
@@ -27,18 +26,23 @@ FRONTEND_URL=https://your-backend-url.railway.app
 NODE_ENV=production
 ```
 
-## 📧 Gmail App Password Alma
+## 📧 Resend API Key Alma
 
-Email doğrulama sisteminin çalışması için Gmail App Password gereklidir:
+Email doğrulama sistemi için Resend API Key gereklidir (Railway uyumlu, SMTP port'ları kullanmaz):
 
-1. Google Hesabınıza gidin: https://myaccount.google.com/
-2. "Security" (Güvenlik) sekmesine tıklayın
-3. "2-Step Verification" (2 Adımlı Doğrulama) açık olmalı
-4. "App passwords" (Uygulama şifreleri) bölümüne gidin
-5. "Mail" için yeni bir app password oluşturun
-6. Oluşturulan 16 haneli şifreyi `EMAIL_PASS` olarak kullanın
-   - **ÖNEMLİ:** Railway'de boşluksuz girin: `xxxxxxxxxxxxxxxx`
-   - Örnek: `bfufcnuphlzkmcna` (boşluklar OLMADAN)
+1. https://resend.com/signup adresine gidin
+2. GitHub hesabınızla giriş yapın
+3. Dashboard'dan "API Keys" bölümüne gidin
+4. "Create API Key" butonuna tıklayın
+5. İsim verin (örn: "KBÜ Sosyal Production")
+6. "Full Access" seçeneğini seçin
+7. Oluşturulan API key'i kopyalayın (örn: `re_123abc456def`)
+8. Bu key'i Railway'de `RESEND_API_KEY` olarak kullanın
+
+**ÖNEMLİ:**
+- Resend ücretsiz planı: 3000 email/ay, 100 email/gün
+- SMTP port sorunları olmaz, Railway ile %100 uyumlu
+- API key sadece bir kez gösterilir, kaydedin!
 
 ## 🚀 Deployment Adımları
 
