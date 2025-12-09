@@ -1667,12 +1667,13 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
 
   // Tüm diğer route'lar için index.html'i döndür (SPA routing için)
-  // Express 5'te wildcard için düzeltilmiş syntax
-  app.get('/*', (req, res) => {
+  // API route'ları hariç, tüm istekler için SPA index.html'i serve et
+  app.use((req, res, next) => {
     // API route'larını atla
     if (req.path.startsWith('/api')) {
-      return res.status(404).json({ error: 'API endpoint bulunamadı' });
+      return next();
     }
+    // SPA için index.html döndür
     res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
   });
 }
