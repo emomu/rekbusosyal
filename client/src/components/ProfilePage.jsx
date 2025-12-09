@@ -22,7 +22,7 @@ export default function ProfilePage() {
 
   // Profil bilgilerini çek
   useEffect(() => {
-    fetch('${API_URL}/api/profile', {
+    fetch(`${API_URL}/api/profile`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
@@ -62,7 +62,7 @@ export default function ProfilePage() {
       const base64String = reader.result;
 
       try {
-        const res = await fetch('${API_URL}/api/profile/picture', {
+        const res = await fetch(`${API_URL}/api/profile/picture`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -95,7 +95,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch('${API_URL}/api/profile/picture', {
+      const res = await fetch(`${API_URL}/api/profile/picture`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -127,7 +127,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch('${API_URL}/api/profile/username', {
+      const res = await fetch(`${API_URL}/api/profile/username`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +172,7 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch('${API_URL}/api/profile/password', {
+      const res = await fetch(`${API_URL}/api/profile/password`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -200,7 +200,7 @@ export default function ProfilePage() {
   // Bio güncelle
   const handleUpdateBio = async () => {
     try {
-      const res = await fetch('${API_URL}/api/profile/bio', {
+      const res = await fetch(`${API_URL}/api/profile/bio`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -227,7 +227,7 @@ export default function ProfilePage() {
   const handleTogglePrivacy = async () => {
     try {
       const newPrivacy = !isPrivate;
-      const res = await fetch('${API_URL}/api/profile/privacy', {
+      const res = await fetch(`${API_URL}/api/profile/privacy`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

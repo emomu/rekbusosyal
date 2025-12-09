@@ -33,7 +33,7 @@ const LoginPage = ({ onLogin }) => {
       // Login formundaki 'username' alanını gönderiyoruz.
       const identifier = formData.username; 
 
-      const res = await fetch('${API_URL}/api/resend-verification', {
+      const res = await fetch(`${API_URL}/api/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: identifier }) 

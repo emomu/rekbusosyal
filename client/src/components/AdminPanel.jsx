@@ -29,7 +29,7 @@ export default function AdminPanel() {
 
   const loadUsers = async () => {
     try {
-      const res = await fetch('${API_URL}/api/admin/users', {
+      const res = await fetch(`${API_URL}/api/admin/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setUsers(await res.json());
@@ -38,7 +38,7 @@ export default function AdminPanel() {
 
   const loadAdvertisements = async () => {
     try {
-      const res = await fetch('${API_URL}/api/admin/advertisements', {
+      const res = await fetch(`${API_URL}/api/admin/advertisements`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setAdvertisements(await res.json());
@@ -47,21 +47,21 @@ export default function AdminPanel() {
 
   const loadCampuses = async () => {
     try {
-      const res = await fetch('${API_URL}/api/campus');
+      const res = await fetch(`${API_URL}/api/campus`);
       if (res.ok) setCampuses(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const loadCommunities = async () => {
     try {
-      const res = await fetch('${API_URL}/api/communities');
+      const res = await fetch(`${API_URL}/api/communities`);
       if (res.ok) setCommunities(await res.json());
     } catch (err) { console.error(err); }
   };
 
   const loadComments = async () => {
     try {
-      const res = await fetch('${API_URL}/api/admin/comments', {
+      const res = await fetch(`${API_URL}/api/admin/comments`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setComments(await res.json());
@@ -70,7 +70,7 @@ export default function AdminPanel() {
 
   const loadPosts = async () => {
     try {
-      const res = await fetch('${API_URL}/api/admin/posts', {
+      const res = await fetch(`${API_URL}/api/admin/posts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setPosts(await res.json());

@@ -416,7 +416,7 @@ export default function App() {
   const handleCreatePost = async () => {
     if (!newPostContent.trim()) return;
     try {
-      const res = await fetch('${API_URL}/api/posts', {
+      const res = await fetch(`${API_URL}/api/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ content: newPostContent })
@@ -440,7 +440,7 @@ export default function App() {
   const handleCreateConfession = async () => {
     if (!newConfessionContent.trim()) return;
     try {
-      const res = await fetch('${API_URL}/api/confessions', {
+      const res = await fetch(`${API_URL}/api/confessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ content: newConfessionContent, isAnonymous })
