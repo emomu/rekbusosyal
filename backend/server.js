@@ -7,6 +7,8 @@ const jwt = require('jsonwebtoken');
 const { Resend } = require('resend'); // Resend ile değiştirildi
 const crypto = require('crypto'); // EKLENDİ
 const User = require('./models/User');
+const { SitemapStream, streamToPromise } = require('sitemap');
+const { createGzip } = require('zlib');
 const JWT_SECRET = process.env.JWT_SECRET; // .env'den çekiliyor
 
 const auth = require('./middleware/auth');
@@ -70,6 +72,66 @@ mongoose.connect(process.env.MONGO_URI) // .env'den çekiliyor
   .catch(err => console.error('Bağlantı Hatası:', err));
 
 // --- ROTALAR ---
+app.get('/sitemap.xml', async (req, res) => {
+  res.header('Content-Type', 'application/xml');
+  res.header('Content-Encoding', 'gzip');
+
+  try {
+    const smStream = new SitemapStream({ hostname: process.env.FRONTEND_URL || 'https://www.kbusosyal.com' });
+    const pipeline = smStream.pipe(createGzip());
+
+    // 1. STATİK SAYFALAR
+    smStream.write({ url: '/', changefreq: 'daily', priority: 1.0 });
+    smStream.write({ url: '/login', changefreq: 'monthly', priority: 0.5 });
+    smStream.write({ url: '/register', changefreq: 'monthly', priority: 0.6 });
+
+    // 2. DİNAMİK: POSTLAR
+    const posts = await Post.find({ isAnonymous: false, category: 'Geyik' })
+                            .select('_id updatedAt')
+                            .sort({ createdAt: -1 })
+                            .limit(1000);
+    
+    posts.forEach(post => {
+      smStream.write({
+        url: `/post/${post._id}`,
+        changefreq: 'weekly',
+        priority: 0.8,
+        lastmod: post.updatedAt ? post.updatedAt.toISOString() : new Date().toISOString()
+      });
+    });
+
+    // 3. DİNAMİK: KULLANICI PROFİLLERİ
+    const users = await User.find({ isPrivate: false })
+                            .select('username updatedAt')
+                            .limit(500);
+
+    users.forEach(user => {
+        smStream.write({
+            url: `/user/${user.username}`,
+            changefreq: 'weekly',
+            priority: 0.7,
+            lastmod: user.updatedAt ? user.updatedAt.toISOString() : new Date().toISOString()
+        });
+    });
+
+    // 4. DİNAMİK: KAMPÜSLER
+    const campuses = await Campus.find().select('_id name');
+    campuses.forEach(campus => {
+      smStream.write({
+        url: `/campus/${campus._id}`,
+        changefreq: 'monthly',
+        priority: 0.6
+      });
+    });
+
+    smStream.end();
+    streamToPromise(pipeline).pipe(res).on('error', (e) => { throw e });
+
+  } catch (e) {
+    console.error('Sitemap Hatası:', e);
+    res.status(500).end();
+  }
+});
 
 // 1. GENEL AKIŞ (POSTLAR)
 // Postları getir (Yazar bilgisiyle birlikte) - Pagination destekli
