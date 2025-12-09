@@ -7,10 +7,12 @@ import PublicProfilePage from './components/PublicProfilePage';
 import AdminPanel from './components/AdminPanel';
 import InitialLoadingScreen from './components/InitialLoadingScreen';
 import LoadMoreButton from './components/LoadMoreButton';
-import { FeedShimmer, GridShimmer, CommentsShimmer } from './components/LoadingShimmer';
+import { FeedShimmer, GridShimmer } from './components/LoadingShimmer';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
 import MobileHeader from './components/MobileHeader';
+import Lottie from 'lottie-react';
+import loaderAnimation from './assets/loader.json';
 import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X } from 'lucide-react';
 import { API_URL } from './config/api';
 
@@ -1317,7 +1319,11 @@ export default function App() {
 
                 <div className="divide-y divide-gray-100">
                   {isLoadingComments ? (
-                    <CommentsShimmer count={3} />
+                    <div className="flex justify-center items-center py-12">
+                      <div className="w-20 h-20">
+                        <Lottie animationData={loaderAnimation} loop={true} />
+                      </div>
+                    </div>
                   ) : campusComments.length > 0 ? campusComments.map((comment) => {
                     const isEditing = editingCommentId === comment._id;
                     const isOwnComment = comment.author?._id === userId;

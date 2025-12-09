@@ -167,9 +167,7 @@ const LoginPage = ({ onLogin }) => {
               {/* --- GÜNCELLENEN TASARIM --- */}
               {showResend && (
                 <div className="mt-3 pt-3 border-t border-red-100 flex items-center justify-between">
-                  <span className="text-xs text-red-600/80 font-medium ml-1">
-                    E-posta ulaşmadı mı?
-                  </span>
+                
                   <button
                     type="button"
                     onClick={handleResendEmail}
@@ -182,7 +180,7 @@ const LoginPage = ({ onLogin }) => {
                         Gönderiliyor...
                       </span>
                     ) : (
-                      'Tekrar Gönder'
+                      'Doğrulama Maili Gönder'
                     )}
                   </button>
                 </div>

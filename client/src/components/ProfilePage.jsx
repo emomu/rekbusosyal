@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X } from 'lucide-react';
+import Lottie from 'lottie-react';
+import loaderAnimation from '../assets/loader.json';
 import { API_URL } from '../config/api';
 import MobileHeader from './MobileHeader';
 
@@ -254,7 +256,9 @@ export default function ProfilePage({ onMenuClick }) {
   if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-400">Yükleniyor...</div>
+        <div className="w-24 h-24">
+          <Lottie animationData={loaderAnimation} loop={true} />
+        </div>
       </div>
     );
   }
