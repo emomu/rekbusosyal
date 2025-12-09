@@ -1667,7 +1667,8 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
 
   // Tüm diğer route'lar için index.html'i döndür (SPA routing için)
-  app.get('*', (req, res) => {
+  // Express 5'te wildcard için düzeltilmiş syntax
+  app.get('/*', (req, res) => {
     // API route'larını atla
     if (req.path.startsWith('/api')) {
       return res.status(404).json({ error: 'API endpoint bulunamadı' });
