@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../store/slices/authSlice';
 import { API_URL } from '../config/api';
+import { ToastContainer } from './Toast';
+import { useToast } from '../hooks/useToast';
 
 const LoginPage = ({ onLogin }) => {
   const dispatch = useDispatch();
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState("");
-  
+  const { toasts, removeToast, success, error: showError, info } = useToast();
+
   // --- YENİ EKLENEN STATE'LER ---
   const [showResend, setShowResend] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
@@ -31,27 +34,27 @@ const LoginPage = ({ onLogin }) => {
     try {
       // Backend hem username hem email kabul edecek şekilde ayarlandıysa
       // Login formundaki 'username' alanını gönderiyoruz.
-      const identifier = formData.username; 
+      const identifier = formData.username;
 
       const res = await fetch(`${API_URL}/api/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: identifier }) 
+        body: JSON.stringify({ email: identifier })
       });
-      
+
       const data = await res.json();
-      
+
       if (res.status === 429) {
-         alert(`Lütfen bekleyin. ${data.error}`);
+         showError(`Lütfen bekleyin. ${data.error}`);
       } else if (res.ok) {
-         alert(data.message);
+         success(data.message);
          setShowResend(false); // Başarılıysa butonu gizle
       } else {
-         alert(data.error || "Mail gönderilemedi.");
+         showError(data.error || "Mail gönderilemedi.");
       }
     } catch (err) {
       console.error(err);
-      alert("Bir hata oluştu.");
+      showError("Bir hata oluştu.");
     } finally {
       setResendLoading(false);
     }
@@ -102,7 +105,8 @@ const LoginPage = ({ onLogin }) => {
         onLogin();
       } else {
         // Kayıt başarılı olduğunda (Backend mail gönderildi mesajı döner)
-        alert(data.message || "Kayıt başarılı! Lütfen mail adresinizi doğrulayın.");
+        success(data.message || "Kayıt başarılı! Lütfen mail adresinizi doğrulayın.", 5000);
+        info("Doğrulama maili gönderildi. Lütfen okul mailinizi kontrol edin.", 5000);
         setIsLogin(true); // Giriş ekranına yönlendir
         setFormData({
           fullName: "",
@@ -122,7 +126,9 @@ const LoginPage = ({ onLogin }) => {
   const inputStyle = "w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 focus:bg-white focus:border-black outline-none transition placeholder:text-gray-500";
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <>
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <div className="min-h-screen flex bg-gray-50">
       
       {/* SOL TARAF - GÖRSEL */}
       <div className="hidden lg:flex w-1/2 bg-blue-900 items-center justify-center relative overflow-hidden">
@@ -260,6 +266,7 @@ const LoginPage = ({ onLogin }) => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 

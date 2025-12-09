@@ -446,25 +446,12 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const verificationToken = crypto.randomBytes(32).toString('hex'); // EKLENDİ
 
-    // 4. Kaydetme
-    const newUser = new User({ 
-      fullName, 
-      username, 
-      email, 
-      birthDate, 
-      password: hashedPassword,
-      verificationToken: verificationToken, // EKLENDİ
-      isVerified: false // EKLENDİ
-    });
-    
-    await newUser.save();
-
-    // 5. Mail Gönderme (EKLENDİ)
-    const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`; // .env'den çekiliyor
+    // 4. Mail Gönderme (ÖNCE MAİL GÖNDER, BAŞARILIYSA KAYDET)
+    const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
 
     const mailOptions = {
-      from: 'KBÜ Sosyal',
-      to: email, // Düzeltme: newUser objesi yerine direkt email değişkeni
+      from: process.env.EMAIL_USER || 'KBÜ Sosyal',
+      to: email,
       subject: 'KBÜ Sosyal - Hesabını Doğrula',
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
@@ -476,15 +463,31 @@ app.post('/api/register', async (req, res) => {
       `
     };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.log("Mail hatası:", error);
-        return res.status(500).json({ error: "Kayıt oldu ancak mail gönderilemedi." });
-      } else {
-        console.log('Mail gönderildi: ' + info.response);
-        res.json({ message: "Kayıt başarılı! Lütfen okul mailine gelen linke tıkla." });
-      }
+    // Mail göndermeyi Promise'e çevir
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log('Mail başarıyla gönderildi:', email);
+    } catch (mailError) {
+      console.error("Mail gönderme hatası:", mailError);
+      return res.status(500).json({
+        error: "Mail gönderilemedi. Lütfen email ayarlarınızı kontrol edin veya daha sonra tekrar deneyin.",
+        details: process.env.NODE_ENV === 'development' ? mailError.message : undefined
+      });
+    }
+
+    // 5. Kaydetme (Mail başarılıysa)
+    const newUser = new User({
+      fullName,
+      username,
+      email,
+      birthDate,
+      password: hashedPassword,
+      verificationToken: verificationToken,
+      isVerified: false
     });
+
+    await newUser.save();
+    res.json({ message: "Kayıt başarılı! Lütfen okul mailine gelen linke tıkla." });
 
   } catch (err) {
     console.log(err);
@@ -1628,10 +1631,10 @@ app.post('/api/resend-verification', async (req, res) => {
     await user.save();
 
     // Mail Gönderme İşlemi (Register ile aynı mantık)
-    const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${newVerificationToken}`; // .env'den çekiliyor
+    const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${newVerificationToken}`;
 
     const mailOptions = {
-      from: 'KBÜ Sosyal',
+      from: process.env.EMAIL_USER || 'KBÜ Sosyal',
       to: user.email,
       subject: 'KBÜ Sosyal - Yeni Doğrulama Linki',
       html: `
@@ -1644,15 +1647,18 @@ app.post('/api/resend-verification', async (req, res) => {
       `
     };
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.log("Mail hatası:", error);
-        return res.status(500).json({ error: "Mail gönderilemedi." });
-      } else {
-        console.log('Tekrar mail gönderildi: ' + info.response);
-        res.json({ message: "Doğrulama maili tekrar gönderildi! Spam kutunu kontrol etmeyi unutma." });
-      }
-    });
+    // Promise-based mail gönderme
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log('Tekrar mail gönderildi:', user.email);
+      res.json({ message: "Doğrulama maili tekrar gönderildi! Spam kutunu kontrol etmeyi unutma." });
+    } catch (mailError) {
+      console.error("Mail gönderme hatası:", mailError);
+      return res.status(500).json({
+        error: "Mail gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+        details: process.env.NODE_ENV === 'development' ? mailError.message : undefined
+      });
+    }
 
   } catch (err) {
     console.error(err);
