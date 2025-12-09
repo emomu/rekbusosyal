@@ -15,7 +15,7 @@ JWT_SECRET=cok_gizli_ve_uzun_rastgele_bir_anahtar
 
 # Email Settings (Gmail App Password gerekli)
 EMAIL_USER=infokbusosyal@gmail.com
-EMAIL_PASS=xxxx xxxx xxxx xxxx
+EMAIL_PASS=xxxxxxxxxxxxxxxx
 
 # Backend URL (Railway'in size verdiği URL)
 BACKEND_URL=https://your-backend-url.railway.app
@@ -37,7 +37,8 @@ Email doğrulama sisteminin çalışması için Gmail App Password gereklidir:
 4. "App passwords" (Uygulama şifreleri) bölümüne gidin
 5. "Mail" için yeni bir app password oluşturun
 6. Oluşturulan 16 haneli şifreyi `EMAIL_PASS` olarak kullanın
-   - Format: `xxxx xxxx xxxx xxxx` (boşluklarla birlikte)
+   - **ÖNEMLİ:** Railway'de boşluksuz girin: `xxxxxxxxxxxxxxxx`
+   - Örnek: `bfufcnuphlzkmcna` (boşluklar OLMADAN)
 
 ## 🚀 Deployment Adımları
 
@@ -59,24 +60,27 @@ Email doğrulama sisteminin çalışması için Gmail App Password gereklidir:
 ## ⚠️ Önemli Notlar
 
 ### Email Gönderme Sorunu
-Eğer kayıt olduktan sonra "Mail gönderilemedi" hatası alıyorsanız:
+Eğer kayıt olduktan sonra "Mail gönderilemedi" veya "Connection timeout" hatası alıyorsanız:
 
 1. **Environment Variables Kontrol Edin:**
-   - `EMAIL_USER` doğru mu?
+   - `EMAIL_USER` doğru mu? (Örn: infokbusosyal@gmail.com)
    - `EMAIL_PASS` doğru App Password mi?
-   - Boşlukları da içeriyor mu?
+   - **BOŞLUKLAR OLMADAN** girdiniz mi? (Örn: `bfufcnuphlzkmcna`)
+   - Railway'de tırnak işaretleri kullanmayın
 
 2. **Gmail Ayarları:**
    - 2-Step Verification açık mı?
    - App Password oluşturuldu mu?
+   - Doğru App Password'ü kopyaladınız mı?
 
 3. **Railway Logs:**
    - Railway dashboard'dan "Deployments" > "View Logs" ile hataları kontrol edin
-   - "Mail hatası:" ile başlayan logları arayın
+   - "✅ Mail server hazır" mesajını görüyor musunuz?
+   - "❌ Mail server bağlantısı başarısız" görüyorsanız EMAIL_PASS yanlış
 
 4. **Test Edin:**
-   - Geliştirme ortamında (localhost) çalışıyor mu?
-   - Çalışıyorsa sorun environment variables'dadır
+   - Railway'de deploy sonrası "✅ Mail server hazır" logunu arayın
+   - Bu log yoksa environment variables yanlış yapılandırılmış
 
 ### Backend URL ve Frontend URL
 - Eğer monorepo (tek proje) kullanıyorsanız, her ikisi de aynı URL olabilir

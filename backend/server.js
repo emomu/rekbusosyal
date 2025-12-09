@@ -28,10 +28,28 @@ const path = require('path');
 // --- EKLENDİ: MAIL GÖNDERİCİ AYARI ---
 // Gmail için App Password almalısın.
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // SSL kullan
   auth: {
-    user: process.env.EMAIL_USER, // .env'den çekiliyor
-    pass: process.env.EMAIL_PASS  // .env'den çekiliyor
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: true,
+    minVersion: 'TLSv1.2'
+  },
+  connectionTimeout: 10000, // 10 saniye timeout
+  greetingTimeout: 5000,
+  socketTimeout: 10000
+});
+
+// Transporter'ı doğrula (başlangıçta)
+transporter.verify(function(error, success) {
+  if (error) {
+    console.log('❌ Mail server bağlantısı başarısız:', error);
+  } else {
+    console.log('✅ Mail server hazır');
   }
 });
 // -------------------------------------
