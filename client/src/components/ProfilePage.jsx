@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X } from 'lucide-react';
+import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X, Trash2 } from 'lucide-react'; // Trash2 eklendi
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { API_URL } from '../config/api';
@@ -47,19 +47,16 @@ export default function ProfilePage({ onMenuClick }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Dosya boyutu kontrolü (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('Dosya boyutu en fazla 5MB olabilir');
       return;
     }
 
-    // Dosya tipi kontrolü
     if (!file.type.startsWith('image/')) {
       setError('Sadece resim dosyaları yüklenebilir');
       return;
     }
 
-    // FileReader ile base64'e çevir
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64String = reader.result;
@@ -122,7 +119,33 @@ export default function ProfilePage({ onMenuClick }) {
     }
   };
 
-  // Kullanıcı adı güncelle
+  // --- YENİ EKLENEN FONKSİYON: Profil Resmini Kaldır ---
+  const handleRemovePicture = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/profile/picture`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ profilePicture: null }) // Resmi temizle
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setProfile({ ...profile, profilePicture: null });
+        setIsEditingPicture(false);
+        setSuccess('Profil resmi kaldırıldı');
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data.error);
+      }
+    } catch (err) {
+      setError('Bir hata oluştu');
+    }
+  };
+  // ---------------------------------------------------
+
   const handleUpdateUsername = async () => {
     if (!newUsername.trim()) {
       setError('Kullanıcı adı boş olamaz');
@@ -155,7 +178,6 @@ export default function ProfilePage({ onMenuClick }) {
     }
   };
 
-  // Şifre güncelle
   const handleUpdatePassword = async () => {
     setError('');
 
@@ -200,7 +222,6 @@ export default function ProfilePage({ onMenuClick }) {
     }
   };
 
-  // Bio güncelle
   const handleUpdateBio = async () => {
     try {
       const res = await fetch(`${API_URL}/api/profile/bio`, {
@@ -226,7 +247,6 @@ export default function ProfilePage({ onMenuClick }) {
     }
   };
 
-  // Privacy ayarını değiştir
   const handleTogglePrivacy = async () => {
     try {
       const newPrivacy = !isPrivate;
@@ -266,13 +286,11 @@ export default function ProfilePage({ onMenuClick }) {
   return (
     <>
       <MobileHeader onMenuClick={onMenuClick} />
-      {/* Header - Site temasına uygun */}
       <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4">
         <h1 className="font-bold text-lg">Ayarlar</h1>
       </header>
 
       <div className="p-5 max-w-2xl mx-auto">
-        {/* Bildirimler */}
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm border border-red-100">
             {error}
@@ -285,14 +303,11 @@ export default function ProfilePage({ onMenuClick }) {
           </div>
         )}
 
-        {/* PROFİL BÖLÜMÜ */}
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-3 px-1">Profil</h2>
 
-          {/* Profil Kartı */}
           <div className="bg-white border border-gray-100 rounded-xl p-6 mb-3">
             <div className="flex items-start gap-6">
-              {/* Profil Resmi */}
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden border-2 border-gray-200">
                   {profile.profilePicture ? (
@@ -319,7 +334,6 @@ export default function ProfilePage({ onMenuClick }) {
                 </button>
               </div>
 
-              {/* Kullanıcı Bilgileri */}
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-gray-900">{profile.fullName}</h3>
                 <p className="text-gray-500 text-sm">@{profile.username}</p>
@@ -327,10 +341,8 @@ export default function ProfilePage({ onMenuClick }) {
               </div>
             </div>
 
-            {/* Profil Resmi Düzenleme */}
             {isEditingPicture && (
               <div className="mt-4 pt-4 border-t border-gray-100 space-y-3">
-                {/* Dosyadan Yükle */}
                 <div>
                   <label className="text-xs text-gray-500 mb-2 block">Bilgisayardan Yükle</label>
                   <input
@@ -342,7 +354,6 @@ export default function ProfilePage({ onMenuClick }) {
                   <p className="text-xs text-gray-400 mt-1">Maksimum 5MB, JPG/PNG formatında</p>
                 </div>
 
-                {/* Veya URL ile */}
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-gray-200"></div>
@@ -371,6 +382,22 @@ export default function ProfilePage({ onMenuClick }) {
                   </div>
                 </div>
 
+                {/* --- YENİ EKLENEN KISIM: Profil Resmini Kaldır Butonu --- */}
+                {profile.profilePicture && (
+                  <div>
+                    <div className="relative flex justify-center text-xs mb-3 mt-2">
+                      <span className="bg-white px-2 text-gray-400">veya</span>
+                    </div>
+                    <button
+                      onClick={handleRemovePicture}
+                      className="w-full bg-red-50 text-red-600 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition flex items-center justify-center gap-2"
+                    >
+                      <Trash2 size={16} /> Profil Resmini Kaldır
+                    </button>
+                  </div>
+                )}
+                {/* ------------------------------------------------------- */}
+
                 <button
                   onClick={() => {
                     setIsEditingPicture(false);
@@ -384,7 +411,6 @@ export default function ProfilePage({ onMenuClick }) {
             )}
           </div>
 
-          {/* Bio */}
           <div className="bg-white border border-gray-100 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -440,11 +466,9 @@ export default function ProfilePage({ onMenuClick }) {
           </div>
         </div>
 
-        {/* HESAP BİLGİLERİ BÖLÜMÜ */}
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-3 px-1">Hesap Bilgileri</h2>
           <div className="space-y-3">
-            {/* Kullanıcı Adı */}
             <div className="bg-white border border-gray-100 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -492,7 +516,6 @@ export default function ProfilePage({ onMenuClick }) {
               )}
             </div>
 
-            {/* Email */}
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
               <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                 <Mail size={14} />
@@ -502,7 +525,6 @@ export default function ProfilePage({ onMenuClick }) {
               <div className="text-xs text-gray-400 mt-1">Email adresi değiştirilemez</div>
             </div>
 
-            {/* Doğum Tarihi */}
             <div className="bg-gray-50 border border-gray-100 rounded-xl p-4">
               <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                 <Calendar size={14} />
@@ -520,11 +542,9 @@ export default function ProfilePage({ onMenuClick }) {
           </div>
         </div>
 
-        {/* GİZLİLİK VE GÜVENLİK BÖLÜMÜ */}
         <div className="mb-6">
           <h2 className="text-sm font-semibold text-gray-900 mb-3 px-1">Gizlilik ve Güvenlik</h2>
           <div className="space-y-3">
-            {/* Gizli Hesap */}
             <div className="bg-white border border-gray-100 rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -550,7 +570,6 @@ export default function ProfilePage({ onMenuClick }) {
               </div>
             </div>
 
-            {/* Şifre Değiştir */}
             <div className="bg-white border border-gray-100 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -618,7 +637,6 @@ export default function ProfilePage({ onMenuClick }) {
           </div>
         </div>
 
-        {/* Güvenlik Notu */}
         <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
           <p className="text-xs text-blue-600">
             <strong>Güvenlik:</strong> Profil bilgileriniz güvenli şekilde saklanmaktadır.

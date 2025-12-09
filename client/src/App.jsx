@@ -836,11 +836,17 @@ export default function App() {
             }}
             className="flex items-center gap-3 mb-2 cursor-pointer transition-opacity hover:opacity-80"
           >
-            <img 
-              src={currentUserInfo?.profilePicture || 'https://via.placeholder.com/150'} 
-              alt="Profil" 
-              className="w-10 h-10 rounded-full object-cover bg-gray-200 border border-gray-200"
-            />
+            {currentUserInfo?.profilePicture ? (
+    <img 
+      src={currentUserInfo.profilePicture} 
+      alt="Profil" 
+      className="w-10 h-10 rounded-full object-cover border border-gray-200"
+    />
+  ) : (
+    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center border border-gray-200">
+      <User size={20} className="text-gray-400" />
+    </div>
+  )}
             <div className="flex flex-col flex-1 min-w-0">
               <span className="font-bold text-sm text-gray-900 truncate">
                 {currentUserInfo?.fullName || 'Kullanıcı'}
@@ -1038,9 +1044,17 @@ export default function App() {
             </header>
 
             <div className="p-4 border-b border-gray-100 flex gap-3">
-              <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-                <User size={20} className="text-gray-400" />
-              </div>
+              {currentUserInfo?.profilePicture ? (
+        <img 
+          src={currentUserInfo.profilePicture} 
+          alt="Profil" 
+          className="w-10 h-10 rounded-full object-cover border border-gray-200 shrink-0"
+        />
+      ) : (
+        <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
+          <User size={20} className="text-gray-400" />
+        </div>
+      )}
               <div className="flex-1">
                 <textarea
                   className="w-full resize-none outline-none text-lg placeholder-gray-400 bg-transparent"
