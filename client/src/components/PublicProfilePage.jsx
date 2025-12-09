@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, Calendar, Lock } from 'lucide-react';
+import { ChevronLeft, Calendar, Lock, User } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import FollowButton from './FollowButton';
@@ -20,6 +20,7 @@ export default function PublicProfilePage({ username, onClose }) {
   const [loading, setLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingConfessions, setLoadingConfessions] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const isOwnProfile = currentUsername === username;
 
@@ -28,6 +29,7 @@ export default function PublicProfilePage({ username, onClose }) {
     const fetchProfile = async () => {
       try {
         setLoading(true);
+        setImageError(false);
         const res = await fetch(`${API_URL}/api/users/${username}`);
         const data = await res.json();
 
@@ -157,13 +159,13 @@ export default function PublicProfilePage({ username, onClose }) {
         // Hangi listede (post veya itiraf) güncelleme yapacağımızı belirliyoruz
         if (type === 'post') {
           // Mevcut post listesini kopyalayıp ilgili postu güncelliyoruz
-          const updatedList = userPosts.map(p => 
+          const updatedList = userPosts.map(p =>
             p._id === postId ? { ...p, likes: updatedPost.likes } : p
           );
           dispatch(setUserPosts(updatedList));
         } else {
           // Mevcut itiraf listesini kopyalayıp ilgili itirafı güncelliyoruz
-          const updatedList = userConfessions.map(c => 
+          const updatedList = userConfessions.map(c =>
             c._id === postId ? { ...c, likes: updatedPost.likes } : c
           );
           dispatch(setUserConfessions(updatedList));
@@ -201,12 +203,18 @@ export default function PublicProfilePage({ username, onClose }) {
 
       <div className="bg-white p-5 border-b border-gray-100">
         <div className="flex items-start gap-4">
-          <img
-            src={currentProfile.profilePicture || 'https://via.placeholder.com/150'}
-            alt={currentProfile.fullName}
-            className="w-16 h-16 bg-gray-200 rounded-full object-cover shrink-0"
-            onError={(e) => { e.target.onerror = null; e.target.src = 'https://via.placeholder.com/150'; }}
-          />
+          {currentProfile.profilePicture && !imageError ? (
+            <img
+              src={currentProfile.profilePicture}
+              alt={currentProfile.fullName}
+              className="w-16 h-16 rounded-full object-cover shrink-0"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <div className="w-16 h-16 bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
+              <User size={32} className="text-gray-400" />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-2 gap-2">
               <div className="min-w-0">
@@ -215,7 +223,7 @@ export default function PublicProfilePage({ username, onClose }) {
               </div>
               {!isOwnProfile && (
                 <div className="shrink-0">
-                   <FollowButton
+                  <FollowButton
                     userId={currentProfile._id}
                     isFollowing={isFollowing}
                     isPending={followRequestPending}
@@ -254,17 +262,15 @@ export default function PublicProfilePage({ username, onClose }) {
           <div className="sticky top-[60px] z-20 bg-white flex border-b border-gray-200">
             <button
               onClick={() => setActiveTab('posts')}
-              className={`flex-1 py-4 text-sm font-medium transition ${
-                activeTab === 'posts' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'
-              }`}
+              className={`flex-1 py-4 text-sm font-medium transition ${activeTab === 'posts' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'
+                }`}
             >
               Gönderiler
             </button>
             <button
               onClick={() => setActiveTab('confessions')}
-              className={`flex-1 py-4 text-sm font-medium transition ${
-                activeTab === 'confessions' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'
-              }`}
+              className={`flex-1 py-4 text-sm font-medium transition ${activeTab === 'confessions' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:bg-gray-50'
+                }`}
             >
               İtiraflar
             </button>
@@ -280,11 +286,17 @@ export default function PublicProfilePage({ username, onClose }) {
                     {userPosts.map((post) => (
                       <div key={post._id} className="p-5">
                         <div className="flex items-center gap-3 mb-2">
-                          <img
-                            src={currentProfile.profilePicture || 'https://via.placeholder.com/150'}
-                            alt={currentProfile.fullName}
-                            className="w-9 h-9 bg-gray-200 rounded-full object-cover"
-                          />
+                          {currentProfile.profilePicture ? (
+                            <img
+                              src={currentProfile.profilePicture}
+                              alt={currentProfile.fullName}
+                              className="w-9 h-9 bg-gray-200 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center">
+                              <User size={18} className="text-gray-400" />
+                            </div>
+                          )}
                           <div>
                             <div className="font-bold text-sm text-gray-900">{currentProfile.username}</div>
                             <div className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleDateString('tr-TR')}</div>
@@ -314,11 +326,17 @@ export default function PublicProfilePage({ username, onClose }) {
                     {userConfessions.map((confession) => (
                       <div key={confession._id} className="p-5">
                         <div className="flex items-center gap-3 mb-2">
-                          <img
-                            src={currentProfile.profilePicture || 'https://via.placeholder.com/150'}
-                            alt={currentProfile.fullName}
-                            className="w-9 h-9 bg-gray-200 rounded-full object-cover"
-                          />
+                          {currentProfile.profilePicture ? (
+                            <img
+                              src={currentProfile.profilePicture}
+                              alt={currentProfile.fullName}
+                              className="w-9 h-9 bg-gray-200 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center">
+                              <User size={18} className="text-gray-400" />
+                            </div>
+                          )}
                           <div>
                             <div className="font-bold text-sm text-gray-900">{currentProfile.username}</div>
                             <div className="text-xs text-gray-400">{new Date(confession.createdAt).toLocaleDateString('tr-TR')}</div>
