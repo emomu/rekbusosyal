@@ -29,29 +29,31 @@ const path = require('path');
 // Gmail için App Password almalısın.
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // SSL kullan
+  port: 587,
+  secure: false, // STARTTLS kullan (587 için false olmalı)
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
   tls: {
-    rejectUnauthorized: true,
-    minVersion: 'TLSv1.2'
+    rejectUnauthorized: false // Railway için gevşetildi
   },
-  connectionTimeout: 10000, // 10 saniye timeout
-  greetingTimeout: 5000,
-  socketTimeout: 10000
+  connectionTimeout: 60000, // 60 saniye timeout
+  greetingTimeout: 30000,
+  socketTimeout: 60000,
+  logger: false, // Railway logs için
+  debug: false
 });
 
-// Transporter'ı doğrula (başlangıçta)
-transporter.verify(function(error, success) {
-  if (error) {
-    console.log('❌ Mail server bağlantısı başarısız:', error);
-  } else {
-    console.log('✅ Mail server hazır');
-  }
-});
+// Transporter'ı doğrula (başlangıçta) - async yapıldı
+transporter.verify()
+  .then(() => {
+    console.log('✅ Mail server hazır (SMTP bağlantısı başarılı)');
+  })
+  .catch((error) => {
+    console.log('⚠️ Mail server bağlantısı kurulamadı:', error.message);
+    console.log('Mail gönderilemeyebilir. EMAIL_USER ve EMAIL_PASS kontrol edin.');
+  });
 // -------------------------------------
 
 // CORS - Manuel olarak tüm header'ları ekle
