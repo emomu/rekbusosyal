@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { UserPlus, UserCheck, Clock } from 'lucide-react';
+import { UserPlus, UserCheck, Clock, X } from 'lucide-react';
 
 const FollowButton = ({ userId, isFollowing, isPending, onFollow, onUnfollow }) => {
   const [isHovered, setIsHovered] = useState(false);
 
   const handleClick = () => {
-    if (isFollowing) {
+    if (isFollowing || isPending) {
       onUnfollow(userId);
     } else {
       onFollow(userId);
@@ -17,10 +17,16 @@ const FollowButton = ({ userId, isFollowing, isPending, onFollow, onUnfollow }) 
     return (
       <button
         onClick={handleClick}
-        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-200 transition"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition ${
+          isHovered
+            ? 'bg-red-50 text-red-600 border border-red-200'
+            : 'bg-gray-100 text-gray-700 border border-gray-200'
+        }`}
       >
-        <Clock size={16} />
-        <span>İstek Gönderildi</span>
+        {isHovered ? <X size={16} /> : <Clock size={16} />}
+        <span>{isHovered ? 'İsteği Geri Çek' : 'İstek Gönderildi'}</span>
       </button>
     );
   }

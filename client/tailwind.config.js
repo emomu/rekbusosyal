@@ -43,6 +43,14 @@ export default {
           '0%, 100%': { transform: 'scale(1)' },
           '50%': { transform: 'scale(1.2)' },
         },
+        'slide-in-right': {
+          '0%': { transform: 'translateX(100%)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
       },
       animation: {
         'heart-pop': 'heart-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
@@ -53,6 +61,8 @@ export default {
         'sparkle-3': 'sparkle-3 0.6s ease-out forwards 0.2s',
         'sparkle-4': 'sparkle-4 0.6s ease-out forwards 0.15s',
         'count-pop': 'count-pop 0.3s ease-out',
+        'slide-in-right': 'slide-in-right 0.3s ease-out',
+        'fade-in': 'fade-in 0.2s ease-out',
       },
     },
   },

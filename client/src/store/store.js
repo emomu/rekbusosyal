@@ -6,6 +6,7 @@ import communitiesReducer from './slices/communitiesSlice';
 import advertisementsReducer from './slices/advertisementsSlice';
 import uiReducer from './slices/uiSlice';
 import userProfileReducer from './slices/userProfileSlice';
+import notificationsReducer from './slices/notificationsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -15,7 +16,8 @@ export const store = configureStore({
     communities: communitiesReducer,
     advertisements: advertisementsReducer,
     ui: uiReducer,
-    userProfile: userProfileReducer
+    userProfile: userProfileReducer,
+    notifications: notificationsReducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

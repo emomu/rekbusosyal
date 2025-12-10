@@ -11,11 +11,14 @@ import { FeedShimmer, GridShimmer } from './components/LoadingShimmer';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
 import MobileHeader from './components/MobileHeader';
+import NotificationsPage from './components/NotificationsPage';
 import LikeButton from './components/LikeButton';
+
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
-import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X } from 'lucide-react';
+import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X, Bell } from 'lucide-react';
 import { API_URL } from './config/api';
+import PostDetailPage from './components/PostDetailPage';
 
 // Redux actions
 import { logout, setUserRole, addInterests } from './store/slices/authSlice';
@@ -24,6 +27,7 @@ import { setCampuses, setSelectedCampus, setCampusComments, addCampusComment, up
 import { setCommunities, setSelectedCommunity, setCommunityComments, addCommunityComment, updateCommunityComment, deleteCommunityComment, updateCommunityVote } from './store/slices/communitiesSlice';
 import { setAdvertisements, incrementAdImpression, incrementAdClick } from './store/slices/advertisementsSlice';
 import { setActiveTab, setSelectedImage, setCommentInput, setCommunityCommentInput, setNewPostContent, setNewConfessionContent, setIsAnonymous, setEditingComment, clearEditingComment, setInitialLoading, setLoadingPosts, setLoadingConfessions, setLoadingCampuses, setLoadingCommunities, setLoadingComments } from './store/slices/uiSlice';
+import { setUnreadCount } from './store/slices/notificationsSlice';
 
 // Reklam Kartı Component (Twitter Tarzı)
 function AdCard({ ad, onView, onClick, onImageClick }) {
@@ -120,6 +124,7 @@ export default function App() {
   const { campuses, selectedCampus, campusComments } = useSelector(state => state.campuses);
   const { communities, selectedCommunity, communityComments } = useSelector(state => state.communities);
   const { advertisements } = useSelector(state => state.advertisements);
+  const { unreadCount } = useSelector(state => state.notifications);
   const {
     activeTab,
     selectedImage,
@@ -142,6 +147,10 @@ export default function App() {
   const [viewedProfile, setViewedProfile] = useState(null);
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Notifications state
+  const [showNotifications, setShowNotifications] = useState(false);
+  // Selected post for detail modal
+  const [selectedPost, setSelectedPost] = useState(null);
 
   // --- YARDIMCI FONKSİYONLAR ---
 
@@ -295,24 +304,26 @@ export default function App() {
         try {
           // Promise.all içine istekleri ekliyoruz
           // DİKKAT: En sona 'api/profile' eklendi (api/users/ID yerine)
-          const [postsRes, campusesRes, roleRes, adsRes, communitiesRes, currentUserRes] = await Promise.all([
+          const [postsRes, campusesRes, roleRes, adsRes, communitiesRes, currentUserRes, unreadCountRes] = await Promise.all([
             fetch(`${API_URL}/api/posts?page=1&limit=10`, { headers: { 'Authorization': `Bearer ${token}` } }),
             fetch(`${API_URL}/api/campus`),
             fetch(`${API_URL}/api/admin/check-role`, { headers: { 'Authorization': `Bearer ${token}` } }),
             fetch(`${API_URL}/api/advertisements`),
             fetch(`${API_URL}/api/communities`, { headers: { 'Authorization': `Bearer ${token}` } }),
-            fetch(`${API_URL}/api/profile`, { headers: { 'Authorization': `Bearer ${token}` } })
+            fetch(`${API_URL}/api/profile`, { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch(`${API_URL}/api/notifications/unread-count`, { headers: { 'Authorization': `Bearer ${token}` } })
           ]);
 
           // Gelen cevapları JSON'a çeviriyoruz
           // DİKKAT: Burada da currentUserRes.json() işlemini değişkene atıyoruz
-          const [postsData, campusesData, roleData, adsData, communitiesData, currentUserData] = await Promise.all([
+          const [postsData, campusesData, roleData, adsData, communitiesData, currentUserData, unreadCountData] = await Promise.all([
             postsRes.json(),
             campusesRes.json(),
             roleRes.json(),
             adsRes.json(),
             communitiesRes.json(),
-            currentUserRes.json() // <-- DÜZELTİLEN KISIM
+            currentUserRes.json(), // <-- DÜZELTİLEN KISIM
+            unreadCountRes.json()
           ]);
 
           // --- Verileri Redux'a ve State'e Kaydetme ---
@@ -334,6 +345,11 @@ export default function App() {
           // 3. Kullanıcı Bilgisi (Sidebar için)
           if (currentUserRes.ok) {
             setCurrentUserInfo(currentUserData);
+          }
+
+          // 4. Bildirim Sayısı
+          if (unreadCountRes.ok) {
+            dispatch(setUnreadCount(unreadCountData.unreadCount || 0));
           }
 
         } catch (err) {
@@ -819,6 +835,21 @@ export default function App() {
           <SidebarItem id="kampusler" icon={MapPin} label="Kampüsler" />
           <SidebarItem id="itiraflar" icon={MessageSquare} label="İtiraflar" />
           <SidebarItem id="topluluklar" icon={User} label="Topluluklar" />
+
+          {/* Bildirimler Butonu */}
+          <div
+            onClick={() => setShowNotifications(true)}
+            className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-gray-100 text-gray-700 relative"
+          >
+            <Bell size={20} />
+            <span className="font-medium text-sm">Bildirimler</span>
+            {unreadCount > 0 && (
+              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </div>
+
           <SidebarItem id="profil" icon={Settings} label="Ayarlar" />
           {(userRole === 'admin' || userRole === 'moderator') && (
             <SidebarItem id="admin" icon={Shield} label="Admin Panel" />
@@ -1032,654 +1063,479 @@ export default function App() {
         </>
       )}
 
-      {/* ORTA PANEL */}
+     {/* ORTA PANEL - MAIN START */}
       <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen">
 
-        {/* --- AKIŞ --- */}
-        {activeTab === 'akis' && !viewedProfile && (
-          <>
-            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
-            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
-              Anasayfa
-            </header>
+        {/* --- 1. ÖNCELİK: GÖNDERİ DETAY SAYFASI (Twitter Tarzı) --- */}
+        {selectedPost ? (
+          <PostDetailPage 
+            post={selectedPost}
+            onClose={() => setSelectedPost(null)}
+            token={token}
+            currentUserId={userId}
+            onLike={(postId) => handleLike(postId, selectedPost.category === 'İtiraf' ? 'confession' : 'post')}
+            currentUserProfilePic={currentUserInfo?.profilePicture}
+          />
+        ) : viewedProfile ? (
+          
+  
+          
+          /* --- 2. ÖNCELİK: BAŞKA BİR KULLANICININ PROFİLİ --- */
+          <PublicProfilePage
+            username={viewedProfile}
+            onClose={() => {
+                setViewedProfile(null)
+            }}
+          />
 
-            <div className="p-4 border-b border-gray-100 flex gap-3">
-              {currentUserInfo?.profilePicture ? (
-        <img 
-          src={currentUserInfo.profilePicture} 
-          alt="Profil" 
-          className="w-10 h-10 rounded-full object-cover border border-gray-200 shrink-0"
-        />
-      ) : (
-        <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-          <User size={20} className="text-gray-400" />
-        </div>
-      )}
-              <div className="flex-1">
-                <textarea
-                  className="w-full resize-none outline-none text-lg placeholder-gray-400 bg-transparent"
-                  placeholder="Neler oluyor?" rows={2}
-                  value={newPostContent} onChange={(e) => dispatch(setNewPostContent(e.target.value))}
-                />
-                <div className="flex justify-end mt-2">
-                  <button onClick={handleCreatePost} disabled={!newPostContent.trim()} className="bg-blue-900 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-blue-800 disabled:opacity-50">Paylaş</button>
-                </div>
-              </div>
-            </div>
+        ) : activeTab === 'publicProfil' ? (
 
-            <div className="divide-y divide-gray-100">
-              {isLoadingPosts && posts.length === 0 ? (
-                <FeedShimmer count={5} />
-              ) : (
-                <>
-                  {mergeWithAds(posts).map((item) => {
-                    // Reklam mı kontrol et
-                    if (item.isAd) {
-                      return (
-                        <AdCard
-                          key={item._id}
-                          ad={item}
-                          onView={() => trackAdImpression(item._id.split('-')[1])}
-                          onClick={() => handleAdClick({ _id: item._id.split('-')[1], targetUrl: item.targetUrl, tags: item.tags })}
-                          onImageClick={(img) => dispatch(setSelectedImage(img))}
-                        />
-                      );
-                    }
-
-                    // Normal post
-                    return (
-                      <div key={item._id} className="p-5">
-                        <div className="flex items-center gap-3 mb-2">
-                          {item.author?.profilePicture ? (
-                            <img
-                              src={item.author.profilePicture}
-                              className="w-9 h-9 bg-gray-200 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-                              onClick={() => setViewedProfile(item.author?.username)}
-                            />
-                          ) : (
-                            <div
-                              className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center cursor-pointer hover:opacity-80 transition"
-                              onClick={() => setViewedProfile(item.author?.username)}
-                            >
-                              <User size={16} className="text-gray-400" />
-                            </div>
-                          )}
-                          <div>
-                            <div
-                              className="font-bold text-sm text-gray-900 cursor-pointer hover:underline"
-                              onClick={() => setViewedProfile(item.author?.username)}
-                            >
-                              {item.author?.username || 'Anonim'}
-                            </div>
-                            <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
-                          </div>
-                        </div>
-                        <p className="text-gray-800 mb-3 whitespace-pre-wrap">{item.content}</p>
-                        <div className="flex items-center gap-2">
-                          <LikeButton
-                            isLiked={item.likes.includes(userId)}
-                            likeCount={item.likes.length}
-                            onClick={() => handleLike(item._id, 'post')}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <LoadMoreButton
-                    onLoadMore={handleLoadMorePosts}
-                    isLoading={isLoadingPosts}
-                    hasMore={postsPagination.hasMore}
-                  />
-                </>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* --- İTİRAFLAR --- */}
-        {activeTab === 'itiraflar' && !viewedProfile && (
-          <>
-            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
-            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
-              İtiraflar
-            </header>
-            <div className="p-4 border-b border-gray-100">
-              <textarea className="w-full resize-none outline-none text-lg placeholder-gray-400 bg-transparent" placeholder="İtirafını yaz..." rows={3} value={newConfessionContent} onChange={(e) => dispatch(setNewConfessionContent(e.target.value))} />
-              <div className="flex justify-between items-center mt-2">
-                <label className="flex items-center gap-2 text-sm text-gray-500"><input type="checkbox" checked={isAnonymous} onChange={(e) => dispatch(setIsAnonymous(e.target.checked))} /> Anonim gönder</label>
-                <button onClick={handleCreateConfession} disabled={!newConfessionContent.trim()} className="bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-red-700 disabled:opacity-50">İtiraf Et</button>
-              </div>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {isLoadingConfessions && confessions.length === 0 ? (
-                <FeedShimmer count={5} />
-              ) : (
-                <>
-                  {mergeWithAds(confessions).map((item) => {
-                    // Reklam mı kontrol et
-                    if (item.isAd) {
-                      return (
-                        <AdCard
-                          key={item._id}
-                          ad={item}
-                          onView={() => trackAdImpression(item._id.split('-')[1])}
-                          onClick={() => handleAdClick({ _id: item._id.split('-')[1], targetUrl: item.targetUrl })}
-                          onImageClick={(img) => dispatch(setSelectedImage(img))}
-                        />
-                      );
-                    }
-
-                    // Normal confession
-                    return (
-                      <div key={item._id} className="p-5">
-                        <div className="flex items-center gap-3 mb-2">
-                          {item.isAnonymous ? (
-                            <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center font-bold text-xs text-gray-500">?</div>
-                          ) : item.author?.profilePicture ? (
-                            <img
-                              src={item.author.profilePicture}
-                              alt="Profile"
-                              className="w-9 h-9 bg-gray-200 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-                              onClick={() => setViewedProfile(item.author?.username)}
-                            />
-                          ) : (
-                            <div
-                              className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center cursor-pointer hover:opacity-80 transition"
-                              onClick={() => setViewedProfile(item.author?.username)}
-                            >
-                              <User size={16} className="text-gray-400" />
-                            </div>
-                          )}
-                          <div>
-                            <div
-                              className={`font-bold text-sm text-gray-900 ${!item.isAnonymous ? 'cursor-pointer hover:underline' : ''}`}
-                              onClick={() => !item.isAnonymous && setViewedProfile(item.author?.username)}
-                            >
-                              {item.isAnonymous ? 'Anonim' : item.author?.username}
-                            </div>
-                            <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
-                          </div>
-                        </div>
-                        <p className="text-gray-800 mb-3">{item.content}</p>
-                        <LikeButton
-                          isLiked={item.likes.includes(userId)}
-                          likeCount={item.likes.length}
-                          onClick={() => handleLike(item._id, 'confession')}
-                        />
-                      </div>
-                    );
-                  })}
-                  <LoadMoreButton
-                    onLoadMore={handleLoadMoreConfessions}
-                    isLoading={isLoadingConfessions}
-                    hasMore={confessionsPagination.hasMore}
-                  />
-                </>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* --- KAMPÜSLER --- */}
-        {activeTab === 'kampusler' && !selectedCampus && !viewedProfile && (
-          <>
-            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
-            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Kampüsler</header>
-            {isLoadingCampuses ? (
-              <GridShimmer count={4} />
-            ) : (
-              <div className="p-6 grid gap-5">
-                {campuses.map(campus => {
-                  const totalVotes = (campus.votes?.positive || 0) + (campus.votes?.neutral || 0) + (campus.votes?.negative || 0);
-                  const positivePercent = totalVotes > 0 ? Math.round(((campus.votes?.positive || 0) / totalVotes) * 100) : 0;
-                  const neutralPercent = totalVotes > 0 ? Math.round(((campus.votes?.neutral || 0) / totalVotes) * 100) : 0;
-                  const negativePercent = totalVotes > 0 ? Math.round(((campus.votes?.negative || 0) / totalVotes) * 100) : 0;
-
-                  return (
-                    <div
-                      key={campus._id}
-                      onClick={() => dispatch(setSelectedCampus(campus))}
-                      className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white"
-                    >
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-bold text-gray-900 mb-2">
-                            {campus.name}
-                          </h3>
-                          <p className="text-sm text-gray-500">
-                            {totalVotes} değerlendirme
-                          </p>
-                        </div>
-                        <MapPin className="text-blue-600" size={28} />
-                      </div>
-
-                      {/* Oy Dağılımı */}
-                      <div className="mb-3">
-                        <div className="flex justify-between text-xs font-medium text-gray-600 mb-2">
-                          <span>👍 {positivePercent}%</span>
-                          <span>😐 {neutralPercent}%</span>
-                          <span>👎 {negativePercent}%</span>
-                        </div>
-                        <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
-                          {positivePercent > 0 && (
-                            <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>
-                          )}
-                          {neutralPercent > 0 && (
-                            <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>
-                          )}
-                          {negativePercent > 0 && (
-                            <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="text-sm font-medium text-blue-600">
-                        Detayları gör →
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* --- KAMPÜS DETAY --- */}
-        {activeTab === 'kampusler' && selectedCampus && !viewedProfile && (
-          <div className="animate-in slide-in-from-right duration-300">
-            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
-            <header className="sticky top-0 md:top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
-              <button onClick={() => dispatch(setSelectedCampus(null))} className="p-2 hover:bg-gray-100 rounded-full transition"><ChevronLeft /></button>
-              <h2 className="font-bold text-lg">{selectedCampus.name}</h2>
-            </header>
-            <div className="p-4">
-              {/* OYLAMA BİLEŞENİ */}
-              <CampusRating data={selectedCampus} onVote={handleVote} />
-
-              <div className="my-6 border-t border-gray-100 pt-6">
-                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <MessageSquare size={20} className="text-blue-600" />
-                  Yorumlar ({campusComments.length})
-                </h3>
-
-                {/* YORUM YAPMA KISMI (OY KONTROLLÜ) */}
-                <div className="mb-6 relative">
-                  {/* Eğer oy verilmediyse üstüne BLUR atan katman */}
-                  {!hasUserVoted && (
-                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-xl border border-dashed border-gray-300">
-                      <div className="flex items-center gap-2 text-gray-500 font-medium text-sm">
-                        <Lock size={16} />
-                        <span>Yorum yapmak için önce oy verin</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={`flex gap-2 transition-opacity ${!hasUserVoted ? 'opacity-40' : 'opacity-100'}`}>
-                    <input
-                      type="text"
-                      disabled={!hasUserVoted}
-                      value={commentInput}
-                      onChange={(e) => dispatch(setCommentInput(e.target.value))}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
-                      placeholder="Deneyimlerini paylaş..."
-                      className="flex-1 bg-gray-100 rounded-full px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition disabled:cursor-not-allowed"
-                    />
-                    <button
-                      onClick={handleSendComment}
-                      disabled={!hasUserVoted}
-                      className="bg-blue-900 text-white p-3 rounded-full hover:bg-blue-800 transition shadow-lg shadow-blue-900/20 disabled:bg-gray-300 disabled:shadow-none"
-                    >
-                      <Send size={18} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-gray-100">
-                  {isLoadingComments ? (
-                    <div className="flex justify-center items-center py-12">
-                      <div className="w-20 h-20">
-                        <Lottie animationData={loaderAnimation} loop={true} />
-                      </div>
-                    </div>
-                  ) : campusComments.length > 0 ? campusComments.map((comment) => {
-                    const isEditing = editingCommentId === comment._id;
-                    const isOwnComment = comment.author?._id === userId;
-                    const voteMessages = ['👍 Bu kampüsü beğendim!', '😐 İdare eder.', '👎 Pek beğenmedim.'];
-                    const isAutoComment = voteMessages.includes(comment.content);
-
-                    // Rozet Detaylarını Al (Backend'den voteType gelmesi şart)
-                    const badge = getVoteBadgeDetails(comment.voteType);
-
-                    return (
-                      <div key={comment._id} className="p-5 hover:bg-gray-50 transition rounded-xl">
-                        <div className="flex items-start gap-3 mb-2">
-                          {comment.author?.profilePicture ? (
-                            <img
-                              src={comment.author.profilePicture}
-                              alt={comment.author?.username}
-                              className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center border border-gray-200">
-                              <User size={18} className="text-gray-400" />
-                            </div>
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <div className="font-bold text-sm text-gray-900">{comment.author?.username || 'Anonim'}</div>
-
-                                {/* --- ROZET (BADGE) GÖSTERİMİ --- */}
-                                {badge && (
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shadow-sm ${badge.color}`}>
-                                    {badge.icon} {badge.label}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleDateString('tr-TR')}</div>
-                            </div>
-
-                            {isEditing ? (
-                              <div className="mb-3 mt-2">
-                                <textarea
-                                  value={editingContent}
-                                  onChange={(e) => dispatch(setEditingComment({ id: editingCommentId, content: e.target.value }))}
-                                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 resize-none"
-                                  rows={3}
-                                />
-                                <div className="flex gap-2 mt-2">
-                                  <button
-                                    onClick={() => handleEditComment(comment._id)}
-                                    className="bg-blue-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-800"
-                                  >
-                                    Kaydet
-                                  </button>
-                                  <button
-                                    onClick={() => dispatch(clearEditingComment())}
-                                    className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-300"
-                                  >
-                                    İptal
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
-                            )}
-
-                            <div className="flex items-center gap-4 mt-3">
-                              <button
-                                onClick={() => handleCommentLike(comment._id)}
-                                className={`flex items-center gap-1.5 transition-colors ${comment.likes?.includes(userId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
-                                  }`}
-                              >
-                                <Heart
-                                  size={16}
-                                  className={comment.likes?.includes(userId) ? 'fill-current' : ''}
-                                />
-                                <span className="text-xs font-medium">{comment.likes?.length || 0}</span>
-                              </button>
-
-                              {isOwnComment && !isAutoComment && !isEditing && (
-                                <button
-                                  onClick={() => dispatch(setEditingComment({ id: comment._id, content: comment.content }))}
-                                  className="text-xs text-gray-500 hover:text-blue-600 font-medium"
-                                >
-                                  Düzenle
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }) : (
-                    <div className="text-center text-gray-400 py-12 text-sm bg-gray-50/50 rounded-xl mt-4 border border-dashed border-gray-200">
-                      <MessageSquare size={32} className="mx-auto mb-3 opacity-30" />
-                      <p>Henüz yorum yok.</p>
-                      <p className="text-xs opacity-70">İlk oyu vererek yorumları başlat!</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- TOPLULUKLAR LİSTE --- */}
-        {activeTab === 'topluluklar' && !selectedCommunity && !viewedProfile && (
-          <>
-            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
-            <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Topluluklar</header>
-            <div className="p-6 grid gap-5">
-              {communities.length > 0 ? communities.map(community => {
-                const totalVotes = (community.votes?.positive || 0) + (community.votes?.neutral || 0) + (community.votes?.negative || 0);
-                const positivePercent = totalVotes > 0 ? Math.round(((community.votes?.positive || 0) / totalVotes) * 100) : 0;
-                const neutralPercent = totalVotes > 0 ? Math.round(((community.votes?.neutral || 0) / totalVotes) * 100) : 0;
-                const negativePercent = totalVotes > 0 ? Math.round(((community.votes?.negative || 0) / totalVotes) * 100) : 0;
-
-                return (
-                  <div
-                    key={community._id}
-                    onClick={() => dispatch(setSelectedCommunity(community))}
-                    className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">
-                          {community.name}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          {totalVotes} değerlendirme
-                        </p>
-                      </div>
-                      <User className="text-blue-600" size={28} />
-                    </div>
-
-                    {/* Oy Dağılımı */}
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs font-medium text-gray-600 mb-2">
-                        <span>👍 {positivePercent}%</span>
-                        <span>😐 {neutralPercent}%</span>
-                        <span>👎 {negativePercent}%</span>
-                      </div>
-                      <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
-                        {positivePercent > 0 && (
-                          <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>
-                        )}
-                        {neutralPercent > 0 && (
-                          <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>
-                        )}
-                        {negativePercent > 0 && (
-                          <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="text-sm font-medium text-blue-600">
-                      Detayları gör →
-                    </div>
-                  </div>
-                );
-              }) : (
-                <div className="text-center text-gray-400 py-12">
-                  <p className="text-lg font-medium">Henüz topluluk bulunmuyor</p>
-                  <p className="text-sm mt-2">Yeni topluluklar yakında eklenecek!</p>
-                </div>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* --- TOPLULUK DETAY --- */}
-        {activeTab === 'topluluklar' && selectedCommunity && !viewedProfile && (
-          <div className="animate-in slide-in-from-right duration-300">
-            <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} />
-            <header className="sticky top-0 md:top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
-              <button onClick={() => dispatch(setSelectedCommunity(null))} className="p-2 hover:bg-gray-100 rounded-full transition"><ChevronLeft /></button>
-              <h2 className="font-bold text-lg">{selectedCommunity.name}</h2>
-            </header>
-            <div className="p-4">
-              {/* OYLAMA BİLEŞENİ */}
-              <CampusRating data={selectedCommunity} onVote={handleCommunityVote} />
-
-              <div className="my-6 border-t border-gray-100 pt-6">
-                <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <MessageSquare size={20} className="text-blue-600" />
-                  Yorumlar ({communityComments.length})
-                </h3>
-
-                {/* YORUM YAPMA KISMI */}
-                <div className="mb-6 relative">
-                  {!hasUserVotedCommunity && (
-                    <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-xl border border-dashed border-gray-300">
-                      <div className="flex items-center gap-2 text-gray-500 font-medium text-sm">
-                        <Lock size={16} />
-                        <span>Yorum yapmak için önce oy verin</span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={`flex gap-2 transition-opacity ${!hasUserVotedCommunity ? 'opacity-40' : 'opacity-100'}`}>
-                    <input
-                      type="text"
-                      disabled={!hasUserVotedCommunity}
-                      value={communityCommentInput}
-                      onChange={(e) => dispatch(setCommunityCommentInput(e.target.value))}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCommunitySendComment()}
-                      placeholder="Deneyimlerini paylaş..."
-                      className="flex-1 bg-gray-100 rounded-full px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition disabled:cursor-not-allowed"
-                    />
-                    <button
-                      onClick={handleCommunitySendComment}
-                      disabled={!hasUserVotedCommunity}
-                      className="bg-blue-900 text-white p-3 rounded-full hover:bg-blue-800 transition shadow-lg shadow-blue-900/20 disabled:bg-gray-300 disabled:shadow-none"
-                    >
-                      <Send size={18} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="divide-y divide-gray-100">
-                  {communityComments.length > 0 ? communityComments.map((comment) => {
-                    const isEditing = editingCommentId === comment._id;
-                    const isOwnComment = comment.author?._id === userId;
-                    const voteMessages = ['👍 Bu topluluğu beğendim!', '😐 İdare eder.', '👎 Pek beğenmedim.'];
-                    const isAutoComment = voteMessages.includes(comment.content);
-
-                    const badge = getVoteBadgeDetails(comment.voteType);
-
-                    return (
-                      <div key={comment._id} className="p-5 hover:bg-gray-50 transition rounded-xl">
-                        <div className="flex items-start gap-3 mb-2">
-                          {comment.author?.profilePicture ? (
-                            <img
-                              src={comment.author.profilePicture}
-                              alt={comment.author?.username}
-                              className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center border border-gray-200">
-                              <User size={18} className="text-gray-400" />
-                            </div>
-                          )}
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <div className="font-bold text-sm text-gray-900">{comment.author?.username || 'Anonim'}</div>
-
-                                {badge && (
-                                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shadow-sm ${badge.color}`}>
-                                    {badge.icon} {badge.label}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleDateString('tr-TR')}</div>
-                            </div>
-
-                            {isEditing ? (
-                              <div className="mb-3 mt-2">
-                                <textarea
-                                  value={editingContent}
-                                  onChange={(e) => dispatch(setEditingComment({ id: editingCommentId, content: e.target.value }))}
-                                  className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100 resize-none"
-                                  rows={3}
-                                />
-                                <div className="flex gap-2 mt-2">
-                                  <button
-                                    onClick={() => handleEditCommunityComment(comment._id)}
-                                    className="bg-blue-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-blue-800"
-                                  >
-                                    Kaydet
-                                  </button>
-                                  <button
-                                    onClick={() => dispatch(clearEditingComment())}
-                                    className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-300"
-                                  >
-                                    İptal
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap leading-relaxed">{comment.content}</p>
-                            )}
-
-                            <div className="flex items-center gap-4 mt-3">
-                              <button
-                                onClick={() => handleCommunityCommentLike(comment._id)}
-                                className={`flex items-center gap-1.5 transition-colors ${comment.likes?.includes(userId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
-                                  }`}
-                              >
-                                <Heart
-                                  size={16}
-                                  className={comment.likes?.includes(userId) ? 'fill-current' : ''}
-                                />
-                                <span className="text-xs font-medium">{comment.likes?.length || 0}</span>
-                              </button>
-
-                              {isOwnComment && !isAutoComment && !isEditing && (
-                                <button
-                                  onClick={() => dispatch(setEditingComment({ id: comment._id, content: comment.content }))}
-                                  className="text-xs text-gray-500 hover:text-blue-600 font-medium"
-                                >
-                                  Düzenle
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }) : (
-                    <div className="text-center text-gray-400 py-12 text-sm bg-gray-50/50 rounded-xl mt-4 border border-dashed border-gray-200">
-                      <MessageSquare size={32} className="mx-auto mb-3 opacity-30" />
-                      <p>Henüz yorum yok.</p>
-                      <p className="text-xs opacity-70">İlk oyu vererek yorumları başlat!</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- PROFİL --- */}
-        {activeTab === 'profil' && !viewedProfile && <ProfilePage onMenuClick={() => setIsMobileMenuOpen(true)} />}
-
-        {activeTab === 'publicProfil' && (
+          /* --- 3. ÖNCELİK: KENDİ PUBLIC PROFİLİN --- */
           <PublicProfilePage 
             username={currentUserInfo?.username} 
             onClose={() => dispatch(setActiveTab('akis'))} 
           />
-        )}
 
-        {/* --- MEVCUT viewedProfile KISMI --- */}
-        {viewedProfile && (
-          <PublicProfilePage
-            username={viewedProfile}
-            onClose={() => setViewedProfile(null)}
-          />
+        ) : (
+          /* --- 4. ÖNCELİK: NORMAL TABLAR (Akış, İtiraflar, Kampüs vb.) --- */
+          <>
+            
+            {/* --- AKIŞ SEKMESİ --- */}
+            {activeTab === 'akis' && (
+              <>
+                <MobileHeader
+                  onMenuClick={() => setIsMobileMenuOpen(true)}
+                  onNotificationsClick={() => setShowNotifications(true)}
+                  unreadCount={unreadCount}
+                />
+                <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
+                  Anasayfa
+                </header>
+
+                {/* Post Atma Alanı */}
+                <div className="p-4 border-b border-gray-100 flex gap-3">
+                  {currentUserInfo?.profilePicture ? (
+                    <img src={currentUserInfo.profilePicture} alt="Profil" className="w-10 h-10 rounded-full object-cover border border-gray-200 shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0 flex items-center justify-center"><User size={20} className="text-gray-400" /></div>
+                  )}
+                  <div className="flex-1">
+                    <textarea
+                      className="w-full resize-none outline-none text-lg placeholder-gray-400 bg-transparent"
+                      placeholder="Neler oluyor?" rows={2}
+                      value={newPostContent} onChange={(e) => dispatch(setNewPostContent(e.target.value))}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button onClick={handleCreatePost} disabled={!newPostContent.trim()} className="bg-blue-900 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-blue-800 disabled:opacity-50">Paylaş</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Post Listesi */}
+                <div className="divide-y divide-gray-100">
+                  {isLoadingPosts && posts.length === 0 ? (
+                    <FeedShimmer count={5} />
+                  ) : (
+                    <>
+                      {mergeWithAds(posts).map((item) => {
+                        if (item.isAd) {
+                          return (
+                            <AdCard
+                              key={item._id}
+                              ad={item}
+                              onView={() => trackAdImpression(item._id.split('-')[1])}
+                              onClick={() => handleAdClick({ _id: item._id.split('-')[1], targetUrl: item.targetUrl, tags: item.tags })}
+                              onImageClick={(img) => dispatch(setSelectedImage(img))}
+                            />
+                          );
+                        }
+                        return (
+                          <div key={item._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(item)}>
+                            <div className="flex items-center gap-3 mb-2">
+                              <div onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
+                                {item.author?.profilePicture ? (
+                                  <img src={item.author.profilePicture} className="w-9 h-9 bg-gray-200 rounded-full object-cover hover:opacity-80 transition" />
+                                ) : (
+                                  <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center hover:opacity-80 transition"><User size={16} className="text-gray-400" /></div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-bold text-sm text-gray-900 hover:underline" onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
+                                  {item.author?.username || 'Anonim'}
+                                </div>
+                                <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                            <p className="text-gray-800 mb-3 whitespace-pre-wrap">{item.content}</p>
+                            
+                            {/* --- DÜZELTME BURADA --- */}
+                            {/* onClick={(e) => e.stopPropagation()} ekleyerek bu alana tıklanınca post detayına gitmesini engelliyoruz */}
+                            <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                              <LikeButton
+                                isLiked={item.likes.includes(userId)}
+                                likeCount={item.likes.length}
+                                onClick={() => handleLike(item._id, 'post')}
+                              />
+                              <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition">
+                                <MessageSquare size={20} />
+                                <span className="text-sm font-medium">Yorum yap</span>
+                              </button>
+                            </div>
+                            
+                          </div>
+                        );
+                      })}
+                      <LoadMoreButton onLoadMore={handleLoadMorePosts} isLoading={isLoadingPosts} hasMore={postsPagination.hasMore} />
+                    </>
+                  )}
+                </div>
+              
+            
+
+                {/* Post Listesi */}
+                <div className="divide-y divide-gray-100">
+                  {isLoadingPosts && posts.length === 0 ? (
+                    <FeedShimmer count={5} />
+                  ) : (
+                    <>
+                      {mergeWithAds(posts).map((item) => {
+                        if (item.isAd) {
+                          return (
+                            <AdCard
+                              key={item._id}
+                              ad={item}
+                              onView={() => trackAdImpression(item._id.split('-')[1])}
+                              onClick={() => handleAdClick({ _id: item._id.split('-')[1], targetUrl: item.targetUrl, tags: item.tags })}
+                              onImageClick={(img) => dispatch(setSelectedImage(img))}
+                            />
+                          );
+                        }
+                        return (
+                          <div key={item._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(item)}>
+                            <div className="flex items-center gap-3 mb-2">
+                              <div onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
+                                {item.author?.profilePicture ? (
+                                  <img src={item.author.profilePicture} className="w-9 h-9 bg-gray-200 rounded-full object-cover hover:opacity-80 transition" />
+                                ) : (
+                                  <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center hover:opacity-80 transition"><User size={16} className="text-gray-400" /></div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-bold text-sm text-gray-900 hover:underline" onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
+                                  {item.author?.username || 'Anonim'}
+                                </div>
+                                <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                            <p className="text-gray-800 mb-3 whitespace-pre-wrap">{item.content}</p>
+                            <div className="flex items-center gap-4">
+                              <LikeButton
+                                isLiked={item.likes.includes(userId)}
+                                likeCount={item.likes.length}
+                                onClick={() => handleLike(item._id, 'post')}
+                              />
+                              <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition">
+                                <MessageSquare size={20} />
+                                <span className="text-sm font-medium">Yorum yap</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <LoadMoreButton onLoadMore={handleLoadMorePosts} isLoading={isLoadingPosts} hasMore={postsPagination.hasMore} />
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* --- İTİRAFLAR SEKMESİ --- */}
+            {activeTab === 'itiraflar' && (
+              <>
+                <MobileHeader
+                  onMenuClick={() => setIsMobileMenuOpen(true)}
+                  onNotificationsClick={() => setShowNotifications(true)}
+                  unreadCount={unreadCount}
+                />
+                <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">
+                  İtiraflar
+                </header>
+                <div className="p-4 border-b border-gray-100">
+                  <textarea className="w-full resize-none outline-none text-lg placeholder-gray-400 bg-transparent" placeholder="İtirafını yaz..." rows={3} value={newConfessionContent} onChange={(e) => dispatch(setNewConfessionContent(e.target.value))} />
+                  <div className="flex justify-between items-center mt-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-500"><input type="checkbox" checked={isAnonymous} onChange={(e) => dispatch(setIsAnonymous(e.target.checked))} /> Anonim gönder</label>
+                    <button onClick={handleCreateConfession} disabled={!newConfessionContent.trim()} className="bg-red-600 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-red-700 disabled:opacity-50">İtiraf Et</button>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {isLoadingConfessions && confessions.length === 0 ? (
+                    <FeedShimmer count={5} />
+                  ) : (
+                    <>
+                      {mergeWithAds(confessions).map((item) => {
+                        if (item.isAd) {
+                          return (
+                            <AdCard
+                              key={item._id}
+                              ad={item}
+                              onView={() => trackAdImpression(item._id.split('-')[1])}
+                              onClick={() => handleAdClick({ _id: item._id.split('-')[1], targetUrl: item.targetUrl })}
+                              onImageClick={(img) => dispatch(setSelectedImage(img))}
+                            />
+                          );
+                        }
+                        return (
+                          <div key={item._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(item)}>
+                            <div className="flex items-center gap-3 mb-2">
+                              {item.isAnonymous ? (
+                                <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center font-bold text-xs text-gray-500">?</div>
+                              ) : (
+                                <div onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
+                                  {item.author?.profilePicture ? (
+                                    <img src={item.author.profilePicture} className="w-9 h-9 bg-gray-200 rounded-full object-cover hover:opacity-80 transition" />
+                                  ) : (
+                                    <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center hover:opacity-80 transition"><User size={16} className="text-gray-400" /></div>
+                                  )}
+                                </div>
+                              )}
+                              <div>
+                                <div className={`font-bold text-sm text-gray-900 ${!item.isAnonymous ? 'hover:underline' : ''}`} onClick={(e) => !item.isAnonymous && (e.stopPropagation() || setViewedProfile(item.author?.username))}>
+                                  {item.isAnonymous ? 'Anonim' : item.author?.username}
+                                </div>
+                                <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                            <p className="text-gray-800 mb-3">{item.content}</p>
+                            <div className="flex items-center gap-4">
+                              <LikeButton isLiked={item.likes.includes(userId)} likeCount={item.likes.length} onClick={() => handleLike(item._id, 'confession')} />
+                              <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition">
+                                <MessageSquare size={20} />
+                                <span className="text-sm font-medium">Yorum yap</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <LoadMoreButton onLoadMore={handleLoadMoreConfessions} isLoading={isLoadingConfessions} hasMore={confessionsPagination.hasMore} />
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* --- KAMPÜSLER SEKMESİ --- */}
+            {activeTab === 'kampusler' && (
+              selectedCampus ? (
+                /* Kampüs Detay */
+                <div className="animate-in slide-in-from-right duration-300">
+                  <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} onNotificationsClick={() => setShowNotifications(true)} unreadCount={unreadCount} />
+                  <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
+                    <button onClick={() => dispatch(setSelectedCampus(null))} className="p-2 hover:bg-gray-100 rounded-full transition"><ChevronLeft /></button>
+                    <h2 className="font-bold text-lg">{selectedCampus.name}</h2>
+                  </header>
+                  <div className="p-4">
+                    <CampusRating data={selectedCampus} onVote={handleVote} />
+                    <div className="my-6 border-t border-gray-100 pt-6">
+                      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><MessageSquare size={20} className="text-blue-600" /> Yorumlar ({campusComments.length})</h3>
+                      {/* Yorum Input */}
+                      <div className="mb-6 relative">
+                        {!hasUserVoted && (
+                          <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-xl border border-dashed border-gray-300">
+                            <div className="flex items-center gap-2 text-gray-500 font-medium text-sm"><Lock size={16} /><span>Yorum yapmak için önce oy verin</span></div>
+                          </div>
+                        )}
+                        <div className={`flex gap-2 transition-opacity ${!hasUserVoted ? 'opacity-40' : 'opacity-100'}`}>
+                          <input type="text" disabled={!hasUserVoted} value={commentInput} onChange={(e) => dispatch(setCommentInput(e.target.value))} onKeyDown={(e) => e.key === 'Enter' && handleSendComment()} placeholder="Deneyimlerini paylaş..." className="flex-1 bg-gray-100 rounded-full px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition disabled:cursor-not-allowed" />
+                          <button onClick={handleSendComment} disabled={!hasUserVoted} className="bg-blue-900 text-white p-3 rounded-full hover:bg-blue-800 transition shadow-lg shadow-blue-900/20 disabled:bg-gray-300 disabled:shadow-none"><Send size={18} /></button>
+                        </div>
+                      </div>
+                      {/* Yorumlar Listesi */}
+                      <div className="divide-y divide-gray-100">
+                        {isLoadingComments ? (
+                          <div className="flex justify-center items-center py-12"><div className="w-20 h-20"><Lottie animationData={loaderAnimation} loop={true} /></div></div>
+                        ) : campusComments.length > 0 ? campusComments.map((comment) => {
+                          const isEditing = editingCommentId === comment._id;
+                          const isOwnComment = comment.author?._id === userId;
+                          const badge = getVoteBadgeDetails(comment.voteType);
+                          return (
+                            <div key={comment._id} className="p-5 hover:bg-gray-50 transition rounded-xl">
+                              <div className="flex items-start gap-3 mb-2">
+                                <img src={comment.author?.profilePicture || 'https://via.placeholder.com/40'} className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200" />
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <div className="font-bold text-sm text-gray-900">{comment.author?.username || 'Anonim'}</div>
+                                      {badge && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shadow-sm ${badge.color}`}>{badge.icon} {badge.label}</span>}
+                                    </div>
+                                    <div className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleDateString('tr-TR')}</div>
+                                  </div>
+                                  {isEditing ? (
+                                    <div className="mb-3 mt-2">
+                                      <textarea value={editingContent} onChange={(e) => dispatch(setEditingComment({ id: editingCommentId, content: e.target.value }))} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none resize-none" rows={3} />
+                                      <div className="flex gap-2 mt-2">
+                                        <button onClick={() => handleEditComment(comment._id)} className="bg-blue-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium">Kaydet</button>
+                                        <button onClick={() => dispatch(clearEditingComment())} className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium">İptal</button>
+                                      </div>
+                                    </div>
+                                  ) : (<p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap">{comment.content}</p>)}
+                                  <div className="flex items-center gap-4 mt-3">
+                                    <button onClick={() => handleCommentLike(comment._id)} className={`flex items-center gap-1.5 transition-colors ${comment.likes?.includes(userId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}><Heart size={20} className={comment.likes?.includes(userId) ? 'fill-current' : ''} /><span className="text-xs font-medium">{comment.likes?.length || 0}</span></button>
+                                    {isOwnComment && !isEditing && <button onClick={() => dispatch(setEditingComment({ id: comment._id, content: comment.content }))} className="text-xs text-gray-500 hover:text-blue-600 font-medium">Düzenle</button>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }) : (<div className="text-center text-gray-400 py-12 text-sm bg-gray-50/50 rounded-xl mt-4 border border-dashed border-gray-200"><MessageSquare size={32} className="mx-auto mb-3 opacity-30" /><p>Henüz yorum yok.</p></div>)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Kampüs Liste */
+                <>
+                  <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} onNotificationsClick={() => setShowNotifications(true)} unreadCount={unreadCount} />
+                  <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Kampüsler</header>
+                  {isLoadingCampuses ? <GridShimmer count={4} /> : (
+                    <div className="p-6 grid gap-5">
+                      {campuses.map(campus => {
+                         const totalVotes = (campus.votes?.positive || 0) + (campus.votes?.neutral || 0) + (campus.votes?.negative || 0);
+                         const positivePercent = totalVotes > 0 ? Math.round(((campus.votes?.positive || 0) / totalVotes) * 100) : 0;
+                         const neutralPercent = totalVotes > 0 ? Math.round(((campus.votes?.neutral || 0) / totalVotes) * 100) : 0;
+                         const negativePercent = totalVotes > 0 ? Math.round(((campus.votes?.negative || 0) / totalVotes) * 100) : 0;
+                         return (
+                           <div key={campus._id} onClick={() => dispatch(setSelectedCampus(campus))} className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white">
+                             <div className="flex items-start justify-between mb-4">
+                               <div className="flex-1"><h3 className="text-xl font-bold text-gray-900 mb-2">{campus.name}</h3><p className="text-sm text-gray-500">{totalVotes} değerlendirme</p></div>
+                               <MapPin className="text-blue-600" size={28} />
+                             </div>
+                             <div className="mb-3">
+                               <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
+                               <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
+                                 {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
+                                 {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
+                                 {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
+                               </div>
+                             </div>
+                             <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
+                           </div>
+                         )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+            )}
+
+            {/* --- TOPLULUKLAR SEKMESİ --- */}
+            {activeTab === 'topluluklar' && (
+              selectedCommunity ? (
+                /* Topluluk Detay */
+                <div className="animate-in slide-in-from-right duration-300">
+                  <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} onNotificationsClick={() => setShowNotifications(true)} unreadCount={unreadCount} />
+                  <header className="sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 flex items-center gap-3">
+                    <button onClick={() => dispatch(setSelectedCommunity(null))} className="p-2 hover:bg-gray-100 rounded-full transition"><ChevronLeft /></button>
+                    <h2 className="font-bold text-lg">{selectedCommunity.name}</h2>
+                  </header>
+                  <div className="p-4">
+                    <CampusRating data={selectedCommunity} onVote={handleCommunityVote} />
+                    <div className="my-6 border-t border-gray-100 pt-6">
+                      <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><MessageSquare size={20} className="text-blue-600" /> Yorumlar ({communityComments.length})</h3>
+                      <div className="mb-6 relative">
+                        {!hasUserVotedCommunity && (
+                          <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-xl border border-dashed border-gray-300">
+                            <div className="flex items-center gap-2 text-gray-500 font-medium text-sm"><Lock size={16} /><span>Yorum yapmak için önce oy verin</span></div>
+                          </div>
+                        )}
+                        <div className={`flex gap-2 transition-opacity ${!hasUserVotedCommunity ? 'opacity-40' : 'opacity-100'}`}>
+                          <input type="text" disabled={!hasUserVotedCommunity} value={communityCommentInput} onChange={(e) => dispatch(setCommunityCommentInput(e.target.value))} onKeyDown={(e) => e.key === 'Enter' && handleCommunitySendComment()} placeholder="Deneyimlerini paylaş..." className="flex-1 bg-gray-100 rounded-full px-5 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-100 transition disabled:cursor-not-allowed" />
+                          <button onClick={handleCommunitySendComment} disabled={!hasUserVotedCommunity} className="bg-blue-900 text-white p-3 rounded-full hover:bg-blue-800 transition shadow-lg shadow-blue-900/20 disabled:bg-gray-300 disabled:shadow-none"><Send size={18} /></button>
+                        </div>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {communityComments.length > 0 ? communityComments.map((comment) => {
+                          const isEditing = editingCommentId === comment._id;
+                          const isOwnComment = comment.author?._id === userId;
+                          const badge = getVoteBadgeDetails(comment.voteType);
+                          return (
+                            <div key={comment._id} className="p-5 hover:bg-gray-50 transition rounded-xl">
+                              <div className="flex items-start gap-3 mb-2">
+                                <img src={comment.author?.profilePicture || 'https://via.placeholder.com/40'} className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200" />
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <div className="font-bold text-sm text-gray-900">{comment.author?.username || 'Anonim'}</div>
+                                      {badge && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shadow-sm ${badge.color}`}>{badge.icon} {badge.label}</span>}
+                                    </div>
+                                    <div className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleDateString('tr-TR')}</div>
+                                  </div>
+                                  {isEditing ? (
+                                    <div className="mb-3 mt-2">
+                                      <textarea value={editingContent} onChange={(e) => dispatch(setEditingComment({ id: editingCommentId, content: e.target.value }))} className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none resize-none" rows={3} />
+                                      <div className="flex gap-2 mt-2">
+                                        <button onClick={() => handleEditCommunityComment(comment._id)} className="bg-blue-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium">Kaydet</button>
+                                        <button onClick={() => dispatch(clearEditingComment())} className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium">İptal</button>
+                                      </div>
+                                    </div>
+                                  ) : (<p className="text-gray-800 text-sm mt-1 whitespace-pre-wrap">{comment.content}</p>)}
+                                  <div className="flex items-center gap-4 mt-3">
+                                    <button onClick={() => handleCommunityCommentLike(comment._id)} className={`flex items-center gap-1.5 transition-colors ${comment.likes?.includes(userId) ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}><Heart size={20} className={comment.likes?.includes(userId) ? 'fill-current' : ''} /><span className="text-xs font-medium">{comment.likes?.length || 0}</span></button>
+                                    {isOwnComment && !isEditing && <button onClick={() => dispatch(setEditingComment({ id: comment._id, content: comment.content }))} className="text-xs text-gray-500 hover:text-blue-600 font-medium">Düzenle</button>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }) : (<div className="text-center text-gray-400 py-12 text-sm bg-gray-50/50 rounded-xl mt-4 border border-dashed border-gray-200"><MessageSquare size={32} className="mx-auto mb-3 opacity-30" /><p>Henüz yorum yok.</p></div>)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Topluluk Liste */
+                <>
+                  <MobileHeader onMenuClick={() => setIsMobileMenuOpen(true)} onNotificationsClick={() => setShowNotifications(true)} unreadCount={unreadCount} />
+                  <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Topluluklar</header>
+                  <div className="p-6 grid gap-5">
+                    {communities.length > 0 ? communities.map(community => {
+                         const totalVotes = (community.votes?.positive || 0) + (community.votes?.neutral || 0) + (community.votes?.negative || 0);
+                         const positivePercent = totalVotes > 0 ? Math.round(((community.votes?.positive || 0) / totalVotes) * 100) : 0;
+                         const neutralPercent = totalVotes > 0 ? Math.round(((community.votes?.neutral || 0) / totalVotes) * 100) : 0;
+                         const negativePercent = totalVotes > 0 ? Math.round(((community.votes?.negative || 0) / totalVotes) * 100) : 0;
+                         return (
+                           <div key={community._id} onClick={() => dispatch(setSelectedCommunity(community))} className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white">
+                             <div className="flex items-start justify-between mb-4">
+                               <div className="flex-1"><h3 className="text-xl font-bold text-gray-900 mb-2">{community.name}</h3><p className="text-sm text-gray-500">{totalVotes} değerlendirme</p></div>
+                               <User className="text-blue-600" size={28} />
+                             </div>
+                             <div className="mb-3">
+                               <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
+                               <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
+                                 {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
+                                 {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
+                                 {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
+                               </div>
+                             </div>
+                             <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
+                           </div>
+                         )
+                    }) : (<div className="text-center text-gray-400 py-12"><p className="text-lg font-medium">Henüz topluluk bulunmuyor</p></div>)}
+                  </div>
+                </>
+              )
+            )}
+
+            {/* --- AYARLAR SEKMESİ --- */}
+            {activeTab === 'profil' && <ProfilePage onMenuClick={() => setIsMobileMenuOpen(true)} />}
+
+          </>
         )}
-      </main>
+      </main> 
+
+      {/* --- BİLDİRİMLER SAYFASI --- */}
+      {showNotifications && (
+        <NotificationsPage onClose={() => setShowNotifications(false)} />
+      )}
 
       {/* SAĞ PANEL */}
       <aside className="w-80 hidden lg:block p-6 sticky top-0 h-screen">
@@ -1727,6 +1583,8 @@ export default function App() {
           />
         </div>
       )}
+
+    
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />

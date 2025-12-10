@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const { Resend } = require('resend'); // Resend ile değiştirildi
 const crypto = require('crypto'); // EKLENDİ
 const User = require('./models/User');
+const cron = require('node-cron'); // En üste ekle
 const { SitemapStream, streamToPromise } = require('sitemap');
 const { createGzip } = require('zlib');
 const JWT_SECRET = process.env.JWT_SECRET; // .env'den çekiliyor
@@ -23,6 +24,8 @@ const CampusComment = require('./models/CampusComment');
 const Advertisement = require('./models/Advertisement');
 const Community = require('./models/Community');
 const CommunityComment = require('./models/CommunityComment');
+const Comment = require('./models/Comment');
+const Notification = require('./models/Notification');
 
 const app = express();
 const path = require('path');
@@ -241,30 +244,59 @@ app.post('/api/confessions', auth, cooldown('confession'), async (req, res) => {
   }
 });
 
-// Post/İtiraf Beğenme
 app.post('/api/posts/:id/like', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (!post) {
-      return res.status(404).json({ error: 'Post bulunamadı' });
-    }
+    if (!post) return res.status(404).json({ error: 'Post bulunamadı' });
 
     const userId = req.userId;
     const isLiked = post.likes.includes(userId);
 
     if (isLiked) {
-      // Beğeniyi geri al
+      // 1. Beğeniyi geri al
       post.likes.pull(userId);
+
+      // 2. SPAM KORUMASI: Bildirimi sil
+      await Notification.deleteOne({
+        recipient: post.author,
+        sender: userId,
+        post: post._id,
+        type: 'like'
+      });
     } else {
-      // Beğen
+      // 1. Beğen
       post.likes.push(userId);
+
+      // 2. Bildirim Oluştur
+      // DÜZELTME: !post.isAnonymous kontrolü kaldırıldı.
+      // Artık post anonim olsa bile sahibine bildirim gider.
+      if (post.author && userId.toString() !== post.author.toString()) {
+        
+        // Çift kayıt kontrolü
+        const existingNotif = await Notification.findOne({
+           recipient: post.author,
+           sender: userId,
+           post: post._id,
+           type: 'like'
+        });
+
+        if (!existingNotif) {
+            await Notification.create({
+              recipient: post.author,
+              sender: userId,
+              type: 'like',
+              post: post._id
+            });
+            console.log(`🔔 Post Like Bildirimi -> Alıcı: ${post.author}`);
+        }
+      }
     }
 
     let updatedPost = await post.save();
-
-    // Güncellenmiş postu yazar ve beğeni bilgileriyle doldur
-    // Anonim değilse ve author varsa populate et
-    if (updatedPost.author && !updatedPost.isAnonymous) {
+    
+    // Frontend için yazar bilgisini populate et
+    // Not: Anonim post ise frontend'de yazar gizlenmeli ama veri dolu gitmeli
+    if (updatedPost.author) { 
       updatedPost = await updatedPost.populate('author', 'username profilePicture');
     }
 
@@ -272,7 +304,7 @@ app.post('/api/posts/:id/like', auth, async (req, res) => {
 
   } catch (err) {
     console.error("Beğenme hatası:", err);
-    res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });
+    res.status(500).json({ error: "İşlem hatası." });
   }
 });
 
@@ -383,50 +415,54 @@ app.get('/api/campus/:id/comments', async (req, res) => {
 });
 
 // 2. YORUM YAPMA ENDPOINT'İ (TERMINATÖR MODU: Eskileri temizler) - 20 saniye cooldown
-app.post('/api/campus/:id/comments', auth, cooldown('comment'), async (req, res) => {
+// --- YORUM YAPMA (BİLDİRİMLİ) ---
+app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, res) => {
   try {
-    const user = await User.findById(req.userId);
-    const userVote = user.votedCampuses.find(v => v.campusId.toString() === req.params.id);
+    const { content } = req.body;
+    const postId = req.params.postId;
+    const userId = req.userId;
 
-    if (!userVote) {
-      return res.status(403).json({ error: 'Yorum yapabilmek için önce oy vermelisiniz.' });
-    }
+    if (!content || content.trim().length === 0) return res.status(400).json({ message: 'Boş olamaz' });
+    if (content.length > 500) return res.status(400).json({ message: 'Yorum çok uzun' });
 
-    // 1. Bu kullanıcıya ait bu kampüsteki TÜM yorumları bul
-    const existingComments = await CampusComment.find({ campusId: req.params.id, author: req.userId });
-    
-    let targetComment;
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: 'Post bulunamadı' });
 
-    if (existingComments.length > 0) {
-      // İlk bulduğunu al, içeriğini güncelle
-      targetComment = existingComments[0];
-      targetComment.content = req.body.content;
-      targetComment.voteType = userVote.voteType;
-      await targetComment.save();
+    const comment = new Comment({ content, author: userId, post: postId });
+    await comment.save();
+    await comment.populate('author', 'username profilePicture fullName');
 
-      // FAZLALIKLARI YOK ET (Duplicate temizliği)
-      if (existingComments.length > 1) {
-        const idsToDelete = existingComments.slice(1).map(c => c._id);
-        await CampusComment.deleteMany({ _id: { $in: idsToDelete } });
-      }
-    } else {
-      // Eğer sistem hatasıyla oy vermiş ama yorumu oluşmamışsa, yenisini yarat
-      targetComment = new CampusComment({
-        campusId: req.params.id,
-        content: req.body.content,
-        author: req.userId,
-        voteType: userVote.voteType
+    // 1. Post Sahibine Bildirim
+    // DÜZELTME: !post.isAnonymous kontrolü kaldırıldı.
+    if (post.author && userId.toString() !== post.author.toString()) {
+      await Notification.create({
+        recipient: post.author,
+        sender: userId,
+        type: 'comment',
+        post: postId,
+        comment: comment._id
       });
-      await targetComment.save();
+      console.log(`💬 Yorum Bildirimi -> Alıcı: ${post.author}`);
     }
 
-    // Döndürmeden önce populate et ki resim ve isim görünsün
-    const populatedComment = await targetComment.populate('author', 'username profilePicture');
-    res.json(populatedComment);
+    // 2. Mention Bildirimleri
+    const mentions = extractMentions(content);
+    if (mentions.length > 0) {
+      const mentionedUsers = await User.find({ username: { $in: mentions }, _id: { $ne: userId } }).select('_id');
+      const mentionNotifs = mentionedUsers.map(user => ({
+        recipient: user._id,
+        sender: userId,
+        type: 'mention',
+        post: postId,
+        comment: comment._id
+      }));
+      if (mentionNotifs.length > 0) await Notification.insertMany(mentionNotifs);
+    }
 
+    res.status(201).json(comment);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Yorum işlemi başarısız" });
+    console.error('Yorum hatası:', err);
+    res.status(500).json({ message: 'Yorum yapılamadı' });
   }
 });
 
@@ -1054,6 +1090,13 @@ app.post('/api/users/:userId/follow', async (req, res) => {
       if (!targetUser.followRequests.includes(currentUserId)) {
         targetUser.followRequests.push(currentUserId);
         await targetUser.save();
+
+        // Takip isteği bildirimi oluştur
+        await Notification.create({
+          recipient: userId,
+          sender: currentUserId,
+          type: 'follow_request'
+        });
       }
       return res.json({ message: "Takip isteği gönderildi", status: "pending" });
     }
@@ -1063,6 +1106,13 @@ app.post('/api/users/:userId/follow', async (req, res) => {
     targetUser.followers.push(currentUserId);
 
     await Promise.all([currentUser.save(), targetUser.save()]);
+
+    // Takip bildirimi oluştur (açık hesaplar için)
+    await Notification.create({
+      recipient: userId,
+      sender: currentUserId,
+      type: 'follow_accept' // Açık hesaplarda direkt takip, yani "kabul edilmiş" gibi
+    });
 
     res.json({ message: "Takip edildi", status: "following" });
   } catch (err) {
@@ -1098,6 +1148,13 @@ app.post('/api/users/:userId/unfollow', async (req, res) => {
     targetUser.followRequests = targetUser.followRequests.filter(id => id.toString() !== currentUserId);
 
     await Promise.all([currentUser.save(), targetUser.save()]);
+
+    // İlgili bildirimleri sil
+    await Notification.deleteMany({
+      recipient: userId,
+      sender: currentUserId,
+      type: { $in: ['follow_request', 'follow_accept'] }
+    });
 
     res.json({ message: "Takip bırakıldı" });
   } catch (err) {
@@ -1137,6 +1194,19 @@ app.post('/api/users/:userId/accept-follow', async (req, res) => {
 
     await Promise.all([currentUser.save(), requesterUser.save()]);
 
+    // Takip isteği bildirimini sil ve kabul bildirimi oluştur
+    await Notification.deleteOne({
+      recipient: currentUserId,
+      sender: userId,
+      type: 'follow_request'
+    });
+
+    await Notification.create({
+      recipient: userId,
+      sender: currentUserId,
+      type: 'follow_accept'
+    });
+
     res.json({ message: "Takip isteği kabul edildi" });
   } catch (err) {
     res.status(500).json({ error: "Sunucu hatası" });
@@ -1160,6 +1230,13 @@ app.post('/api/users/:userId/reject-follow', async (req, res) => {
     // İsteği kaldır
     currentUser.followRequests = currentUser.followRequests.filter(id => id.toString() !== userId);
     await currentUser.save();
+
+    // Takip isteği bildirimini sil
+    await Notification.deleteOne({
+      recipient: currentUserId,
+      sender: userId,
+      type: 'follow_request'
+    });
 
     res.json({ message: "Takip isteği reddedildi" });
   } catch (err) {
@@ -1723,6 +1800,331 @@ app.post('/api/resend-verification', async (req, res) => {
   }
 });
 
+// ======================================
+// BİLDİRİM API ENDPOINTS
+// ======================================
+
+// Get user's notifications
+// ======================================
+// BİLDİRİM API ENDPOINTS (DÜZELTİLMİŞ)
+// ======================================
+
+// Get user's notifications
+app.get('/api/notifications', auth, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    // DÜZELTME: req.user.userId YERİNE req.userId KULLANILDI
+    const notifications = await Notification.find({ recipient: req.userId }) 
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate('sender', 'username fullName profilePicture')
+      .populate('post', 'content')
+      .lean();
+
+    // DÜZELTME: req.userId
+    const totalNotifications = await Notification.countDocuments({ recipient: req.userId });
+    const unreadCount = await Notification.countDocuments({ recipient: req.userId, isRead: false });
+
+    res.json({
+      notifications,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalNotifications / limit),
+        totalNotifications,
+        hasMore: skip + notifications.length < totalNotifications
+      },
+      unreadCount
+    });
+  } catch (err) {
+    console.error('Get notifications error:', err);
+    res.status(500).json({ message: 'Bildirimler yüklenirken hata oluştu' });
+  }
+});
+
+// Get unread count
+app.get('/api/notifications/unread-count', auth, async (req, res) => {
+  try {
+    const unreadCount = await Notification.countDocuments({
+      recipient: req.userId, // DÜZELTME: req.user.userId -> req.userId
+      isRead: false
+    });
+    res.json({ unreadCount });
+  } catch (err) {
+    console.error('Get unread count error:', err);
+    res.status(500).json({ message: 'Hata oluştu' });
+  }
+});
+
+// Mark notification as read
+app.put('/api/notifications/:id/read', auth, async (req, res) => {
+  try {
+    const notification = await Notification.findOne({
+      _id: req.params.id,
+      recipient: req.userId // DÜZELTME: req.user.userId -> req.userId
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Bildirim bulunamadı' });
+    }
+
+    notification.isRead = true;
+    await notification.save();
+
+    res.json({ message: 'Bildirim okundu olarak işaretlendi' });
+  } catch (err) {
+    console.error('Mark as read error:', err);
+    res.status(500).json({ message: 'Hata oluştu' });
+  }
+});
+
+// Mark all notifications as read
+app.put('/api/notifications/read-all', auth, async (req, res) => {
+  try {
+    await Notification.updateMany(
+      { recipient: req.userId, isRead: false }, // DÜZELTME: req.user.userId -> req.userId
+      { isRead: true }
+    );
+
+    res.json({ message: 'Tüm bildirimler okundu olarak işaretlendi' });
+  } catch (err) {
+    console.error('Mark all as read error:', err);
+    res.status(500).json({ message: 'Hata oluştu' });
+  }
+});
+
+// Delete notification
+app.delete('/api/notifications/:id', auth, async (req, res) => {
+  try {
+    const notification = await Notification.findOne({
+      _id: req.params.id,
+      recipient: req.userId // DÜZELTME: req.user.userId -> req.userId
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: 'Bildirim bulunamadı' });
+    }
+
+    await notification.deleteOne();
+    res.json({ message: 'Bildirim silindi' });
+  } catch (err) {
+    console.error('Delete notification error:', err);
+    res.status(500).json({ message: 'Hata oluştu' });
+  }
+});
+
+// ============ COMMENT ENDPOINTS ============
+
+// Helper function to extract mentions from text
+function extractMentions(text) {
+  const mentionRegex = /@(\w+)/g;
+  const mentions = [];
+  let match;
+  while ((match = mentionRegex.exec(text)) !== null) {
+    mentions.push(match[1]);
+  }
+  return [...new Set(mentions)];
+}
+
+app.get('/api/posts/:postId/comments', async (req, res) => {
+  try {
+    const comments = await Comment.find({ post: req.params.postId })
+      .populate('author', 'username profilePicture fullName')
+      .sort({ createdAt: -1 });
+    res.json(comments);
+  } catch (err) {
+    console.error('Yorumları getirme hatası:', err);
+    res.status(500).json({ message: 'Yorumlar yüklenemedi' });
+  }
+});
+
+// 2. Yorum Yap (POST)
+app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, res) => {
+  try {
+    const { content } = req.body;
+    const postId = req.params.postId;
+    const userId = req.userId;
+
+    // Validasyonlar
+    if (!content || content.trim().length === 0) return res.status(400).json({ message: 'İçerik boş olamaz' });
+    if (content.length > 500) return res.status(400).json({ message: 'Yorum çok uzun' });
+
+    const post = await Post.findById(postId);
+    if (!post) return res.status(404).json({ message: 'Gönderi bulunamadı' });
+
+    // Yorumu Kaydet
+    const comment = new Comment({
+      content,
+      author: userId,
+      post: postId
+    });
+    await comment.save();
+    
+    // Frontend için yazar bilgisini ekle
+    await comment.populate('author', 'username profilePicture fullName');
+
+    // 3. Bildirim: Post Sahibine (Kendi postu değilse)
+    if (post.author && userId.toString() !== post.author.toString() && !post.isAnonymous) {
+      await Notification.create({
+        recipient: post.author,
+        sender: userId,
+        type: 'comment',
+        post: postId,
+        comment: comment._id
+      });
+    }
+
+    // 4. Bildirim: Etiketlenenlere (@mention)
+    const mentions = extractMentions(content);
+    if (mentions.length > 0) {
+      const mentionedUsers = await User.find({ 
+        username: { $in: mentions }, 
+        _id: { $ne: userId } 
+      }).select('_id');
+
+      const mentionNotifs = mentionedUsers.map(user => ({
+        recipient: user._id,
+        sender: userId,
+        type: 'mention',
+        post: postId,
+        comment: comment._id
+      }));
+
+      if (mentionNotifs.length > 0) {
+        await Notification.insertMany(mentionNotifs);
+      }
+    }
+
+    res.status(201).json(comment);
+
+  } catch (err) {
+    console.error('Yorum oluşturma hatası:', err);
+    res.status(500).json({ message: 'Yorum oluşturulamadı' });
+  }
+});
+// --- YORUM BEĞENME (GÜNCELLENMİŞ & SPAM KORUMALI) ---
+app.post('/api/comments/:commentId/like', auth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) return res.status(404).json({ message: 'Yorum bulunamadı' });
+
+    const userId = req.userId;
+    const isLiked = comment.likes.includes(userId);
+
+    if (isLiked) {
+      // 1. Beğeniyi geri al
+      comment.likes.pull(userId);
+
+      // 2. SPAM KORUMASI: Bildirimi SİL
+      await Notification.deleteOne({
+        recipient: comment.author,
+        sender: userId,
+        type: 'comment_like',
+        comment: comment._id
+      });
+    } else {
+      // 1. Beğen
+      comment.likes.push(userId);
+
+      // 2. Bildirim Gönder (Kendi yorumu değilse)
+      if (comment.author.toString() !== userId) {
+        
+        // ÇİFT KAYIT KONTROLÜ
+        const existingNotif = await Notification.findOne({
+            recipient: comment.author,
+            sender: userId,
+            type: 'comment_like',
+            comment: comment._id
+        });
+
+        if (!existingNotif) {
+            await Notification.create({
+              recipient: comment.author,
+              sender: userId,
+              type: 'comment_like',
+              post: comment.post,
+              comment: comment._id
+            });
+            console.log(`❤️ Yorum Like Bildirimi gönderildi -> Alıcı: ${comment.author}`);
+        }
+      }
+    }
+
+    await comment.save();
+    // Yazar bilgisini ekle
+    await comment.populate('author', 'username profilePicture fullName');
+    
+    res.json(comment);
+  } catch (err) {
+    console.error('Yorum like hatası:', err);
+    res.status(500).json({ message: 'Hata' });
+  }
+});
+
+// Update a comment
+app.put('/api/comments/:commentId', auth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Yorum bulunamadı' });
+    }
+
+    if (comment.author.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Bu yorumu düzenleyemezsiniz' });
+    }
+
+    const { content } = req.body;
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ message: 'Yorum içeriği boş olamaz' });
+    }
+
+    if (content.length > 500) {
+      return res.status(400).json({ message: 'Yorum çok uzun (max 500 karakter)' });
+    }
+
+    comment.content = content;
+    await comment.save();
+    await comment.populate('author', 'username profilePicture fullName');
+
+    res.json(comment);
+  } catch (err) {
+    console.error('Update comment error:', err);
+    res.status(500).json({ message: 'Yorum güncellenemedi' });
+  }
+});
+
+// Delete a comment
+app.delete('/api/comments/:commentId', auth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Yorum bulunamadı' });
+    }
+
+    if (comment.author.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Bu yorumu silemezsiniz' });
+    }
+
+    await comment.deleteOne();
+
+    // Also delete related notifications
+    await Notification.deleteMany({
+      $or: [
+        { type: 'comment', post: comment.post, sender: comment.author },
+        { type: 'mention', post: comment.post, sender: comment.author }
+      ]
+    });
+
+    res.json({ message: 'Yorum silindi' });
+  } catch (err) {
+    console.error('Delete comment error:', err);
+    res.status(500).json({ message: 'Yorum silinemedi' });
+  }
+});
+
 // --- PRODUCTION: FRONTEND STATIC FILES SUNMA ---
 // Production'da frontend'i backend ile aynı domain'de sunuyoruz
 if (process.env.NODE_ENV === 'production') {
@@ -1740,7 +2142,47 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, '../client/dist', 'index.html'));
   });
 }
+// --- ZAMANLANMIŞ GÖREVLER (CRON JOBS) ---
+// Her gün saat 12:00 ve 20:00'de çalışır
+cron.schedule('0 12,20 * * *', async () => {
+  console.log('🔄 Öneri sistemi çalışıyor...');
+  try {
+    // 1. Son 24 saatte en çok beğenilen postu bul
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    const popularPost = await Post.findOne({
+      createdAt: { $gt: oneDayAgo },
+      isAnonymous: false, // Anonim postları önerme (tercihen)
+      category: 'Geyik'   // Sadece genel akıştan öner
+    }).sort({ likes: -1 }); // En çok beğenilen
 
+    if (!popularPost) return;
+
+    // 2. Tüm kullanıcılara bildirim gönder (Not: Çok kullanıcılı sistemlerde bu işlem kuyruk yapısı ile yapılmalıdır)
+    // Burada basitlik adına doğrudan ekliyoruz.
+    
+    // Post sahibine kendi postunu önerme
+    const usersToNotify = await User.find({ 
+      _id: { $ne: popularPost.author } 
+    }).select('_id');
+
+    const notifications = usersToNotify.map(user => ({
+      recipient: user._id,
+      sender: popularPost.author, // Gönderen olarak post sahibi görünsün
+      type: 'suggestion',
+      post: popularPost._id,
+      isRead: false
+    }));
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+      console.log(`✅ ${notifications.length} kullanıcıya öneri gönderildi.`);
+    }
+
+  } catch (err) {
+    console.error('Öneri sistemi hatası:', err);
+  }
+});
 const PORT = process.env.PORT || 5001; // .env'den çekiliyor veya 5001
 app.listen(PORT, () => {
   console.log(`Sunucu ${PORT} portunda çalışıyor...`);
