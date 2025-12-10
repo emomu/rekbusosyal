@@ -806,13 +806,15 @@ export default function App() {
     }
   };
 
-  const SidebarItem = ({ id, icon: Icon, label }) => (
+// Kodun başındaki SidebarItem bileşeni
+const SidebarItem = ({ id, icon: Icon, label }) => (
     <div
       onClick={() => {
         dispatch(setActiveTab(id));
         dispatch(setSelectedCampus(null));
         dispatch(setSelectedCommunity(null));
-        setViewedProfile(null); // <--- BU SATIRI EKLE (ÇOK ÖNEMLİ)
+        setViewedProfile(null);
+        setSelectedPost(null); // <--- BU SATIRI EKLE (Post detayını kapatır)
       }}
       className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${activeTab === id ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'}`}
     >
@@ -858,24 +860,6 @@ export default function App() {
           <SidebarItem id="itiraflar" icon={MessageSquare} label="İtiraflar" />
           <SidebarItem id="topluluklar" icon={User} label="Topluluklar" />
 
-          {/* Bildirimler Butonu */}
-          <div
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowNotifications(true);
-            }}
-            className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-gray-100 text-gray-700 relative"
-          >
-            <Bell size={20} />
-            <span className="font-medium text-sm">Bildirimler</span>
-            {unreadCount > 0 && (
-              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </div>
-
           <SidebarItem id="profil" icon={Settings} label="Ayarlar" />
           {(userRole === 'admin' || userRole === 'moderator') && (
             <SidebarItem id="admin" icon={Shield} label="Admin Panel" />
@@ -883,13 +867,15 @@ export default function App() {
         </nav>
 
         <div className="mt-auto pt-4 border-t border-gray-100">
+        
          {/* Twitter Tarzı Profil Kartı - Sadeleştirilmiş */}
-          <div 
+          <div
             onClick={() => {
               dispatch(setActiveTab('publicProfil'));
               dispatch(setSelectedCampus(null));
               dispatch(setSelectedCommunity(null));
               setViewedProfile(null); // Hata almamak için bunu eklemeyi unutma
+              setSelectedPost(null); 
             }}
             className="flex items-center gap-3 mb-2 cursor-pointer transition-opacity hover:opacity-80"
           >
@@ -912,6 +898,23 @@ export default function App() {
                 @{currentUserInfo?.username || 'kullanici'}
               </span>
             </div>
+              {/* Bildirimler İkonu */}
+          <div
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowNotifications(true);
+            }}
+            className="relative p-2 hover:bg-gray-100 rounded-lg transition cursor-pointer flex justify-center"
+          >
+            <Bell size={24} className="text-gray-700" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </div>
+
           </div>
           <button onClick={handleLogout} className="flex items-center gap-3 text-red-500 font-bold text-sm hover:bg-red-50 p-2 rounded-lg w-full transition">
             <LogOut size={18} /> Çıkış Yap
@@ -950,6 +953,7 @@ export default function App() {
                   dispatch(setSelectedCampus(null));
                   dispatch(setSelectedCommunity(null));
                   setViewedProfile(null);
+                  setSelectedPost(null); // <--- BU SATIRI EKLE
                   setIsMobileMenuOpen(false);
                 }}
                 className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition"
@@ -978,6 +982,7 @@ export default function App() {
                   dispatch(setSelectedCampus(null));
                   dispatch(setSelectedCommunity(null));
                   setViewedProfile(null);
+                  setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
@@ -994,6 +999,7 @@ export default function App() {
                   dispatch(setSelectedCampus(null));
                   dispatch(setSelectedCommunity(null));
                   setViewedProfile(null);
+                  setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
@@ -1010,6 +1016,7 @@ export default function App() {
                   dispatch(setSelectedCampus(null));
                   dispatch(setSelectedCommunity(null));
                   setViewedProfile(null);
+                  setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
@@ -1026,6 +1033,7 @@ export default function App() {
                   dispatch(setSelectedCampus(null));
                   dispatch(setSelectedCommunity(null));
                   setViewedProfile(null);
+                  setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
@@ -1042,6 +1050,7 @@ export default function App() {
                   dispatch(setSelectedCampus(null));
                   dispatch(setSelectedCommunity(null));
                   setViewedProfile(null);
+                  setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
@@ -1560,7 +1569,41 @@ export default function App() {
 
       {/* --- BİLDİRİMLER SAYFASI --- */}
       {showNotifications && (
-        <NotificationsPage onClose={() => setShowNotifications(false)} />
+        <NotificationsPage
+          onClose={() => setShowNotifications(false)}
+          onNavigateToProfile={(userId) => {
+            // Önce diğer açık sayfaları kapat
+            setSelectedPost(null);
+            setViewedProfile(userId);
+            dispatch(setActiveTab('profile'));
+          }}
+          onNavigateToPost={async (postId) => {
+            // Post'u mevcut state'lerden bul (posts veya confessions)
+            let post = posts.find(p => p._id === postId);
+            if (!post) {
+              post = confessions.find(c => c._id === postId);
+            }
+
+            // Eğer state'te yoksa backend'den fetch et
+            if (!post) {
+              try {
+                const res = await fetch(`${API_URL}/api/posts/${postId}`, {
+                  headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                  post = await res.json();
+                }
+              } catch (err) {
+                console.error('Post yüklenemedi:', err);
+                return;
+              }
+            }
+
+            // Önce diğer açık sayfaları kapat
+            setViewedProfile(null);
+            setSelectedPost(post);
+          }}
+        />
       )}
 
       {/* SAĞ PANEL */}

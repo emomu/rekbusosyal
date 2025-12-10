@@ -6,7 +6,7 @@ import loaderAnimation from '../assets/loader.json';
 import { setNotifications, appendNotifications, setPagination, setUnreadCount, markAsRead, markAllAsRead, deleteNotification, setLoading } from '../store/slices/notificationsSlice';
 import { API_URL } from '../config/api';
 
-export default function NotificationsPage({ onClose }) {
+export default function NotificationsPage({ onClose, onNavigateToProfile, onNavigateToPost }) {
   const dispatch = useDispatch();
   const token = useSelector(state => state.auth.token);
   const { notifications, unreadCount, pagination, loading } = useSelector(state => state.notifications);
@@ -134,7 +134,7 @@ export default function NotificationsPage({ onClose }) {
     try {
       const res = await fetch(`${API_URL}/api/users/${senderId}/reject-follow`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
@@ -148,6 +148,43 @@ export default function NotificationsPage({ onClose }) {
       console.error('Takip red hatası:', err);
     } finally {
       setProcessingIds(prev => prev.filter(id => id !== notificationId));
+    }
+  };
+
+  // --- YENİ EKLENEN: Bildirime Tıklama İşlemi ---
+  const handleNotificationClick = (notification) => {
+    // follow_request için tıklamayı devre dışı bırak (çünkü butonlar var)
+    if (notification.type === 'follow_request') {
+      return;
+    }
+
+    // Bildirimi okundu işaretle
+    if (!notification.isRead) {
+      handleMarkAsRead(notification._id);
+    }
+
+    // Bildirim tipine göre yönlendirme
+    switch (notification.type) {
+      case 'like':
+      case 'comment':
+      case 'mention':
+        // Post'a git - notification.post sadece {_id, content} içeriyor, tam post için fetch gerekecek
+        if (notification.post?._id) {
+          onNavigateToPost(notification.post._id);
+          onClose(); // Bildirim panelini kapat
+        }
+        break;
+
+      case 'follow_accept':
+        // Kullanıcının profiline git
+        if (notification.sender?._id) {
+          onNavigateToProfile(notification.sender._id);
+          onClose(); // Bildirim panelini kapat
+        }
+        break;
+
+      default:
+        break;
     }
   };
 
@@ -259,7 +296,7 @@ export default function NotificationsPage({ onClose }) {
                 className={`p-4 hover:bg-gray-50 transition cursor-pointer ${
                   !notification.isRead ? 'bg-blue-50/50' : ''
                 }`}
-                onClick={() => !notification.isRead && handleMarkAsRead(notification._id)}
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex items-start gap-3">
                   {/* Sender Profile Picture */}

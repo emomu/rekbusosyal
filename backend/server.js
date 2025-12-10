@@ -246,7 +246,8 @@ app.post('/api/confessions', auth, cooldown('confession'), async (req, res) => {
 
 app.post('/api/posts/:id/like', auth, async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
+    // DÜZELTME: author field'ı select: false olduğu için +author ile dahil ediyoruz
+    const post = await Post.findById(req.params.id).select('+author');
     if (!post) return res.status(404).json({ error: 'Post bulunamadı' });
 
     const userId = req.userId;
@@ -314,6 +315,23 @@ app.post('/api/posts/:id/like', auth, async (req, res) => {
   }
 });
 
+// --- GET SINGLE POST ---
+app.get('/api/posts/:id', auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .select('+author') // author field'ı dahil et
+      .populate('author', 'username profilePicture');
+
+    if (!post) {
+      return res.status(404).json({ error: 'Post bulunamadı' });
+    }
+
+    res.json(post);
+  } catch (err) {
+    console.error('Post getirme hatası:', err);
+    res.status(500).json({ error: 'Post yüklenemedi' });
+  }
+});
 
 // 2. KAMPÜSLER VE OYLAMA
 app.get('/api/campus', async (req, res) => {
@@ -431,7 +449,8 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, r
     if (!content || content.trim().length === 0) return res.status(400).json({ message: 'Boş olamaz' });
     if (content.length > 500) return res.status(400).json({ message: 'Yorum çok uzun' });
 
-    const post = await Post.findById(postId);
+    // DÜZELTME: author field'ı select: false olduğu için +author ile dahil ediyoruz
+    const post = await Post.findById(postId).select('+author');
     if (!post) return res.status(404).json({ message: 'Post bulunamadı' });
 
     const comment = new Comment({ content, author: userId, post: postId });
@@ -563,8 +582,8 @@ app.post('/api/register', async (req, res) => {
     const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
 
     try {
-      await resend.emails.send({
-        from: 'KBÜ Sosyal <kbusosyal@resend.dev>',
+      const { data, error } = await resend.emails.send({
+        from: 'KBÜ Sosyal <onboarding@resend.dev>',
         to: email,
         subject: '🎓 Hoş Geldin! Hesabını Doğrula - KBÜ Sosyal',
         html: `
@@ -667,9 +686,19 @@ app.post('/api/register', async (req, res) => {
 </html>
         `
       });
-      console.log('✅ Doğrulama maili gönderildi:', email);
+
+      if (error) {
+        console.error("❌ Resend error:", error);
+        return res.status(500).json({
+          error: "Mail gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+          details: process.env.NODE_ENV === 'development' ? error : undefined
+        });
+      }
+
+      console.log('✅ Doğrulama maili başarıyla gönderildi:', email);
+      console.log('📧 Resend Mail ID:', data?.id);
     } catch (mailError) {
-      console.error("❌ Mail gönderme hatası:", mailError);
+      console.error("❌ Mail gönderme hatası (catch):", mailError);
       return res.status(500).json({
         error: "Mail gönderilemedi. Lütfen daha sonra tekrar deneyin.",
         details: process.env.NODE_ENV === 'development' ? mailError.message : undefined
@@ -1877,7 +1906,7 @@ app.post('/api/resend-verification', async (req, res) => {
 
     // Resend ile mail gönder
     try {
-      await resend.emails.send({
+      const { data, error } = await resend.emails.send({
         from: 'KBÜ Sosyal <onboarding@resend.dev>',
         to: user.email,
         subject: 'KBÜ Sosyal - Yeni Doğrulama Linki',
@@ -1890,10 +1919,20 @@ app.post('/api/resend-verification', async (req, res) => {
           </div>
         `
       });
-      console.log('✅ Tekrar doğrulama maili gönderildi:', user.email);
+
+      if (error) {
+        console.error("❌ Resend error:", error);
+        return res.status(500).json({
+          error: "Mail gönderilemedi. Lütfen daha sonra tekrar deneyin.",
+          details: process.env.NODE_ENV === 'development' ? error : undefined
+        });
+      }
+
+      console.log('✅ Tekrar doğrulama maili başarıyla gönderildi:', user.email);
+      console.log('📧 Resend Mail ID:', data?.id);
       res.json({ message: "Doğrulama maili tekrar gönderildi! Spam kutunu kontrol etmeyi unutma." });
     } catch (mailError) {
-      console.error("❌ Mail gönderme hatası:", mailError);
+      console.error("❌ Mail gönderme hatası (catch):", mailError);
       return res.status(500).json({
         error: "Mail gönderilemedi. Lütfen daha sonra tekrar deneyin.",
         details: process.env.NODE_ENV === 'development' ? mailError.message : undefined
