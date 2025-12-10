@@ -74,6 +74,28 @@ export default function PublicProfilePage({ username, onClose }) {
       setLoadingPosts(false);
     }
   };
+  const renderWithMentions = (text) => {
+    if (!text) return null;
+    const parts = text.split(/(@[\w.-]+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const user = part.slice(1);
+        return (
+          <span
+            key={index}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onMentionClick) onMentionClick(user);
+            }}
+            className="text-blue-600 font-bold hover:underline cursor-pointer"
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
 
   const fetchUserConfessions = async (userId, page = 1) => {
     try {
@@ -302,7 +324,9 @@ export default function PublicProfilePage({ username, onClose }) {
                             <div className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleDateString('tr-TR')}</div>
                           </div>
                         </div>
-                        <p className="text-gray-800 mb-3 whitespace-pre-wrap">{post.content}</p>
+                        <div className="text-gray-800 mb-3 whitespace-pre-wrap">
+                          {renderWithMentions(post.content)}
+                        </div>
                         {/* Post Beğeni Butonu */}
                         <LikeButton
                           isLiked={post.likes?.includes(currentUserId)}
@@ -342,7 +366,9 @@ export default function PublicProfilePage({ username, onClose }) {
                             <div className="text-xs text-gray-400">{new Date(confession.createdAt).toLocaleDateString('tr-TR')}</div>
                           </div>
                         </div>
-                        <p className="text-gray-800 mb-3">{confession.content}</p>
+                        <div className="text-gray-800 mb-3 whitespace-pre-wrap">
+                          {renderWithMentions(confession.content)}
+                        </div>
                         {/* İtiraf Beğeni Butonu */}
                         <LikeButton
                           isLiked={confession.likes?.includes(currentUserId)}

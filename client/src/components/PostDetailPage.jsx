@@ -8,7 +8,7 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
   const [particles, setParticles] = useState([]);
 
   const handleClick = (e) => {
-    if(e && e.stopPropagation) e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
 
     if (!isLiked) {
       setIsAnimating(true);
@@ -23,7 +23,7 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
         setParticles([]);
       }, 600);
     }
-    
+
     onClick();
   };
 
@@ -61,11 +61,10 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
       <div className={`relative ${isAnimating ? 'animate-heart-pop' : ''}`}>
         <Heart
           size={22}
-          className={`transition-all duration-300 ${
-            isLiked
-              ? 'fill-red-500 text-red-500 scale-100'
-              : 'text-gray-500 group-hover:text-red-500 group-hover:scale-110'
-          }`}
+          className={`transition-all duration-300 ${isLiked
+            ? 'fill-red-500 text-red-500 scale-100'
+            : 'text-gray-500 group-hover:text-red-500 group-hover:scale-110'
+            }`}
         />
         {isAnimating && (
           <>
@@ -78,9 +77,8 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
       </div>
 
       <span
-        className={`text-sm font-medium transition-all duration-300 ${
-          isLiked ? 'text-red-500' : 'text-gray-500 group-hover:text-red-500'
-        } ${isAnimating ? 'animate-like-count-pop' : ''}`}
+        className={`text-sm font-medium transition-all duration-300 ${isLiked ? 'text-red-500' : 'text-gray-500 group-hover:text-red-500'
+          } ${isAnimating ? 'animate-like-count-pop' : ''}`}
       >
         {likeCount > 0 ? likeCount : ''}
       </span>
@@ -122,17 +120,17 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
 
 // --- ANA SAYFA BİLEŞENİ (POST DETAIL PAGE) ---
 
-export default function PostDetailPage({ post, onClose, token, currentUserId, onLike ,currentUserProfilePic}) {
+export default function PostDetailPage({ post, onClose, token, currentUserId, onLike, currentUserProfilePic }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(null);
-  
+
   // Yerel State
   const [isLiked, setIsLiked] = useState(post.likes?.includes(currentUserId) || false);
   const [likeCount, setLikeCount] = useState(post.likes?.length || 0);
-  
+
   const commentInputRef = useRef(null);
 
   useEffect(() => {
@@ -154,11 +152,11 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
   const handleLikeToggle = () => {
     // 1. Yeni durumu hesapla
     const nextIsLiked = !isLiked;
-    
+
     // 2. State'leri BAĞIMSIZ olarak güncelle (İç içe değil!)
     // Bu sayede React'in double-invocation (çift çalışma) sorunu engellenir.
     setIsLiked(nextIsLiked);
-    
+
     // Eğer beğenildiyse +1, geri alındıysa -1
     setLikeCount((prev) => nextIsLiked ? prev + 1 : prev - 1);
 
@@ -166,6 +164,28 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
     if (onLike) {
       onLike(post._id);
     }
+  };
+  const renderWithMentions = (text) => {
+    if (!text) return null;
+    const parts = text.split(/(@[\w.-]+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const username = part.slice(1);
+        return (
+          <span
+            key={index}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onMentionClick) onMentionClick(username);
+            }}
+            className="text-blue-600 font-bold hover:underline cursor-pointer"
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
   };
 
   const fetchComments = async () => {
@@ -246,7 +266,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
     const shareData = {
       title: 'Kbü Sosyal Gönderisi',
       text: post.content,
-      url: window.location.href, 
+      url: window.location.href,
     };
 
     try {
@@ -289,10 +309,10 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
 
   return (
     <div className="bg-white min-h-screen animate-in slide-in-from-right duration-300">
-      
+
       {/* 1. HEADER (Sticky) */}
       <div className="sticky top-0 z-20 bg-white/100 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-6">
-        <button 
+        <button
           onClick={onClose}
           className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
         >
@@ -329,7 +349,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
 
         {/* Gönderi Metni */}
         <div className="text-gray-900 text-xl leading-normal whitespace-pre-wrap mb-4 font-normal">
-          {post.content}
+          {renderWithMentions(post.content)}
         </div>
 
         {/* Resim Varsa */}
@@ -348,48 +368,48 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
 
         {/* Aksiyon Butonları */}
         <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-0 px-2">
-          
-          <button 
+
+          <button
             className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500  p-2 rounded-full transition group"
             onClick={() => commentInputRef.current?.focus()}
           >
             <MessageSquare size={22} className="group-hover:stroke-blue-500" />
             {comments.length > 0 && (
-                <span className="text-sm font-medium group-hover:text-blue-500">{comments.length}</span>
+              <span className="text-sm font-medium group-hover:text-blue-500">{comments.length}</span>
             )}
           </button>
-          
-          <LikeButton 
-             isLiked={isLiked}
-             likeCount={likeCount}
-             onClick={handleLikeToggle}
+
+          <LikeButton
+            isLiked={isLiked}
+            likeCount={likeCount}
+            onClick={handleLikeToggle}
           />
 
           <button className="text-gray-500 hover:text-green-500 hover:bg-green-50 p-2 rounded-full transition group">
             <BarChart2 size={22} className="group-hover:stroke-green-500" />
           </button>
 
-          <button 
-             onClick={handleShare}
-             className="text-gray-500 hover:text-blue-500 hover:bg-blue-50 p-2 rounded-full transition group"
+          <button
+            onClick={handleShare}
+            className="text-gray-500 hover:text-blue-500 hover:bg-blue-50 p-2 rounded-full transition group"
           >
             <Share2 size={22} className="group-hover:stroke-blue-500" />
           </button>
         </div>
       </div>
 
-    {/* 3. YORUM YAZMA ALANI */}
+      {/* 3. YORUM YAZMA ALANI */}
       <div className="px-4 py-2 border-b border-gray-100">
         <form onSubmit={handleSubmitComment} className="flex gap-3 items-center">
-         {currentUserProfilePic ? (
-            <img 
-              src={currentUserProfilePic} 
-              alt="Profil" 
+          {currentUserProfilePic ? (
+            <img
+              src={currentUserProfilePic}
+              alt="Profil"
               className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
             />
           ) : (
             <div className="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
-               <User size={18} className="text-gray-400" />
+              <User size={18} className="text-gray-400" />
             </div>
           )}
           <div className="flex-1">
@@ -402,7 +422,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
               className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
             />
           </div>
-          <button 
+          <button
             type="submit"
             disabled={!newComment.trim() || submitting}
             className="px-4 py-1.5 bg-blue-500 text-white rounded-full font-bold text-sm hover:bg-blue-600 disabled:opacity-50 transition"
@@ -415,7 +435,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
       {/* 4. YORUMLAR LİSTESİ */}
       <div className="pb-20">
         {loading ? (
-           <div className="py-8 flex justify-center"><div className="w-6 h-6 border-2 border-blue-500 rounded-full animate-spin border-t-transparent"></div></div>
+          <div className="py-8 flex justify-center"><div className="w-6 h-6 border-2 border-blue-500 rounded-full animate-spin border-t-transparent"></div></div>
         ) : comments.length === 0 ? (
           <div className="text-center py-10 text-gray-500 text-sm">
             İlk yanıtı sen ver!
@@ -432,7 +452,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                     <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"><User size={18} className="text-gray-500" /></div>
                   )}
                 </div>
-                
+
                 {/* İçerik */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
@@ -440,36 +460,38 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                       <span className="font-bold text-gray-900 truncate">{comment.author?.username || 'Kullanıcı'}</span>
                       <span className="text-gray-500 text-sm">· {timeAgo(comment.createdAt)}</span>
                     </div>
-                    
+
                     {/* Yorum Menüsü */}
                     {comment.author?._id === currentUserId && (
                       <div className="relative">
                         <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === comment._id ? null : comment._id); }} className="text-gray-400 p-1 hover:text-blue-500">
-                           <MoreHorizontal size={16} />
+                          <MoreHorizontal size={16} />
                         </button>
                         {menuOpen === comment._id && (
                           <div className="absolute right-0 top-6 bg-white shadow-lg border border-gray-100 rounded-lg py-1 z-10 w-32">
-                             <button onClick={() => handleDeleteComment(comment._id)} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14}/> Sil</button>
+                            <button onClick={() => handleDeleteComment(comment._id)} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14} /> Sil</button>
                           </div>
                         )}
                       </div>
                     )}
                   </div>
 
-                  <p className="text-gray-900 mt-1 whitespace-pre-wrap text-base">{comment.content}</p>
+                  <div className="text-gray-900 mt-1 whitespace-pre-wrap text-base">
+                    {renderWithMentions(comment.content)}
+                  </div>
 
                   {/* Yorum Altı Butonlar */}
                   <div className="flex items-center gap-6 mt-3 max-w-md">
-                     <button className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-sm group">
-                        <MessageSquare size={16} className="group-hover:stroke-blue-500" />
-                     </button>
-                     <button 
-                        onClick={() => handleLikeComment(comment._id)}
-                        className={`flex items-center gap-1 text-sm group ${comment.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
-                      >
-                        <Heart size={16} className={`group-hover:stroke-red-500 ${comment.likes?.includes(currentUserId) ? 'fill-current' : ''}`} />
-                        {comment.likes?.length > 0 && <span>{comment.likes.length}</span>}
-                     </button>
+                    <button className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-sm group">
+                      <MessageSquare size={16} className="group-hover:stroke-blue-500" />
+                    </button>
+                    <button
+                      onClick={() => handleLikeComment(comment._id)}
+                      className={`flex items-center gap-1 text-sm group ${comment.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
+                    >
+                      <Heart size={16} className={`group-hover:stroke-red-500 ${comment.likes?.includes(currentUserId) ? 'fill-current' : ''}`} />
+                      {comment.likes?.length > 0 && <span>{comment.likes.length}</span>}
+                    </button>
                   </div>
                 </div>
               </div>

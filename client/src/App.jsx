@@ -538,6 +538,34 @@ export default function App() {
       }
     } catch (err) { console.error(err); }
   };
+  // --- MENTION PARSER ---
+  // Metin içindeki @kullaniciadi kısımlarını renkli ve tıklanabilir yapar
+  const renderContentWithMentions = (text) => {
+    if (!text) return null;
+
+    // Regex: @ ile başlayan ve boşluk/noktalama işaretine kadar olan kısmı alır
+    const parts = text.split(/(@[\w.-]+)/g);
+
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        const username = part.slice(1); // @ işaretini kaldır
+        return (
+          <span
+            key={index}
+            onClick={(e) => {
+              e.stopPropagation(); // Post detayına gitmeyi engelle
+              setViewedProfile(username); // Profile git
+              setSelectedPost(null); // Eğer post açıksa kapat
+            }}
+            className="text-blue-600 font-bold hover:underline cursor-pointer"
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
 
   // Kampüs Detay & Yorum
   useEffect(() => {
@@ -806,8 +834,8 @@ export default function App() {
     }
   };
 
-// Kodun başındaki SidebarItem bileşeni
-const SidebarItem = ({ id, icon: Icon, label }) => (
+  // Kodun başındaki SidebarItem bileşeni
+  const SidebarItem = ({ id, icon: Icon, label }) => (
     <div
       onClick={() => {
         dispatch(setActiveTab(id));
@@ -867,29 +895,29 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
         </nav>
 
         <div className="mt-auto pt-4 border-t border-gray-100">
-        
-         {/* Twitter Tarzı Profil Kartı - Sadeleştirilmiş */}
+
+          {/* Twitter Tarzı Profil Kartı - Sadeleştirilmiş */}
           <div
             onClick={() => {
               dispatch(setActiveTab('publicProfil'));
               dispatch(setSelectedCampus(null));
               dispatch(setSelectedCommunity(null));
               setViewedProfile(null); // Hata almamak için bunu eklemeyi unutma
-              setSelectedPost(null); 
+              setSelectedPost(null);
             }}
             className="flex items-center gap-3 mb-2 cursor-pointer transition-opacity hover:opacity-80"
           >
             {currentUserInfo?.profilePicture ? (
-    <img 
-      src={currentUserInfo.profilePicture} 
-      alt="Profil" 
-      className="w-10 h-10 rounded-full object-cover border border-gray-200"
-    />
-  ) : (
-    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center border border-gray-200">
-      <User size={20} className="text-gray-400" />
-    </div>
-  )}
+              <img
+                src={currentUserInfo.profilePicture}
+                alt="Profil"
+                className="w-10 h-10 rounded-full object-cover border border-gray-200"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center border border-gray-200">
+                <User size={20} className="text-gray-400" />
+              </div>
+            )}
             <div className="flex flex-col flex-1 min-w-0">
               <span className="font-bold text-sm text-gray-900 truncate">
                 {currentUserInfo?.fullName || 'Kullanıcı'}
@@ -898,22 +926,22 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                 @{currentUserInfo?.username || 'kullanici'}
               </span>
             </div>
-              {/* Bildirimler İkonu */}
-          <div
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowNotifications(true);
-            }}
-            className="relative p-2 hover:bg-gray-100 rounded-lg transition cursor-pointer flex justify-center"
-          >
-            <Bell size={24} className="text-gray-700" />
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </div>
+            {/* Bildirimler İkonu */}
+            <div
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowNotifications(true);
+              }}
+              className="relative p-2 hover:bg-gray-100 rounded-lg transition cursor-pointer flex justify-center"
+            >
+              <Bell size={24} className="text-gray-700" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </div>
 
           </div>
           <button onClick={handleLogout} className="flex items-center gap-3 text-red-500 font-bold text-sm hover:bg-red-50 p-2 rounded-lg w-full transition">
@@ -985,9 +1013,8 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                   setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                  activeTab === 'akis' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
-                }`}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${activeTab === 'akis' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
               >
                 <Home size={22} />
                 <span className="font-medium">Akış</span>
@@ -1002,9 +1029,8 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                   setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                  activeTab === 'kampusler' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
-                }`}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${activeTab === 'kampusler' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
               >
                 <MapPin size={22} />
                 <span className="font-medium">Kampüsler</span>
@@ -1019,9 +1045,8 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                   setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                  activeTab === 'itiraflar' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
-                }`}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${activeTab === 'itiraflar' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
               >
                 <MessageSquare size={22} />
                 <span className="font-medium">İtiraflar</span>
@@ -1036,9 +1061,8 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                   setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                  activeTab === 'topluluklar' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
-                }`}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${activeTab === 'topluluklar' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
               >
                 <User size={22} />
                 <span className="font-medium">Topluluklar</span>
@@ -1053,9 +1077,8 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                   setSelectedPost(null); // Post modalını kapat
                   setIsMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                  activeTab === 'profil' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
-                }`}
+                className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${activeTab === 'profil' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
               >
                 <Settings size={22} />
                 <span className="font-medium">Ayarlar</span>
@@ -1070,9 +1093,8 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                     setViewedProfile(null);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${
-                    activeTab === 'admin' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
-                  }`}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg transition ${activeTab === 'admin' ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                    }`}
                 >
                   <Shield size={22} />
                   <span className="font-medium">Admin Panel</span>
@@ -1098,52 +1120,62 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
         </>
       )}
 
-     {/* ORTA PANEL - MAIN START */}
+      {/* ORTA PANEL - MAIN START */}
       <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen">
 
         {/* --- 1. ÖNCELİK: GÖNDERİ DETAY SAYFASI (Twitter Tarzı) --- */}
         {selectedPost ? (
-          <PostDetailPage 
+          <PostDetailPage
             post={selectedPost}
             onClose={() => setSelectedPost(null)}
             token={token}
             currentUserId={userId}
             onLike={(postId) => handleLike(postId, selectedPost.category === 'İtiraf' ? 'confession' : 'post')}
             currentUserProfilePic={currentUserInfo?.profilePicture}
+            onMentionClick={(username) => {
+              setSelectedPost(null);
+              setViewedProfile(username);
+            }}
           />
         ) : viewedProfile ? (
-          
-  
-          
+
+
+
           /* --- 2. ÖNCELİK: BAŞKA BİR KULLANICININ PROFİLİ --- */
-         <PublicProfilePage
+          <PublicProfilePage
             username={viewedProfile}
             onClose={() => {
               setViewedProfile(null); // 1. Profili kapat
-              
+
               // 2. Arkada geçerli bir sekme açık mı kontrol et
               // Bu sekmelerden biri açıksa dokunma (kullanıcı orada kalır)
               const validTabs = ['akis', 'kampusler', 'itiraflar', 'topluluklar', 'profil', 'publicProfil'];
-              
+
               // Eğer geçerli bir sekme yoksa (boşluğa düşecekse) Akış'a gönder
               if (!validTabs.includes(activeTab)) {
                 dispatch(setActiveTab('akis'));
               }
+            }}
+            onMentionClick={(username) => {
+              setViewedProfile(username);
             }}
           />
 
         ) : activeTab === 'publicProfil' ? (
 
           /* --- 3. ÖNCELİK: KENDİ PUBLIC PROFİLİN --- */
-          <PublicProfilePage 
-            username={currentUserInfo?.username} 
-            onClose={() => dispatch(setActiveTab('akis'))} 
+          <PublicProfilePage
+            username={currentUserInfo?.username}
+            onClose={() => dispatch(setActiveTab('akis'))}
+            onMentionClick={(username) => {
+              setViewedProfile(username);
+            }}
           />
 
         ) : (
           /* --- 4. ÖNCELİK: NORMAL TABLAR (Akış, İtiraflar, Kampüs vb.) --- */
           <>
-            
+
             {/* --- AKIŞ SEKMESİ --- */}
             {activeTab === 'akis' && (
               <>
@@ -1210,8 +1242,10 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                                 <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
                               </div>
                             </div>
-                            <p className="text-gray-800 mb-3 whitespace-pre-wrap">{item.content}</p>
-                            
+                            <div className="text-gray-800 mb-3 whitespace-pre-wrap">
+                              {renderContentWithMentions(item.content)}
+                            </div>
+
                             {/* --- DÜZELTME BURADA --- */}
                             {/* onClick={(e) => e.stopPropagation()} ekleyerek bu alana tıklanınca post detayına gitmesini engelliyoruz */}
                             <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
@@ -1225,7 +1259,7 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                                 <span className="text-sm font-medium">Yorum yap</span>
                               </button>
                             </div>
-                            
+
                           </div>
                         );
                       })}
@@ -1233,8 +1267,8 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                     </>
                   )}
                 </div>
-              
-            
+
+
 
                 {/* Post Listesi */}
                 <div className="divide-y divide-gray-100">
@@ -1271,7 +1305,9 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                                 <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
                               </div>
                             </div>
-                            <p className="text-gray-800 mb-3 whitespace-pre-wrap">{item.content}</p>
+                            <div className="text-gray-800 mb-3 whitespace-pre-wrap">
+                              {renderContentWithMentions(item.content)}
+                            </div>
                             <div className="flex items-center gap-4">
                               <LikeButton
                                 isLiked={item.likes.includes(userId)}
@@ -1349,7 +1385,9 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                                 <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
                               </div>
                             </div>
-                            <p className="text-gray-800 mb-3">{item.content}</p>
+                            <div className="text-gray-800 mb-3 whitespace-pre-wrap">
+                              {renderContentWithMentions(item.content)}
+                            </div>
                             <div className="flex items-center gap-4">
                               <LikeButton isLiked={item.likes.includes(userId)} likeCount={item.likes.length} onClick={() => handleLike(item._id, 'confession')} />
                               <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition">
@@ -1443,27 +1481,27 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                   {isLoadingCampuses ? <GridShimmer count={4} /> : (
                     <div className="p-6 grid gap-5">
                       {campuses.map(campus => {
-                         const totalVotes = (campus.votes?.positive || 0) + (campus.votes?.neutral || 0) + (campus.votes?.negative || 0);
-                         const positivePercent = totalVotes > 0 ? Math.round(((campus.votes?.positive || 0) / totalVotes) * 100) : 0;
-                         const neutralPercent = totalVotes > 0 ? Math.round(((campus.votes?.neutral || 0) / totalVotes) * 100) : 0;
-                         const negativePercent = totalVotes > 0 ? Math.round(((campus.votes?.negative || 0) / totalVotes) * 100) : 0;
-                         return (
-                           <div key={campus._id} onClick={() => dispatch(setSelectedCampus(campus))} className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white">
-                             <div className="flex items-start justify-between mb-4">
-                               <div className="flex-1"><h3 className="text-xl font-bold text-gray-900 mb-2">{campus.name}</h3><p className="text-sm text-gray-500">{totalVotes} değerlendirme</p></div>
-                               <MapPin className="text-blue-600" size={28} />
-                             </div>
-                             <div className="mb-3">
-                               <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
-                               <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
-                                 {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
-                                 {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
-                                 {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
-                               </div>
-                             </div>
-                             <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
-                           </div>
-                         )
+                        const totalVotes = (campus.votes?.positive || 0) + (campus.votes?.neutral || 0) + (campus.votes?.negative || 0);
+                        const positivePercent = totalVotes > 0 ? Math.round(((campus.votes?.positive || 0) / totalVotes) * 100) : 0;
+                        const neutralPercent = totalVotes > 0 ? Math.round(((campus.votes?.neutral || 0) / totalVotes) * 100) : 0;
+                        const negativePercent = totalVotes > 0 ? Math.round(((campus.votes?.negative || 0) / totalVotes) * 100) : 0;
+                        return (
+                          <div key={campus._id} onClick={() => dispatch(setSelectedCampus(campus))} className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white">
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex-1"><h3 className="text-xl font-bold text-gray-900 mb-2">{campus.name}</h3><p className="text-sm text-gray-500">{totalVotes} değerlendirme</p></div>
+                              <MapPin className="text-blue-600" size={28} />
+                            </div>
+                            <div className="mb-3">
+                              <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
+                              <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
+                                {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
+                                {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
+                                {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
+                              </div>
+                            </div>
+                            <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
+                          </div>
+                        )
                       })}
                     </div>
                   )}
@@ -1542,27 +1580,27 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
                   <header className="hidden md:block sticky top-0 z-10 bg-white/100 backdrop-blur-md border-b border-gray-200 p-4 font-bold text-lg">Topluluklar</header>
                   <div className="p-6 grid gap-5">
                     {communities.length > 0 ? communities.map(community => {
-                         const totalVotes = (community.votes?.positive || 0) + (community.votes?.neutral || 0) + (community.votes?.negative || 0);
-                         const positivePercent = totalVotes > 0 ? Math.round(((community.votes?.positive || 0) / totalVotes) * 100) : 0;
-                         const neutralPercent = totalVotes > 0 ? Math.round(((community.votes?.neutral || 0) / totalVotes) * 100) : 0;
-                         const negativePercent = totalVotes > 0 ? Math.round(((community.votes?.negative || 0) / totalVotes) * 100) : 0;
-                         return (
-                           <div key={community._id} onClick={() => dispatch(setSelectedCommunity(community))} className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white">
-                             <div className="flex items-start justify-between mb-4">
-                               <div className="flex-1"><h3 className="text-xl font-bold text-gray-900 mb-2">{community.name}</h3><p className="text-sm text-gray-500">{totalVotes} değerlendirme</p></div>
-                               <User className="text-blue-600" size={28} />
-                             </div>
-                             <div className="mb-3">
-                               <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
-                               <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
-                                 {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
-                                 {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
-                                 {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
-                               </div>
-                             </div>
-                             <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
-                           </div>
-                         )
+                      const totalVotes = (community.votes?.positive || 0) + (community.votes?.neutral || 0) + (community.votes?.negative || 0);
+                      const positivePercent = totalVotes > 0 ? Math.round(((community.votes?.positive || 0) / totalVotes) * 100) : 0;
+                      const neutralPercent = totalVotes > 0 ? Math.round(((community.votes?.neutral || 0) / totalVotes) * 100) : 0;
+                      const negativePercent = totalVotes > 0 ? Math.round(((community.votes?.negative || 0) / totalVotes) * 100) : 0;
+                      return (
+                        <div key={community._id} onClick={() => dispatch(setSelectedCommunity(community))} className="relative overflow-hidden border border-gray-200 p-6 rounded-2xl cursor-pointer bg-white">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1"><h3 className="text-xl font-bold text-gray-900 mb-2">{community.name}</h3><p className="text-sm text-gray-500">{totalVotes} değerlendirme</p></div>
+                            <User className="text-blue-600" size={28} />
+                          </div>
+                          <div className="mb-3">
+                            <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
+                            <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
+                              {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
+                              {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
+                              {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
+                        </div>
+                      )
                     }) : (<div className="text-center text-gray-400 py-12"><p className="text-lg font-medium">Henüz topluluk bulunmuyor</p></div>)}
                   </div>
                 </>
@@ -1574,7 +1612,7 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
 
           </>
         )}
-      </main> 
+      </main>
 
       {/* --- BİLDİRİMLER SAYFASI --- */}
       {showNotifications && (
@@ -1662,7 +1700,7 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
         </div>
       )}
 
-    
+
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
