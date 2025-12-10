@@ -167,8 +167,9 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
     switch (notification.type) {
       case 'like':
       case 'comment':
+      case 'comment_like': // Bunu da ekledik
       case 'mention':
-        // Post'a git - notification.post sadece {_id, content} içeriyor, tam post için fetch gerekecek
+        // Post'a git
         if (notification.post?._id) {
           onNavigateToPost(notification.post._id);
           onClose(); // Bildirim panelini kapat
@@ -176,10 +177,15 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         break;
 
       case 'follow_accept':
-        // Kullanıcının profiline git
-        if (notification.sender?._id) {
-          onNavigateToProfile(notification.sender._id);
+        // DÜZELTME BURADA: _id yerine username gönderiyoruz
+        if (notification.sender?.username) {
+          onNavigateToProfile(notification.sender.username);
           onClose(); // Bildirim panelini kapat
+        } else if (notification.sender?._id) {
+          // Yedek plan: Eğer username yoksa (nadir durum) ID deneyelim ama
+          // asıl çözüm username olmasıdır.
+          onNavigateToProfile(notification.sender._id);
+          onClose();
         }
         break;
 
@@ -187,7 +193,6 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         break;
     }
   };
-
  const getNotificationIcon = (type) => {
     switch (type) {
       case 'like':

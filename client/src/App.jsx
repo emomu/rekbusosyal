@@ -1116,10 +1116,19 @@ const SidebarItem = ({ id, icon: Icon, label }) => (
   
           
           /* --- 2. ÖNCELİK: BAŞKA BİR KULLANICININ PROFİLİ --- */
-          <PublicProfilePage
+         <PublicProfilePage
             username={viewedProfile}
             onClose={() => {
-                setViewedProfile(null)
+              setViewedProfile(null); // 1. Profili kapat
+              
+              // 2. Arkada geçerli bir sekme açık mı kontrol et
+              // Bu sekmelerden biri açıksa dokunma (kullanıcı orada kalır)
+              const validTabs = ['akis', 'kampusler', 'itiraflar', 'topluluklar', 'profil', 'publicProfil'];
+              
+              // Eğer geçerli bir sekme yoksa (boşluğa düşecekse) Akış'a gönder
+              if (!validTabs.includes(activeTab)) {
+                dispatch(setActiveTab('akis'));
+              }
             }}
           />
 
