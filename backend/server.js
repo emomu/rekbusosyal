@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { Resend } = require('resend'); // Resend ile değiştirildi
+const nodemailer = require('nodemailer'); // Nodemailer ile değiştirildi
 const crypto = require('crypto'); // EKLENDİ
 const User = require('./models/User');
 const cron = require('node-cron'); // En üste ekle
@@ -30,14 +30,28 @@ const Notification = require('./models/Notification');
 const app = express();
 const path = require('path');
 
-// --- Resend Email Servisi (Railway uyumlu) ---
-const resend = new Resend(process.env.RESEND_API_KEY);
+// --- Nodemailer Email Servisi ---
+const transporter = nodemailer.createTransport({
+  service: 'gmail', // Gmail kullanıyoruz (Outlook, Yahoo vs de olabilir)
+  auth: {
+    user: process.env.EMAIL_USER, // Gmail adresiniz
+    pass: process.env.EMAIL_PASS  // Gmail app password (uygulama şifresi)
+  }
+});
 
-// Resend API key kontrolü
-if (!process.env.RESEND_API_KEY) {
-  console.log('⚠️ RESEND_API_KEY bulunamadı. Email gönderilemeyecek.');
+// Email servis kontrolü
+if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+  console.log('⚠️ EMAIL_USER veya EMAIL_PASS bulunamadı. Email gönderilemeyecek.');
 } else {
-  console.log('✅ Resend email servisi hazır');
+  console.log('✅ Nodemailer email servisi hazır');
+  // Test bağlantısı
+  transporter.verify((error, success) => {
+    if (error) {
+      console.log('❌ Email servisi bağlantı hatası:', error);
+    } else {
+      console.log('✅ Email servisi bağlantısı başarılı');
+    }
+  });
 }
 // -------------------------------------
 
@@ -270,8 +284,10 @@ app.post('/api/posts/:id/like', auth, async (req, res) => {
       // 2. Bildirim Oluştur
       // DÜZELTME: !post.isAnonymous kontrolü kaldırıldı.
       // Artık post anonim olsa bile sahibine bildirim gider.
+      console.log(`[LIKE] Post ID: ${post._id}, Author: ${post.author}, Current User: ${userId}, isAnonymous: ${post.isAnonymous}`);
+
       if (post.author && userId.toString() !== post.author.toString()) {
-        
+
         // Çift kayıt kontrolü
         const existingNotif = await Notification.findOne({
            recipient: post.author,
@@ -281,14 +297,18 @@ app.post('/api/posts/:id/like', auth, async (req, res) => {
         });
 
         if (!existingNotif) {
-            await Notification.create({
+            const notification = await Notification.create({
               recipient: post.author,
               sender: userId,
               type: 'like',
               post: post._id
             });
-            console.log(`🔔 Post Like Bildirimi -> Alıcı: ${post.author}`);
+            console.log(`🔔 Post Like Bildirimi OLUŞTURULDU -> Alıcı: ${post.author}, Bildirim ID: ${notification._id}`);
+        } else {
+            console.log(`⚠️ Post Like Bildirimi zaten var, atlanıyor`);
         }
+      } else {
+        console.log(`⚠️ Bildirim OLUŞTURULAMADI - Sebep: ${!post.author ? 'Post author yok' : 'Kendi postunu beğendin'}`);
       }
     }
 
@@ -434,21 +454,27 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, r
 
     // 1. Post Sahibine Bildirim
     // DÜZELTME: !post.isAnonymous kontrolü kaldırıldı.
+    console.log(`[YORUM] Post ID: ${postId}, Author: ${post.author}, Current User: ${userId}, isAnonymous: ${post.isAnonymous}`);
+
     if (post.author && userId.toString() !== post.author.toString()) {
-      await Notification.create({
+      const notification = await Notification.create({
         recipient: post.author,
         sender: userId,
         type: 'comment',
         post: postId,
         comment: comment._id
       });
-      console.log(`💬 Yorum Bildirimi -> Alıcı: ${post.author}`);
+      console.log(`💬 Yorum Bildirimi OLUŞTURULDU -> Alıcı: ${post.author}, Bildirim ID: ${notification._id}`);
+    } else {
+      console.log(`⚠️ Yorum Bildirimi OLUŞTURULAMADI - Sebep: ${!post.author ? 'Post author yok' : 'Kendi postuna yorum yaptın'}`);
     }
 
     // 2. Mention Bildirimleri
     const mentions = extractMentions(content);
+    console.log(`[MENTION] Bulunan mention'lar:`, mentions);
     if (mentions.length > 0) {
       const mentionedUsers = await User.find({ username: { $in: mentions }, _id: { $ne: userId } }).select('_id');
+      console.log(`[MENTION] Mention edilen kullanıcılar:`, mentionedUsers.map(u => u._id));
       const mentionNotifs = mentionedUsers.map(user => ({
         recipient: user._id,
         sender: userId,
@@ -456,7 +482,10 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, r
         post: postId,
         comment: comment._id
       }));
-      if (mentionNotifs.length > 0) await Notification.insertMany(mentionNotifs);
+      if (mentionNotifs.length > 0) {
+        await Notification.insertMany(mentionNotifs);
+        console.log(`📢 ${mentionNotifs.length} Mention Bildirimi OLUŞTURULDU`);
+      }
     }
 
     res.status(201).json(comment);
@@ -544,12 +573,12 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const verificationToken = crypto.randomBytes(32).toString('hex'); // EKLENDİ
 
-    // 4. Mail Gönderme (Resend ile)
+    // 4. Mail Gönderme (Nodemailer ile)
     const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
 
     try {
-      await resend.emails.send({
-        from: 'KBÜ Sosyal <onboarding@resend.dev>',
+      await transporter.sendMail({
+        from: `"KBÜ Sosyal" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: 'KBÜ Sosyal - Hesabını Doğrula',
         html: `
@@ -1769,10 +1798,10 @@ app.post('/api/resend-verification', async (req, res) => {
     // Mail Gönderme İşlemi (Register ile aynı mantık)
     const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${newVerificationToken}`;
 
-    // Resend ile mail gönder
+    // Nodemailer ile mail gönder
     try {
-      await resend.emails.send({
-        from: 'KBÜ Sosyal <onboarding@resend.dev>',
+      await transporter.sendMail({
+        from: `"KBÜ Sosyal" <${process.env.EMAIL_USER}>`,
         to: user.email,
         subject: 'KBÜ Sosyal - Yeni Doğrulama Linki',
         html: `

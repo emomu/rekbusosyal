@@ -11,7 +11,12 @@ export default function MobileHeader({ onMenuClick, onNotificationsClick, unread
         <div className="flex items-center gap-2">
           {/* Bildirimler Butonu */}
           <button
-            onClick={onNotificationsClick}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onNotificationsClick();
+            }}
+            type="button"
             className="relative p-2 hover:bg-gray-100 rounded-lg transition"
             aria-label="Bildirimler"
           >

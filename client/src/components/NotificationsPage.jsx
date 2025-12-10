@@ -20,8 +20,11 @@ export default function NotificationsPage({ onClose }) {
 
   const fetchNotifications = async (page = 1) => {
     try {
+      // Sadece ilk sayfa ve bildirim yoksa loading göster
       if (page === 1) {
-        dispatch(setLoading(true));
+        if (notifications.length === 0) {
+          dispatch(setLoading(true));
+        }
       } else {
         setLoadingMore(true);
       }
@@ -205,16 +208,6 @@ export default function NotificationsPage({ onClose }) {
     return notifDate.toLocaleDateString('tr-TR');
   };
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-white z-50 flex items-center justify-center">
-        <div className="w-24 h-24">
-          <Lottie animationData={loaderAnimation} loop={true} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       {/* Backdrop - Sadece desktop'ta görünür */}
@@ -246,7 +239,13 @@ export default function NotificationsPage({ onClose }) {
 
       {/* Notifications List */}
       <div className="flex-1 overflow-y-auto">
-        {notifications.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-16 h-16">
+              <Lottie animationData={loaderAnimation} loop={true} />
+            </div>
+          </div>
+        ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
             <Bell size={48} className="text-gray-300 mb-3" />
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Henüz bildirim yok</h2>

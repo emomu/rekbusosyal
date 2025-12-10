@@ -362,9 +362,31 @@ export default function App() {
       };
 
       loadInitialData();
-
     }
   }, [token, userId, dispatch]);
+
+  // Periyodik bildirim kontrol - Her 30 saniyede bir yeni bildirim var mı kontrol et
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchUnreadCount = () => {
+      fetch(`${API_URL}/api/notifications/unread-count`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data.unreadCount !== undefined) {
+            dispatch(setUnreadCount(data.unreadCount));
+          }
+        })
+        .catch(err => console.error('Bildirim sayısı yüklenemedi:', err));
+    };
+
+    // Her 30 saniyede bir güncelle (yeni bildirimler için)
+    const interval = setInterval(fetchUnreadCount, 30000);
+
+    return () => clearInterval(interval);
+  }, [token, dispatch]);
 
   // İtiraflar Tabına Geçilince Veri Çek (Pagination ile)
   useEffect(() => {
@@ -838,7 +860,11 @@ export default function App() {
 
           {/* Bildirimler Butonu */}
           <div
-            onClick={() => setShowNotifications(true)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowNotifications(true);
+            }}
             className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all hover:bg-gray-100 text-gray-700 relative"
           >
             <Bell size={20} />
