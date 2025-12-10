@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer'); // Nodemailer ile değiştirildi
+const { Resend } = require('resend'); // Resend
 const crypto = require('crypto'); // EKLENDİ
 const User = require('./models/User');
 const cron = require('node-cron'); // En üste ekle
@@ -30,34 +30,14 @@ const Notification = require('./models/Notification');
 const app = express();
 const path = require('path');
 
-// --- Nodemailer Email Servisi ---
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 10000, // 10 saniye timeout
-  greetingTimeout: 10000,
-  socketTimeout: 10000
-});
+// --- Resend Email Servisi ---
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Email servis kontrolü
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-  console.log('⚠️ EMAIL_USER veya EMAIL_PASS bulunamadı. Email gönderilemeyecek.');
+if (!process.env.RESEND_API_KEY) {
+  console.log('⚠️ RESEND_API_KEY bulunamadı. Email gönderilemeyecek.');
 } else {
-  console.log('✅ Nodemailer email servisi hazır');
-  // Test bağlantısı - async olarak yapalım ki server başlamasını engellemesin
-  transporter.verify().then(() => {
-    console.log('✅ Email servisi bağlantısı başarılı');
-  }).catch((error) => {
-    console.log('⚠️ Email servisi bağlantı hatası (mail gönderilemeyebilir):', error.message);
-  });
+  console.log('✅ Resend email servisi hazır');
 }
 // -------------------------------------
 
@@ -579,21 +559,112 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
     const verificationToken = crypto.randomBytes(32).toString('hex'); // EKLENDİ
 
-    // 4. Mail Gönderme (Nodemailer ile)
+    // 4. Mail Gönderme (Resend ile)
     const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${verificationToken}`;
 
     try {
-      await transporter.sendMail({
-        from: `"KBÜ Sosyal" <${process.env.EMAIL_USER}>`,
+      await resend.emails.send({
+        from: 'KBÜ Sosyal <kbusosyal@resend.dev>',
         to: email,
-        subject: 'KBÜ Sosyal - Hesabını Doğrula',
+        subject: '🎓 Hoş Geldin! Hesabını Doğrula - KBÜ Sosyal',
         html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-            <h2 style="color: #1e3a8a;">Hoş Geldin ${fullName}!</h2>
-            <p>KBÜ Sosyal hesabını etkinleştirmek için lütfen aşağıdaki butona tıkla:</p>
-            <a href="${verificationLink}" style="background-color: #1e3a8a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Hesabımı Doğrula</a>
-            <p style="margin-top: 20px; font-size: 12px; color: #777;">Bu işlemi sen yapmadıysan, bu maili dikkate alma.</p>
-          </div>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hesabını Doğrula</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container -->
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+          <!-- Header with Logo and Background -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 40px 30px; text-align: center;">
+              <div style="background-color: white; display: inline-block; padding: 15px 30px; border-radius: 12px; margin-bottom: 20px;">
+                <h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -1px; color: #1e3a8a;">
+                  KBÜ<span style="color: #dc2626;">Sosyal</span>
+                </h1>
+              </div>
+              <h2 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
+                Hesabını Doğrula
+              </h2>
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <h1 style="color: #1f2937; font-size: 28px; margin: 0 0 20px 0; font-weight: 700;">
+                Merhaba ${fullName}! 👋
+              </h1>
+
+              <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                KBÜ Sosyal'e hoş geldin! Karabük Üniversitesi öğrencilerine özel platformumuza katıldığın için çok mutluyuz.
+              </p>
+
+              <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
+                Hesabını aktif etmek ve aramıza katılmak için aşağıdaki butona tıklaman yeterli:
+              </p>
+
+              <!-- CTA Button -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding: 20px 0;">
+                    <a href="${verificationLink}" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
+                      ✓ Hesabımı Doğrula
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Features Box -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px; background-color: #f9fafb; border-radius: 12px; padding: 20px;">
+                <tr>
+                  <td>
+                    <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 15px 0;">
+                      📱 Seni Neler Bekliyor?
+                    </p>
+                    <ul style="color: #6b7280; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
+                      <li>Kampüs hayatını paylaş</li>
+                      <li>Öğrenci topluluklarına katıl</li>
+                      <li>Kampüsler hakkında görüş bildir</li>
+                      <li>Anonim itiraflar yap</li>
+                    </ul>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Alternative Link -->
+              <p style="color: #9ca3af; font-size: 13px; line-height: 1.6; margin: 30px 0 0 0; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                Buton çalışmıyorsa, aşağıdaki linki tarayıcına kopyala:<br>
+                <a href="${verificationLink}" style="color: #3b82f6; word-break: break-all;">${verificationLink}</a>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">
+                Bu maili sen talep etmediysen, güvenle görmezden gelebilirsin.
+              </p>
+              <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+                © 2024 KBÜ Sosyal • Karabük Üniversitesi Öğrenci Platformu
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
         `
       });
       console.log('✅ Doğrulama maili gönderildi:', email);
@@ -1804,10 +1875,10 @@ app.post('/api/resend-verification', async (req, res) => {
     // Mail Gönderme İşlemi (Register ile aynı mantık)
     const verificationLink = `${process.env.BACKEND_URL}/api/verify-email?token=${newVerificationToken}`;
 
-    // Nodemailer ile mail gönder
+    // Resend ile mail gönder
     try {
-      await transporter.sendMail({
-        from: `"KBÜ Sosyal" <${process.env.EMAIL_USER}>`,
+      await resend.emails.send({
+        from: 'KBÜ Sosyal <onboarding@resend.dev>',
         to: user.email,
         subject: 'KBÜ Sosyal - Yeni Doğrulama Linki',
         html: `
