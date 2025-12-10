@@ -32,11 +32,19 @@ const path = require('path');
 
 // --- Nodemailer Email Servisi ---
 const transporter = nodemailer.createTransport({
-  service: 'gmail', // Gmail kullanıyoruz (Outlook, Yahoo vs de olabilir)
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // true for 465, false for other ports
   auth: {
-    user: process.env.EMAIL_USER, // Gmail adresiniz
-    pass: process.env.EMAIL_PASS  // Gmail app password (uygulama şifresi)
-  }
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000, // 10 saniye timeout
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
 
 // Email servis kontrolü
@@ -44,13 +52,11 @@ if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
   console.log('⚠️ EMAIL_USER veya EMAIL_PASS bulunamadı. Email gönderilemeyecek.');
 } else {
   console.log('✅ Nodemailer email servisi hazır');
-  // Test bağlantısı
-  transporter.verify((error, success) => {
-    if (error) {
-      console.log('❌ Email servisi bağlantı hatası:', error);
-    } else {
-      console.log('✅ Email servisi bağlantısı başarılı');
-    }
+  // Test bağlantısı - async olarak yapalım ki server başlamasını engellemesin
+  transporter.verify().then(() => {
+    console.log('✅ Email servisi bağlantısı başarılı');
+  }).catch((error) => {
+    console.log('⚠️ Email servisi bağlantı hatası (mail gönderilemeyebilir):', error.message);
   });
 }
 // -------------------------------------
