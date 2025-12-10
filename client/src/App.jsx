@@ -16,7 +16,8 @@ import LikeButton from './components/LikeButton';
 
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
-import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X, Bell } from 'lucide-react';
+// Loader2 ikonu eklendi
+import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X, Bell, Loader2 } from 'lucide-react';
 import { API_URL } from './config/api';
 import PostDetailPage from './components/PostDetailPage';
 
@@ -151,6 +152,12 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   // Selected post for detail modal
   const [selectedPost, setSelectedPost] = useState(null);
+
+  // --- ARAMA İÇİN STATE'LER ---
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef(null);
 
   // --- YARDIMCI FONKSİYONLAR ---
 
@@ -538,6 +545,7 @@ export default function App() {
       }
     } catch (err) { console.error(err); }
   };
+
   // --- MENTION PARSER ---
   // Metin içindeki @kullaniciadi kısımlarını renkli ve tıklanabilir yapar
   const renderContentWithMentions = (text) => {
@@ -565,6 +573,68 @@ export default function App() {
       }
       return part;
     });
+  };
+
+  // App.js içindeki handleSearch fonksiyonunu bununla değiştir:
+
+  const handleSearch = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+
+    // Önceki zamanlayıcıyı temizle (Debounce)
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Eğer kutu boşsa veya 1 karakterden azsa arama yapma
+    if (!query.trim() || query.length < 1) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+
+    // 500ms bekle ve isteği at
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        if (!token) {
+           console.warn("Arama için giriş yapmalısınız.");
+           setIsSearching(false);
+           return;
+        }
+
+        console.log(`🌐 İstek gönderiliyor: ${API_URL}/api/search/users?q=${query}`);
+
+        const res = await fetch(`${API_URL}/api/search/users?q=${encodeURIComponent(query)}`, {
+          method: 'GET', // Methodu açıkça belirtelim
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(Array.isArray(data) ? data : []);
+        } else {
+          console.error("Arama sunucu hatası:", res.status, res.statusText);
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error('Arama ağ hatası:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+  };
+
+  const handleSearchResultClick = (username) => {
+    setViewedProfile(username);
+    setSelectedPost(null);
+    setSearchQuery(''); // Arama kutusunu temizle
+    setSearchResults([]); // Sonuçları temizle
   };
 
   // Kampüs Detay & Yorum
@@ -1246,8 +1316,6 @@ export default function App() {
                               {renderContentWithMentions(item.content)}
                             </div>
 
-                            {/* --- DÜZELTME BURADA --- */}
-                            {/* onClick={(e) => e.stopPropagation()} ekleyerek bu alana tıklanınca post detayına gitmesini engelliyoruz */}
                             <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
                               <LikeButton
                                 isLiked={item.likes.includes(userId)}
@@ -1260,65 +1328,6 @@ export default function App() {
                               </button>
                             </div>
 
-                          </div>
-                        );
-                      })}
-                      <LoadMoreButton onLoadMore={handleLoadMorePosts} isLoading={isLoadingPosts} hasMore={postsPagination.hasMore} />
-                    </>
-                  )}
-                </div>
-
-
-
-                {/* Post Listesi */}
-                <div className="divide-y divide-gray-100">
-                  {isLoadingPosts && posts.length === 0 ? (
-                    <FeedShimmer count={5} />
-                  ) : (
-                    <>
-                      {mergeWithAds(posts).map((item) => {
-                        if (item.isAd) {
-                          return (
-                            <AdCard
-                              key={item._id}
-                              ad={item}
-                              onView={() => trackAdImpression(item._id.split('-')[1])}
-                              onClick={() => handleAdClick({ _id: item._id.split('-')[1], targetUrl: item.targetUrl, tags: item.tags })}
-                              onImageClick={(img) => dispatch(setSelectedImage(img))}
-                            />
-                          );
-                        }
-                        return (
-                          <div key={item._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(item)}>
-                            <div className="flex items-center gap-3 mb-2">
-                              <div onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
-                                {item.author?.profilePicture ? (
-                                  <img src={item.author.profilePicture} className="w-9 h-9 bg-gray-200 rounded-full object-cover hover:opacity-80 transition" />
-                                ) : (
-                                  <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center hover:opacity-80 transition"><User size={16} className="text-gray-400" /></div>
-                                )}
-                              </div>
-                              <div>
-                                <div className="font-bold text-sm text-gray-900 hover:underline" onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
-                                  {item.author?.username || 'Anonim'}
-                                </div>
-                                <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
-                              </div>
-                            </div>
-                            <div className="text-gray-800 mb-3 whitespace-pre-wrap">
-                              {renderContentWithMentions(item.content)}
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <LikeButton
-                                isLiked={item.likes.includes(userId)}
-                                likeCount={item.likes.length}
-                                onClick={() => handleLike(item._id, 'post')}
-                              />
-                              <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition">
-                                <MessageSquare size={20} />
-                                <span className="text-sm font-medium">Yorum yap</span>
-                              </button>
-                            </div>
                           </div>
                         );
                       })}
@@ -1653,12 +1662,60 @@ export default function App() {
         />
       )}
 
-      {/* SAĞ PANEL */}
+      {/* SAĞ PANEL - GÜNCELLENMİŞ ARAMA KISMI */}
       <aside className="w-80 hidden lg:block p-6 sticky top-0 h-screen">
         <div className="relative mb-6">
           <Search className="absolute left-3 top-3 text-gray-400" size={18} />
-          <input type="text" placeholder="Ara..." className="w-full bg-gray-100 p-2.5 pl-10 rounded-full text-sm outline-none focus:ring-2 focus:ring-blue-100" />
+          <input 
+            type="text" 
+            placeholder="Ara..." 
+            className="w-full bg-gray-100 p-2.5 pl-10 rounded-full text-sm outline-none focus:ring-2 focus:ring-blue-100"
+            value={searchQuery}
+            onChange={handleSearch}
+          />
+          
+          {/* Arama Sonuçları Dropdown */}
+          {(searchResults.length > 0 || isSearching) && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50 max-h-96 overflow-y-auto">
+              {isSearching ? (
+                <div className="p-4 flex justify-center items-center text-gray-500">
+                  <Loader2 className="animate-spin mr-2" size={20} />
+                  <span className="text-sm">Aranıyor...</span>
+                </div>
+              ) : (
+                searchResults.map(user => (
+                  <div 
+                    key={user._id}
+                    onClick={() => handleSearchResultClick(user.username)}
+                    className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
+                  >
+                    {user.profilePicture ? (
+                      <img 
+                        src={user.profilePicture} 
+                        alt={user.username} 
+                        className="w-10 h-10 rounded-full object-cover border border-gray-100"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-400">
+                        <User size={20} />
+                      </div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="font-bold text-sm text-gray-900">{user.fullName}</span>
+                      <span className="text-xs text-gray-500">@{user.username}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+              {!isSearching && searchResults.length === 0 && searchQuery.length >= 2 && (
+                <div className="p-4 text-center text-gray-500 text-sm">
+                  Sonuç bulunamadı.
+                </div>
+              )}
+            </div>
+          )}
         </div>
+        
         <div className="border border-gray-200 rounded-xl p-5 bg-white">
           <h3 className="font-bold mb-3 text-gray-800">Popüler Başlıklar</h3>
           <ul className="space-y-3">
@@ -1700,11 +1757,8 @@ export default function App() {
         </div>
       )}
 
-
-
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
     </div>
   );
 }
-

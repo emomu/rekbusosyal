@@ -74,6 +74,43 @@ mongoose.connect(process.env.MONGO_URI) // .env'den çekiliyor
   .then(() => console.log('MongoDB Bağlandı'))
   .catch(err => console.error('Bağlantı Hatası:', err));
 
+app.get('/api/search/users', auth, async (req, res) => {
+  try {
+    let { q } = req.query;
+    console.log(`🔎 Arama İsteği Alındı: "${q}"`); // Terminalde bu logu görmelisin
+
+    if (!q || q.trim().length < 1) {
+      return res.json([]);
+    }
+
+    // @ işaretini temizle
+    if (q.startsWith('@')) {
+      q = q.substring(1);
+    }
+
+    // Özel karakterleri escape et (Regex güvenliği)
+    const safeQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    const users = await User.find({
+      $and: [
+        { _id: { $ne: req.userId } }, // Kendini arama sonuçlarında gösterme
+        {
+          $or: [
+            { username: { $regex: safeQuery, $options: 'i' } }, // Case-insensitive arama
+            { fullName: { $regex: safeQuery, $options: 'i' } }
+          ]
+        }
+      ]
+    })
+    .select('username fullName profilePicture') // Sadece gerekli alanları al
+    .limit(10); // Max 10 sonuç
+
+    res.json(users);
+  } catch (err) {
+    console.error('❌ Kullanıcı arama hatası:', err);
+    res.status(500).json({ error: "Arama sırasında bir hata oluştu" });
+  }
+});
 // --- ROTALAR ---
 app.get('/sitemap.xml', async (req, res) => {
   res.header('Content-Type', 'application/xml');
@@ -1103,9 +1140,14 @@ app.put('/api/profile/privacy', async (req, res) => {
 // KULLANICI PROFİLİ VE TAKİP SİSTEMİ
 // ============================================
 
-// Kullanıcı profilini getir (public)
+
+// 1. SIRADA: ARAMA (Search) - MUTLAKA ÜSTTE OLMALI
+
+
+// 2. SIRADA: PROFİL (:username) - MUTLAKA ARAMADAN SONRA OLMALI
 app.get('/api/users/:username', async (req, res) => {
   try {
+    // Eğer kod buraya giriyorsa, username "search" değildir.
     const user = await User.findOne({ username: req.params.username })
       .select('-password -votedCampuses -votedCommunities')
       .populate('followers', 'username fullName profilePicture')
