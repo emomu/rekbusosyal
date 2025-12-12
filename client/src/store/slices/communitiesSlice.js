@@ -43,11 +43,9 @@ const communitiesSlice = createSlice({
 
     updateCommunityVote: (state, action) => {
       const { communityId, counts } = action.payload;
-      const community = state.communities.find(c => c._id === communityId);
-      if (community) {
-        community.positiveCount = counts.positiveCount;
-        community.neutralCount = counts.neutralCount;
-        community.negativeCount = counts.negativeCount;
+      const communityIndex = state.communities.findIndex(c => c._id === communityId);
+      if (communityIndex !== -1) {
+        state.communities[communityIndex].votes = counts.votes;
       }
     },
 

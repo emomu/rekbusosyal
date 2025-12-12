@@ -43,11 +43,9 @@ const campusesSlice = createSlice({
 
     updateCampusVote: (state, action) => {
       const { campusId, counts } = action.payload;
-      const campus = state.campuses.find(c => c._id === campusId);
-      if (campus) {
-        campus.positiveCount = counts.positiveCount;
-        campus.neutralCount = counts.neutralCount;
-        campus.negativeCount = counts.negativeCount;
+      const campusIndex = state.campuses.findIndex(c => c._id === campusId);
+      if (campusIndex !== -1) {
+        state.campuses[campusIndex].votes = counts.votes;
       }
     },
 
