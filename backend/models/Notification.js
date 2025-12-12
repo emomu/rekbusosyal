@@ -39,7 +39,16 @@ const notificationSchema = new mongoose.Schema({
   timestamps: true
 });
 
-notificationSchema.index({ recipient: 1, createdAt: -1 });
-notificationSchema.index({ recipient: 1, isRead: 1 });
+// Compound indexes for better query performance
+notificationSchema.index({ recipient: 1, createdAt: -1 }); // Bildirimleri sırayla çekmek için
+notificationSchema.index({ recipient: 1, isRead: 1 }); // Okunmamış bildirimleri filtrelemek için
+notificationSchema.index({ recipient: 1, isRead: 1, createdAt: -1 }); // Hem okunmamış hem sıralı
+
+// Type ve post alanları için index (suggestion bildirimlerinde aynı postu kontrol etmek için)
+notificationSchema.index({ recipient: 1, type: 1, post: 1 }); // Duplicate bildirim önleme
+
+// TTL Index: 90 gün sonra otomatik silme (opsiyonel - bellek tasarrufu için)
+// İsteğe bağlı olarak aktif edilebilir:
+// notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 }); // 90 gün
 
 module.exports = mongoose.model('Notification', notificationSchema);

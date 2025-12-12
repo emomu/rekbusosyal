@@ -13,6 +13,7 @@ import { useToast } from './hooks/useToast';
 import MobileHeader from './components/MobileHeader';
 import NotificationsPage from './components/NotificationsPage';
 import LikeButton from './components/LikeButton';
+import VersionNotesPage from './components/VersionNotesPage';
 
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
@@ -1229,6 +1230,7 @@ export default function App() {
             onMentionClick={(username) => {
               setViewedProfile(username);
             }}
+            currentUserProfilePic={currentUserInfo?.profilePicture}
           />
 
         ) : activeTab === 'publicProfil' ? (
@@ -1240,6 +1242,7 @@ export default function App() {
             onMentionClick={(username) => {
               setViewedProfile(username);
             }}
+            currentUserProfilePic={currentUserInfo?.profilePicture}
           />
 
         ) : (
@@ -1618,6 +1621,9 @@ export default function App() {
 
             {/* --- AYARLAR SEKMESİ --- */}
             {activeTab === 'profil' && <ProfilePage onMenuClick={() => setIsMobileMenuOpen(true)} />}
+
+            {/* --- SÜRÜM NOTLARI SEKMESİ --- */}
+            {activeTab === 'versionNotes' && <VersionNotesPage />}
 
           </>
         )}

@@ -26,6 +26,7 @@ const Community = require('./models/Community');
 const CommunityComment = require('./models/CommunityComment');
 const Comment = require('./models/Comment');
 const Notification = require('./models/Notification');
+const VersionNote = require('./models/VersionNote');
 
 const app = express();
 const path = require('path');
@@ -1491,6 +1492,21 @@ app.put('/api/admin/users/:id/role', strictAdminAuth, async (req, res) => {
   }
 });
 
+// Kullanıcı doğrulama durumu değiştir
+app.put('/api/admin/users/:id/verify', adminAuth, async (req, res) => {
+  try {
+    const { isVerified } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isVerified },
+      { new: true }
+    ).select('-password');
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Doğrulama durumu güncellenemedi" });
+  }
+});
+
 // Kullanıcıyı sil
 app.delete('/api/admin/users/:id', strictAdminAuth, async (req, res) => {
   try {
@@ -1698,10 +1714,16 @@ app.delete('/api/admin/communities/:id', adminAuth, async (req, res) => {
 // Tüm yorumları listele
 app.get('/api/admin/comments', adminAuth, async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
     const comments = await CampusComment.find()
       .populate('author', 'username profilePicture')
       .populate('campusId', 'name')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
     res.json(comments);
   } catch (err) {
     res.status(500).json({ error: "Yorumlar getirilemedi" });
@@ -1721,9 +1743,15 @@ app.delete('/api/admin/comments/:id', adminAuth, async (req, res) => {
 // Tüm postları listele (moderasyon için)
 app.get('/api/admin/posts', adminAuth, async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
     const posts = await Post.find()
       .populate('author', 'username profilePicture')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
     res.json(posts);
   } catch (err) {
     res.status(500).json({ error: "Postlar getirilemedi" });
@@ -1737,6 +1765,116 @@ app.delete('/api/admin/posts/:id', adminAuth, async (req, res) => {
     res.json({ message: "Post silindi" });
   } catch (err) {
     res.status(500).json({ error: "Post silinemedi" });
+  }
+});
+
+// ============================================
+// SÜRÜM NOTLARI (VERSION NOTES) ENDPOİNT'LERİ
+// ============================================
+
+// Tüm yayınlanmış sürüm notlarını getir (Public)
+app.get('/api/version-notes', async (req, res) => {
+  try {
+    const notes = await VersionNote.find({ isPublished: true })
+      .sort({ releaseDate: -1 })
+      .select('-createdBy')
+      .lean();
+    res.json(notes);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Sürüm notları getirilemedi' });
+  }
+});
+
+// Tüm sürüm notlarını getir (Admin - hem published hem unpublished)
+app.get('/api/admin/version-notes', adminAuth, async (req, res) => {
+  try {
+    const notes = await VersionNote.find()
+      .sort({ releaseDate: -1 })
+      .populate('createdBy', 'username fullName')
+      .lean();
+    res.json(notes);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Sürüm notları getirilemedi' });
+  }
+});
+
+// Yeni sürüm notu oluştur (Admin)
+app.post('/api/admin/version-notes', adminAuth, async (req, res) => {
+  try {
+    const { version, title, description, features, bugFixes, improvements, releaseDate, isPublished } = req.body;
+
+    const newNote = new VersionNote({
+      version,
+      title,
+      description,
+      features: features || [],
+      bugFixes: bugFixes || [],
+      improvements: improvements || [],
+      releaseDate: releaseDate || new Date(),
+      isPublished: isPublished || false,
+      createdBy: req.userId
+    });
+
+    await newNote.save();
+    res.status(201).json(newNote);
+  } catch (err) {
+    console.error(err);
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'Bu sürüm numarası zaten mevcut' });
+    }
+    res.status(500).json({ error: 'Sürüm notu oluşturulamadı' });
+  }
+});
+
+// Sürüm notunu güncelle (Admin)
+app.put('/api/admin/version-notes/:id', adminAuth, async (req, res) => {
+  try {
+    const { version, title, description, features, bugFixes, improvements, releaseDate, isPublished } = req.body;
+
+    const updatedNote = await VersionNote.findByIdAndUpdate(
+      req.params.id,
+      {
+        version,
+        title,
+        description,
+        features,
+        bugFixes,
+        improvements,
+        releaseDate,
+        isPublished
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedNote) {
+      return res.status(404).json({ error: 'Sürüm notu bulunamadı' });
+    }
+
+    res.json(updatedNote);
+  } catch (err) {
+    console.error(err);
+    if (err.code === 11000) {
+      return res.status(400).json({ error: 'Bu sürüm numarası zaten mevcut' });
+    }
+    res.status(500).json({ error: 'Sürüm notu güncellenemedi' });
+  }
+});
+
+// Sürüm notunu sil (Admin)
+app.delete('/api/admin/version-notes/:id', adminAuth, async (req, res) => {
+  try {
+    const deletedNote = await VersionNote.findByIdAndDelete(req.params.id);
+
+    if (!deletedNote) {
+      return res.status(404).json({ error: 'Sürüm notu bulunamadı' });
+    }
+
+    res.json({ message: 'Sürüm notu silindi' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Sürüm notu silinemedi' });
   }
 });
 
@@ -2336,38 +2474,91 @@ cron.schedule('0 12,20 * * *', async () => {
   try {
     // 1. Son 24 saatte en çok beğenilen postu bul
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
+
     const popularPost = await Post.findOne({
       createdAt: { $gt: oneDayAgo },
       isAnonymous: false, // Anonim postları önerme (tercihen)
       category: 'Geyik'   // Sadece genel akıştan öner
-    }).sort({ likes: -1 }); // En çok beğenilen
+    })
+    .sort({ 'likes.length': -1 }) // En çok beğenilen (likes array'inin uzunluğuna göre)
+    .select('_id author'); // Sadece gerekli alanları çek
 
-    if (!popularPost) return;
-
-    // 2. Tüm kullanıcılara bildirim gönder (Not: Çok kullanıcılı sistemlerde bu işlem kuyruk yapısı ile yapılmalıdır)
-    // Burada basitlik adına doğrudan ekliyoruz.
-    
-    // Post sahibine kendi postunu önerme
-    const usersToNotify = await User.find({ 
-      _id: { $ne: popularPost.author } 
-    }).select('_id');
-
-    const notifications = usersToNotify.map(user => ({
-      recipient: user._id,
-      sender: popularPost.author, // Gönderen olarak post sahibi görünsün
-      type: 'suggestion',
-      post: popularPost._id,
-      isRead: false
-    }));
-
-    if (notifications.length > 0) {
-      await Notification.insertMany(notifications);
-      console.log(`✅ ${notifications.length} kullanıcıya öneri gönderildi.`);
+    if (!popularPost) {
+      console.log('📭 Son 24 saatte önerilecek popüler post bulunamadı.');
+      return;
     }
 
+    // 2. OPTİMİZE EDİLMİŞ BİLDİRİM SİSTEMİ
+    // Tüm kullanıcıları RAM'e çekmek yerine, batch (toplu) işlem yapıyoruz
+
+    const BATCH_SIZE = 500; // Her seferde 500 kullanıcı işle
+    let processedUsers = 0;
+    let skip = 0;
+
+    // Toplam kullanıcı sayısını al (sadece sayma için)
+    const totalUsers = await User.countDocuments({
+      _id: { $ne: popularPost.author }
+    });
+
+    console.log(`📊 Toplam ${totalUsers} kullanıcıya bildirim gönderilecek...`);
+
+    // Batch işleme döngüsü
+    while (skip < totalUsers) {
+      // Her seferinde sadece BATCH_SIZE kadar kullanıcı çek
+      const userBatch = await User.find({
+        _id: { $ne: popularPost.author }
+      })
+      .select('_id') // Sadece ID'yi al (bellek optimizasyonu)
+      .skip(skip)
+      .limit(BATCH_SIZE)
+      .lean(); // Mongoose document'ı olmadan düz JS objesi olarak al (daha hızlı)
+
+      if (userBatch.length === 0) break;
+
+      // Duplicate bildirim kontrolü: Bu kullanıcılara bu post için zaten bildirim gönderilmiş mi?
+      const existingNotifications = await Notification.find({
+        recipient: { $in: userBatch.map(u => u._id) },
+        type: 'suggestion',
+        post: popularPost._id
+      }).select('recipient').lean();
+
+      // Zaten bildirim alan kullanıcıları filtrele
+      const existingRecipients = new Set(existingNotifications.map(n => n.recipient.toString()));
+      const usersToNotify = userBatch.filter(user => !existingRecipients.has(user._id.toString()));
+
+      // Eğer tüm kullanıcılara zaten bildirim gönderildiyse, devam et
+      if (usersToNotify.length === 0) {
+        skip += BATCH_SIZE;
+        continue;
+      }
+
+      // Bu batch için bildirimleri hazırla
+      const notifications = usersToNotify.map(user => ({
+        recipient: user._id,
+        sender: popularPost.author,
+        type: 'suggestion',
+        post: popularPost._id,
+        isRead: false,
+        createdAt: new Date()
+      }));
+
+      // Batch olarak veritabanına ekle
+      // insertMany ordered:false ile hata olsa bile diğerlerine devam eder
+      await Notification.insertMany(notifications, { ordered: false });
+
+      processedUsers += usersToNotify.length; // Sadece gerçekten bildirim gönderilenleri say
+      skip += BATCH_SIZE;
+
+      console.log(`✅ ${processedUsers}/${totalUsers} kullanıcıya bildirim gönderildi (${userBatch.length - usersToNotify.length} duplicate atlandı)...`);
+
+      // RAM'i rahatlatmak için kısa bir bekleme (isteğe bağlı)
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log(`🎉 Öneri sistemi tamamlandı: ${processedUsers} kullanıcıya bildirim gönderildi.`);
+
   } catch (err) {
-    console.error('Öneri sistemi hatası:', err);
+    console.error('❌ Öneri sistemi hatası:', err);
   }
 });
 const PORT = process.env.PORT || 5001; // .env'den çekiliyor veya 5001

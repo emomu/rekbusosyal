@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X, Trash2 } from 'lucide-react'; // Trash2 eklendi
+import { useDispatch } from 'react-redux';
+import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X, Trash2, FileText } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { API_URL } from '../config/api';
 import MobileHeader from './MobileHeader';
+import { setActiveTab } from '../store/slices/uiSlice';
 
 export default function ProfilePage({ onMenuClick }) {
+  const dispatch = useDispatch();
   const [profile, setProfile] = useState(null);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -636,13 +639,33 @@ export default function ProfilePage({ onMenuClick }) {
             </div>
           </div>
         </div>
-
-        <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl">
+         <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl mt-6">
           <p className="text-xs text-blue-600">
             <strong>Güvenlik:</strong> Profil bilgileriniz güvenli şekilde saklanmaktadır.
             Şifrenizi kimseyle paylaşmayın.
           </p>
         </div>
+
+        {/* Sürüm Notları Butonu */}
+        <div className="mt-6">
+          <button
+            onClick={() => dispatch(setActiveTab('versionNotes'))}
+            className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl hover:from-blue-100 hover:to-blue-200 transition group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500 rounded-lg">
+                <FileText size={20} className="text-white" />
+              </div>
+              <div className="text-left">
+                <p className="font-semibold text-gray-900">Sürüm Notları</p>
+                <p className="text-xs text-gray-600">Güncellemeleri ve yenilikleri görüntüle</p>
+              </div>
+            </div>
+            <div className="text-blue-500 group-hover:translate-x-1 transition-transform">→</div>
+          </button>
+        </div>
+
+       
       </div>
     </>
   );

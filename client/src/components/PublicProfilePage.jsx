@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, Calendar, Lock, User } from 'lucide-react';
+import { ChevronLeft, Calendar, Lock, User, MessageSquare } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import FollowButton from './FollowButton';
 import LoadMoreButton from './LoadMoreButton';
 import LikeButton from './LikeButton';
+import PostDetailPage from './PostDetailPage';
 import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
 import { API_URL } from '../config/api';
 
-export default function PublicProfilePage({ username, onClose }) {
+export default function PublicProfilePage({ username, onClose, onMentionClick, currentUserProfilePic }) {
   const dispatch = useDispatch();
   const token = useSelector(state => state.auth.token);
   const currentUserId = useSelector(state => state.auth.userId);
@@ -21,6 +22,7 @@ export default function PublicProfilePage({ username, onClose }) {
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [loadingConfessions, setLoadingConfessions] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
 
   const isOwnProfile = currentUsername === username;
 
@@ -212,6 +214,24 @@ export default function PublicProfilePage({ username, onClose }) {
 
   const isPrivateAndNotFollowing = currentProfile.isPrivate && !isFollowing && !isOwnProfile;
 
+  // Eğer post detay sayfası açıksa, onu göster
+  if (selectedPost) {
+    return (
+      <PostDetailPage
+        post={selectedPost}
+        onClose={() => setSelectedPost(null)}
+        token={token}
+        currentUserId={currentUserId}
+        onLike={(postId) => handleLike(postId, selectedPost.category === 'İtiraf' ? 'confession' : 'post')}
+        currentUserProfilePic={currentUserProfilePic}
+        onMentionClick={(username) => {
+          setSelectedPost(null);
+          if (onMentionClick) onMentionClick(username);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="relative min-h-screen bg-white">
       <header className="sticky top-0 z-30 bg-white/100 backdrop-blur-md border-b border-gray-200 px-4 h-[60px] flex items-center">
@@ -306,7 +326,7 @@ export default function PublicProfilePage({ username, onClose }) {
                 ) : (
                   <>
                     {userPosts.map((post) => (
-                      <div key={post._id} className="p-5">
+                      <div key={post._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(post)}>
                         <div className="flex items-center gap-3 mb-2">
                           {currentProfile.profilePicture ? (
                             <img
@@ -327,12 +347,24 @@ export default function PublicProfilePage({ username, onClose }) {
                         <div className="text-gray-800 mb-3 whitespace-pre-wrap">
                           {renderWithMentions(post.content)}
                         </div>
-                        {/* Post Beğeni Butonu */}
-                        <LikeButton
-                          isLiked={post.likes?.includes(currentUserId)}
-                          likeCount={post.likes?.length || 0}
-                          onClick={() => handleLike(post._id, 'post')}
-                        />
+                        {/* Post Beğeni ve Yorum Butonları */}
+                        <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                          <LikeButton
+                            isLiked={post.likes?.includes(currentUserId)}
+                            likeCount={post.likes?.length || 0}
+                            onClick={() => handleLike(post._id, 'post')}
+                          />
+                          <button
+                            className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPost(post);
+                            }}
+                          >
+                            <MessageSquare size={20} />
+                            <span className="text-sm font-medium">Yorum yap</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                     <LoadMoreButton onLoadMore={() => fetchUserPosts(currentProfile._id, postsPagination.currentPage + 1)} isLoading={loadingPosts} hasMore={postsPagination.hasMore} />
@@ -348,7 +380,7 @@ export default function PublicProfilePage({ username, onClose }) {
                 ) : (
                   <>
                     {userConfessions.map((confession) => (
-                      <div key={confession._id} className="p-5">
+                      <div key={confession._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(confession)}>
                         <div className="flex items-center gap-3 mb-2">
                           {currentProfile.profilePicture ? (
                             <img
@@ -369,12 +401,24 @@ export default function PublicProfilePage({ username, onClose }) {
                         <div className="text-gray-800 mb-3 whitespace-pre-wrap">
                           {renderWithMentions(confession.content)}
                         </div>
-                        {/* İtiraf Beğeni Butonu */}
-                        <LikeButton
-                          isLiked={confession.likes?.includes(currentUserId)}
-                          likeCount={confession.likes?.length || 0}
-                          onClick={() => handleLike(confession._id, 'confession')}
-                        />
+                        {/* İtiraf Beğeni ve Yorum Butonları */}
+                        <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                          <LikeButton
+                            isLiked={confession.likes?.includes(currentUserId)}
+                            likeCount={confession.likes?.length || 0}
+                            onClick={() => handleLike(confession._id, 'confession')}
+                          />
+                          <button
+                            className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPost(confession);
+                            }}
+                          >
+                            <MessageSquare size={20} />
+                            <span className="text-sm font-medium">Yorum yap</span>
+                          </button>
+                        </div>
                       </div>
                     ))}
                     <LoadMoreButton onLoadMore={() => fetchUserConfessions(currentProfile._id, confessionsPagination.currentPage + 1)} isLoading={loadingConfessions} hasMore={confessionsPagination.hasMore} />

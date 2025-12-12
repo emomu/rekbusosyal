@@ -120,7 +120,7 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
 
 // --- ANA SAYFA BİLEŞENİ (POST DETAIL PAGE) ---
 
-export default function PostDetailPage({ post, onClose, token, currentUserId, onLike, currentUserProfilePic }) {
+export default function PostDetailPage({ post, onClose, token, currentUserId, onLike, currentUserProfilePic, onMentionClick }) {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
