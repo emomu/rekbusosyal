@@ -6,7 +6,7 @@ import loaderAnimation from '../assets/loader.json';
 import { setNotifications, appendNotifications, setPagination, setUnreadCount, markAsRead, markAllAsRead, deleteNotification, setLoading } from '../store/slices/notificationsSlice';
 import { API_URL } from '../config/api';
 
-export default function NotificationsPage({ onClose, onNavigateToProfile, onNavigateToPost, onNavigateToVersionNotes }) {
+export default function NotificationsPage({ onClose, onNavigateToProfile, onNavigateToPost, onNavigateToComment, onNavigateToVersionNotes }) {
   const dispatch = useDispatch();
   const token = useSelector(state => state.auth.token);
   const { notifications, unreadCount, pagination, loading } = useSelector(state => state.notifications);
@@ -167,12 +167,27 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
     switch (notification.type) {
       case 'like':
       case 'comment':
-      case 'comment_like': // Bunu da ekledik
       case 'mention':
         // Post'a git
         if (notification.post?._id) {
           onNavigateToPost(notification.post._id);
           onClose(); // Bildirim panelini kapat
+        }
+        break;
+
+      case 'comment_reply':
+        // Yoruma git (CommentDetailPage aç)
+        if (notification.comment) {
+          onNavigateToComment(notification.comment);
+          onClose(); // Bildirim panelini kapat
+        }
+        break;
+
+      case 'comment_like':
+        // Yorum beğenisi - yoruma git
+        if (notification.comment) {
+          onNavigateToComment(notification.comment);
+          onClose();
         }
         break;
 
@@ -210,6 +225,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return <UserCheck size={20} className="text-green-500" />;
       case 'comment':
         return <MessageSquare size={20} className="text-purple-500" />;
+      case 'comment_reply': // YENİ: Yoruma cevap
+        return <MessageSquare size={20} className="text-blue-500" />;
       case 'mention':
         return <Bell size={20} className="text-orange-500" />;
       case 'suggestion': // YENİ: Öneri
@@ -234,6 +251,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return `${senderName} takip isteğini kabul etti`;
       case 'comment':
         return `${senderName} gönderine yorum yaptı`;
+      case 'comment_reply': // YENİ
+        return `${senderName} yorumuna cevap verdi`;
       case 'mention':
         return `${senderName} seni bir gönderide bahsetti`;
       case 'suggestion': // YENİ

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, BarChart2, Heart } from 'lucide-react';
+import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, Heart } from 'lucide-react';
 import { API_URL } from '../config/api';
 
-// --- LIKE BUTONU BİLEŞENİ (Dokunulmadı, aynen korundu) ---
+// --- LIKE BUTONU BİLEŞENİ ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [particles, setParticles] = useState([]);
@@ -84,7 +84,7 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
       </span>
 
       <style>{`
-        
+
         @keyframes burstWave {
           0% { transform: scale(0.5); opacity: 0.8; }
           100% { transform: scale(3); opacity: 0; }
@@ -118,53 +118,51 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
   );
 };
 
-// --- ANA SAYFA BİLEŞENİ (POST DETAIL PAGE) ---
+// --- ANA COMPONENT (COMMENT DETAIL PAGE) ---
 
-export default function PostDetailPage({ post, onClose, token, currentUserId, onLike, currentUserProfilePic, onMentionClick, onCommentClick }) {
-  const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState('');
+export default function CommentDetailPage({
+  comment: initialComment,
+  onClose,
+  token,
+  currentUserId,
+  currentUserProfilePic,
+  onMentionClick
+}) {
+  const [comment, setComment] = useState(initialComment);
+  const [replies, setReplies] = useState([]);
+  const [newReply, setNewReply] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(null);
 
-  // Yerel State
-  const [isLiked, setIsLiked] = useState(post.likes?.includes(currentUserId) || false);
-  const [likeCount, setLikeCount] = useState(post.likes?.length || 0);
+  // Yerel State - Ana yorum için
+  const [isLiked, setIsLiked] = useState(comment?.likes?.includes(currentUserId) || false);
+  const [likeCount, setLikeCount] = useState(comment?.likes?.length || 0);
 
-  const commentInputRef = useRef(null);
+  const replyInputRef = useRef(null);
 
   useEffect(() => {
-    fetchComments();
+    fetchReplies();
     window.scrollTo(0, 0);
   }, []);
 
-  // --- SORUNU ÇÖZEN KISIM 1: Veri Senkronizasyonu ---
-  // Eğer post prop'u değişirse (örneğin parent component güncellerse), 
-  // yerel state'i güncelle ki veriler tutarlı kalsın.
+  // Ana yorumun like durumunu senkronize et
   useEffect(() => {
-    if (post) {
-      setIsLiked(post.likes?.includes(currentUserId) || false);
-      setLikeCount(post.likes?.length || 0);
+    if (comment) {
+      setIsLiked(comment.likes?.includes(currentUserId) || false);
+      setLikeCount(comment.likes?.length || 0);
     }
-  }, [post, currentUserId]);
+  }, [comment, currentUserId]);
 
-  // --- SORUNU ÇÖZEN KISIM 2: Temiz Toggle Mantığı ---
   const handleLikeToggle = () => {
-    // 1. Yeni durumu hesapla
     const nextIsLiked = !isLiked;
-
-    // 2. State'leri BAĞIMSIZ olarak güncelle (İç içe değil!)
-    // Bu sayede React'in double-invocation (çift çalışma) sorunu engellenir.
     setIsLiked(nextIsLiked);
-
-    // Eğer beğenildiyse +1, geri alındıysa -1
     setLikeCount((prev) => nextIsLiked ? prev + 1 : prev - 1);
 
-    // 3. API çağrısı
-    if (onLike) {
-      onLike(post._id);
-    }
+    // API çağrısı
+    handleLikeComment(comment._id);
   };
+
   const renderWithMentions = (text) => {
     if (!text) return null;
     const parts = text.split(/(@[\w.-]+)/g);
@@ -188,45 +186,47 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
     });
   };
 
-  const fetchComments = async () => {
+  const fetchReplies = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/posts/${post._id}/comments`);
+      const res = await fetch(`${API_URL}/api/comments/${comment._id}/replies`);
       const data = await res.json();
       if (res.ok) {
-        setComments(data);
+        setReplies(data);
       }
     } catch (err) {
-      console.error('Yorumlar yüklenemedi:', err);
+      console.error('Cevaplar yüklenemedi:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubmitComment = async (e) => {
+  const handleSubmitReply = async (e) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    if (!newReply.trim()) return;
 
     try {
       setSubmitting(true);
-      const res = await fetch(`${API_URL}/api/posts/${post._id}/comments`, {
+      const res = await fetch(`${API_URL}/api/comments/${comment._id}/replies`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ content: newComment })
+        body: JSON.stringify({ content: newReply })
       });
 
       const data = await res.json();
       if (res.ok) {
-        setComments([data, ...comments]);
-        setNewComment('');
+        setReplies([data, ...replies]);
+        setNewReply('');
+        // Update reply count locally
+        setComment({ ...comment, replyCount: (comment.replyCount || 0) + 1 });
       } else {
-        alert(data.message || 'Yorum gönderilemedi');
+        alert(data.message || 'Cevap gönderilemedi');
       }
     } catch (err) {
-      console.error('Yorum gönderme hatası:', err);
+      console.error('Cevap gönderme hatası:', err);
     } finally {
       setSubmitting(false);
     }
@@ -240,22 +240,29 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
       });
       const data = await res.json();
       if (res.ok) {
-        setComments(comments.map(c => c._id === commentId ? data : c));
+        // Ana yorum mu yoksa reply mı kontrol et
+        if (commentId === comment._id) {
+          setComment(data);
+        } else {
+          setReplies(replies.map(r => r._id === commentId ? data : r));
+        }
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleDeleteComment = async (commentId) => {
-    if (!window.confirm('Bu yorumu silmek istediğinize emin misiniz?')) return;
+  const handleDeleteReply = async (replyId) => {
+    if (!window.confirm('Bu cevabı silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
+      const res = await fetch(`${API_URL}/api/comments/${replyId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        setComments(comments.filter(c => c._id !== commentId));
+        setReplies(replies.filter(r => r._id !== replyId));
+        // Update reply count
+        setComment({ ...comment, replyCount: Math.max(0, (comment.replyCount || 0) - 1) });
       }
     } catch (err) {
       console.error(err);
@@ -264,8 +271,8 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
 
   const handleShare = async () => {
     const shareData = {
-      title: 'Kbü Sosyal Gönderisi',
-      text: post.content,
+      title: 'Kbü Sosyal Yorumu',
+      text: comment.content,
       url: window.location.href,
     };
 
@@ -274,22 +281,11 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(shareData.url);
-        alert('Gönderi bağlantısı kopyalandı!');
+        alert('Yorum bağlantısı kopyalandı!');
       }
     } catch (err) {
       console.error('Paylaşım hatası:', err);
     }
-  };
-
-  const formatTime = (dateString) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('tr-TR', {
-      hour: 'numeric',
-      minute: 'numeric',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    }).format(date);
   };
 
   const timeAgo = (date) => {
@@ -307,6 +303,17 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
     return "Şimdi";
   };
 
+  const formatTime = (dateString) => {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('tr-TR', {
+      hour: 'numeric',
+      minute: 'numeric',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+  };
+
   return (
     <div className="bg-white min-h-screen animate-in slide-in-from-right duration-300">
 
@@ -318,18 +325,18 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
         >
           <ChevronLeft size={20} className="text-gray-900" />
         </button>
-        <h2 className="text-lg font-bold text-gray-900">Gönderi</h2>
+        <h2 className="text-lg font-bold text-gray-900">Yorum</h2>
       </div>
 
-      {/* 2. ANA GÖNDERİ İÇERİĞİ */}
+      {/* 2. ANA YORUM İÇERİĞİ */}
       <div className="px-4 pt-3 pb-0">
         {/* Yazar Bilgisi */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            {post.author?.profilePicture ? (
+            {comment.author?.profilePicture ? (
               <img
-                src={post.author.profilePicture}
-                alt={post.author.username}
+                src={comment.author.profilePicture}
+                alt={comment.author.username}
                 className="w-10 h-10 rounded-full object-cover border border-gray-100"
               />
             ) : (
@@ -338,8 +345,8 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
               </div>
             )}
             <div className="flex flex-col">
-              <span className="font-bold text-gray-900 text-base">{post.author?.username || 'Anonim'}</span>
-              <span className="text-gray-500 text-sm">{timeAgo(post.createdAt)} önce</span>
+              <span className="font-bold text-gray-900 text-base">{comment.author?.username || 'Anonim'}</span>
+              <span className="text-gray-500 text-sm">{timeAgo(comment.createdAt)} önce</span>
             </div>
           </div>
           <button className="text-gray-400 hover:text-blue-500 transition">
@@ -347,22 +354,15 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
           </button>
         </div>
 
-        {/* Gönderi Metni */}
+        {/* Yorum Metni */}
         <div className="text-gray-900 text-xl leading-normal whitespace-pre-wrap mb-4 font-normal">
-          {renderWithMentions(post.content)}
+          {renderWithMentions(comment.content)}
         </div>
-
-        {/* Resim Varsa */}
-        {post.imageUrl && (
-          <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100">
-            <img src={post.imageUrl} alt="Post content" className="w-full h-auto" />
-          </div>
-        )}
 
         {/* Tarih */}
         <div className="border-b border-gray-100 pb-3 mb-3">
           <span className="text-gray-500 text-sm hover:underline cursor-pointer">
-            {formatTime(post.createdAt)}
+            {formatTime(comment.createdAt)}
           </span>
         </div>
 
@@ -370,12 +370,12 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
         <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-0 px-2">
 
           <button
-            className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500  p-2 rounded-full transition group"
-            onClick={() => commentInputRef.current?.focus()}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-blue-500 p-2 rounded-full transition group"
+            onClick={() => replyInputRef.current?.focus()}
           >
             <MessageSquare size={22} className="group-hover:stroke-blue-500" />
-            {comments.length > 0 && (
-              <span className="text-sm font-medium group-hover:text-blue-500">{comments.length}</span>
+            {replies.length > 0 && (
+              <span className="text-sm font-medium group-hover:text-blue-500">{replies.length}</span>
             )}
           </button>
 
@@ -384,10 +384,6 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
             likeCount={likeCount}
             onClick={handleLikeToggle}
           />
-
-          <button className="text-gray-500 hover:text-green-500 hover:bg-green-50 p-2 rounded-full transition group">
-            <BarChart2 size={22} className="group-hover:stroke-green-500" />
-          </button>
 
           <button
             onClick={handleShare}
@@ -398,9 +394,9 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
         </div>
       </div>
 
-      {/* 3. YORUM YAZMA ALANI */}
+      {/* 3. CEVAP YAZMA ALANI */}
       <div className="px-4 py-2 border-b border-gray-100">
-        <form onSubmit={handleSubmitComment} className="flex gap-3 items-center">
+        <form onSubmit={handleSubmitReply} className="flex gap-3 items-center">
           {currentUserProfilePic ? (
             <img
               src={currentUserProfilePic}
@@ -414,44 +410,40 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
           )}
           <div className="flex-1">
             <input
-              ref={commentInputRef}
+              ref={replyInputRef}
               type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Yanıtını gönder"
+              value={newReply}
+              onChange={(e) => setNewReply(e.target.value)}
+              placeholder="Cevabını gönder"
               className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
             />
           </div>
           <button
             type="submit"
-            disabled={!newComment.trim() || submitting}
+            disabled={!newReply.trim() || submitting}
             className="px-4 py-1.5 bg-blue-500 text-white rounded-full font-bold text-sm hover:bg-blue-600 disabled:opacity-50 transition"
           >
-            Yanıtla
+            Cevapla
           </button>
         </form>
       </div>
 
-      {/* 4. YORUMLAR LİSTESİ */}
+      {/* 4. CEVAPLAR LİSTESİ */}
       <div className="pb-20">
         {loading ? (
           <div className="py-8 flex justify-center"><div className="w-6 h-6 border-2 border-blue-500 rounded-full animate-spin border-t-transparent"></div></div>
-        ) : comments.length === 0 ? (
+        ) : replies.length === 0 ? (
           <div className="text-center py-10 text-gray-500 text-sm">
-            İlk yanıtı sen ver!
+            İlk cevabı sen ver!
           </div>
         ) : (
-          comments.map((comment) => (
-            <div
-              key={comment._id}
-              className="p-4 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
-              onClick={() => onCommentClick && onCommentClick(comment)}
-            >
+          replies.map((reply) => (
+            <div key={reply._id} className="p-4 border-b border-gray-100 hover:bg-gray-50 transition">
               <div className="flex gap-3">
                 {/* Avatar */}
                 <div className="flex-shrink-0">
-                  {comment.author?.profilePicture ? (
-                    <img src={comment.author.profilePicture} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  {reply.author?.profilePicture ? (
+                    <img src={reply.author.profilePicture} alt="" className="w-10 h-10 rounded-full object-cover" />
                   ) : (
                     <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"><User size={18} className="text-gray-500" /></div>
                   )}
@@ -461,19 +453,19 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="font-bold text-gray-900 truncate">{comment.author?.username || 'Kullanıcı'}</span>
-                      <span className="text-gray-500 text-sm">· {timeAgo(comment.createdAt)}</span>
+                      <span className="font-bold text-gray-900 truncate">{reply.author?.username || 'Kullanıcı'}</span>
+                      <span className="text-gray-500 text-sm">· {timeAgo(reply.createdAt)}</span>
                     </div>
 
-                    {/* Yorum Menüsü */}
-                    {comment.author?._id === currentUserId && (
+                    {/* Cevap Menüsü */}
+                    {reply.author?._id === currentUserId && (
                       <div className="relative">
-                        <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === comment._id ? null : comment._id); }} className="text-gray-400 p-1 hover:text-blue-500">
+                        <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === reply._id ? null : reply._id); }} className="text-gray-400 p-1 hover:text-blue-500">
                           <MoreHorizontal size={16} />
                         </button>
-                        {menuOpen === comment._id && (
+                        {menuOpen === reply._id && (
                           <div className="absolute right-0 top-6 bg-white shadow-lg border border-gray-100 rounded-lg py-1 z-10 w-32">
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteComment(comment._id); }} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14} /> Sil</button>
+                            <button onClick={() => handleDeleteReply(reply._id)} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14} /> Sil</button>
                           </div>
                         )}
                       </div>
@@ -481,23 +473,17 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                   </div>
 
                   <div className="text-gray-900 mt-1 whitespace-pre-wrap text-base">
-                    {renderWithMentions(comment.content)}
+                    {renderWithMentions(reply.content)}
                   </div>
 
-                  {/* Yorum Altı Butonlar */}
+                  {/* Cevap Altı Butonlar */}
                   <div className="flex items-center gap-6 mt-3 max-w-md">
-                    <button className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-sm group">
-                      <MessageSquare size={16} className="group-hover:stroke-blue-500" />
-                      {comment.replyCount > 0 && (
-                        <span className="group-hover:text-blue-500">{comment.replyCount}</span>
-                      )}
-                    </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); handleLikeComment(comment._id); }}
-                      className={`flex items-center gap-1 text-sm group ${comment.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
+                      onClick={() => handleLikeComment(reply._id)}
+                      className={`flex items-center gap-1 text-sm group ${reply.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
                     >
-                      <Heart size={16} className={`group-hover:stroke-red-500 ${comment.likes?.includes(currentUserId) ? 'fill-current' : ''}`} />
-                      {comment.likes?.length > 0 && <span>{comment.likes.length}</span>}
+                      <Heart size={16} className={`group-hover:stroke-red-500 ${reply.likes?.includes(currentUserId) ? 'fill-current' : ''}`} />
+                      {reply.likes?.length > 0 && <span>{reply.likes.length}</span>}
                     </button>
                   </div>
                 </div>

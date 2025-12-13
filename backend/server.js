@@ -2254,7 +2254,11 @@ function extractMentions(text) {
 
 app.get('/api/posts/:postId/comments', async (req, res) => {
   try {
-    const comments = await Comment.find({ post: req.params.postId })
+    // Sadece parent comment'leri getir (nested comment'leri hariç tut)
+    const comments = await Comment.find({
+      post: req.params.postId,
+      parentComment: null  // Sadece ana yorumlar
+    })
       .populate('author', 'username profilePicture fullName')
       .sort({ createdAt: -1 });
     res.json(comments);
@@ -2445,6 +2449,121 @@ app.delete('/api/comments/:commentId', auth, async (req, res) => {
   } catch (err) {
     console.error('Delete comment error:', err);
     res.status(500).json({ message: 'Yorum silinemedi' });
+  }
+});
+
+// --- NESTED COMMENTS (YORUMLARA YORUM) API ---
+
+// Get a single comment by ID (for CommentDetailPage)
+app.get('/api/comments/:commentId', async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId)
+      .populate('author', 'username profilePicture fullName')
+      .populate('post', '_id');
+
+    if (!comment) {
+      return res.status(404).json({ message: 'Yorum bulunamadı' });
+    }
+
+    res.json(comment);
+  } catch (err) {
+    console.error('Yorum getirme hatası:', err);
+    res.status(500).json({ message: 'Yorum yüklenemedi' });
+  }
+});
+
+// Get replies for a specific comment
+app.get('/api/comments/:commentId/replies', async (req, res) => {
+  try {
+    const replies = await Comment.find({
+      parentComment: req.params.commentId
+    })
+      .populate('author', 'username profilePicture fullName')
+      .sort({ createdAt: -1 });
+
+    res.json(replies);
+  } catch (err) {
+    console.error('Cevapları getirme hatası:', err);
+    res.status(500).json({ message: 'Cevaplar yüklenemedi' });
+  }
+});
+
+// Post a reply to a comment
+app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), async (req, res) => {
+  try {
+    const { content } = req.body;
+    const parentCommentId = req.params.commentId;
+    const userId = req.userId;
+
+    // Validasyonlar
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ message: 'İçerik boş olamaz' });
+    }
+    if (content.length > 500) {
+      return res.status(400).json({ message: 'Yorum çok uzun' });
+    }
+
+    // Parent comment'i bul
+    const parentComment = await Comment.findById(parentCommentId);
+    if (!parentComment) {
+      return res.status(404).json({ message: 'Yorum bulunamadı' });
+    }
+
+    // Reply'i kaydet
+    const reply = new Comment({
+      content,
+      author: userId,
+      post: parentComment.post,
+      parentComment: parentCommentId
+    });
+    await reply.save();
+
+    // Parent comment'in reply count'unu artır
+    parentComment.replyCount += 1;
+    await parentComment.save();
+
+    // Frontend için yazar bilgisini ekle
+    await reply.populate('author', 'username profilePicture fullName');
+
+    // Bildirim: Parent comment sahibine (kendi yorumu değilse)
+    if (parentComment.author && userId.toString() !== parentComment.author.toString()) {
+      await Notification.create({
+        recipient: parentComment.author,
+        sender: userId,
+        type: 'comment_reply',
+        post: parentComment.post,
+        comment: parentCommentId,
+        reply: reply._id
+      });
+    }
+
+    // Bildirim: Etiketlenenlere (@mention)
+    const mentions = extractMentions(content);
+    if (mentions.length > 0) {
+      const mentionedUsers = await User.find({
+        username: { $in: mentions },
+        _id: { $ne: userId }
+      }).select('_id');
+
+      const mentionNotifs = mentionedUsers.map(user => ({
+        recipient: user._id,
+        sender: userId,
+        type: 'mention',
+        post: parentComment.post,
+        comment: parentCommentId,
+        reply: reply._id
+      }));
+
+      if (mentionNotifs.length > 0) {
+        await Notification.insertMany(mentionNotifs);
+      }
+    }
+
+    res.status(201).json(reply);
+
+  } catch (err) {
+    console.error('Reply oluşturma hatası:', err);
+    res.status(500).json({ message: 'Cevap oluşturulamadı' });
   }
 });
 

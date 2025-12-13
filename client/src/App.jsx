@@ -21,6 +21,7 @@ import loaderAnimation from './assets/loader.json';
 import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X, Bell, Loader2 } from 'lucide-react';
 import { API_URL } from './config/api';
 import PostDetailPage from './components/PostDetailPage';
+import CommentDetailPage from './components/CommentDetailPage';
 
 // Redux actions
 import { logout, setUserRole, addInterests } from './store/slices/authSlice';
@@ -153,6 +154,8 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   // Selected post for detail modal
   const [selectedPost, setSelectedPost] = useState(null);
+  // Selected comment for detail modal
+  const [selectedComment, setSelectedComment] = useState(null);
 
   // --- ARAMA İÇİN STATE'LER ---
   const [searchQuery, setSearchQuery] = useState('');
@@ -1194,8 +1197,21 @@ export default function App() {
       {/* ORTA PANEL - MAIN START */}
       <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen">
 
-        {/* --- 1. ÖNCELİK: GÖNDERİ DETAY SAYFASI (Twitter Tarzı) --- */}
-        {selectedPost ? (
+        {/* --- 1. ÖNCELİK: YORUM DETAY SAYFASI --- */}
+        {selectedComment ? (
+          <CommentDetailPage
+            comment={selectedComment}
+            onClose={() => setSelectedComment(null)}
+            token={token}
+            currentUserId={userId}
+            currentUserProfilePic={currentUserInfo?.profilePicture}
+            onMentionClick={(username) => {
+              setSelectedComment(null);
+              setViewedProfile(username);
+            }}
+          />
+        ) : selectedPost ? (
+          /* --- 2. ÖNCELİK: GÖNDERİ DETAY SAYFASI (Twitter Tarzı) --- */
           <PostDetailPage
             post={selectedPost}
             onClose={() => setSelectedPost(null)}
@@ -1206,6 +1222,9 @@ export default function App() {
             onMentionClick={(username) => {
               setSelectedPost(null);
               setViewedProfile(username);
+            }}
+            onCommentClick={(comment) => {
+              setSelectedComment(comment);
             }}
           />
         ) : viewedProfile ? (
@@ -1670,6 +1689,23 @@ export default function App() {
             // Önce diğer açık sayfaları kapat
             setViewedProfile(null);
             setSelectedPost(post);
+          }}
+          onNavigateToComment={async (commentId) => {
+            // Backend'den comment'i fetch et
+            try {
+              const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              if (res.ok) {
+                const comment = await res.json();
+                // Önce diğer açık sayfaları kapat
+                setViewedProfile(null);
+                setSelectedPost(null);
+                setSelectedComment(comment);
+              }
+            } catch (err) {
+              console.error('Yorum yüklenemedi:', err);
+            }
           }}
         />
       )}

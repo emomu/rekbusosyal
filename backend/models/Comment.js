@@ -16,6 +16,17 @@ const CommentSchema = new mongoose.Schema({
     ref: 'Post',
     required: true
   },
+  // Nested comments support - parentComment varsa bu bir reply'dir
+  parentComment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null
+  },
+  // Reply sayısını saklamak için
+  replyCount: {
+    type: Number,
+    default: 0
+  },
   likes: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
