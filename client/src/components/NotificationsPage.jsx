@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Check, X as XIcon } from 'lucide-react';
+import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Check, X as XIcon, Gift } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { setNotifications, appendNotifications, setPagination, setUnreadCount, markAsRead, markAllAsRead, deleteNotification, setLoading } from '../store/slices/notificationsSlice';
 import { API_URL } from '../config/api';
 
-export default function NotificationsPage({ onClose, onNavigateToProfile, onNavigateToPost }) {
+export default function NotificationsPage({ onClose, onNavigateToProfile, onNavigateToPost, onNavigateToVersionNotes }) {
   const dispatch = useDispatch();
   const token = useSelector(state => state.auth.token);
   const { notifications, unreadCount, pagination, loading } = useSelector(state => state.notifications);
@@ -189,6 +189,11 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         }
         break;
 
+      case 'version_update':
+        onNavigateToVersionNotes();
+        onClose();
+        break;
+
       default:
         break;
     }
@@ -209,6 +214,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return <Bell size={20} className="text-orange-500" />;
       case 'suggestion': // YENİ: Öneri
         return <Star size={20} className="text-yellow-500" />;
+      case 'version_update':
+        return <Gift size={20} className="text-indigo-500" />;
       default:
         return <Bell size={20} className="text-gray-500" />;
     }
@@ -231,6 +238,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return `${senderName} seni bir gönderide bahsetti`;
       case 'suggestion': // YENİ
         return `Günün önerisi: ${senderName} kullanıcısının popüler gönderisine göz at!`;
+      case 'version_update':
+        return `${notification.title} ${notification.message}`;
       default:
         return 'Yeni bir bildirim';
     }

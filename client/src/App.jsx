@@ -1504,11 +1504,13 @@ export default function App() {
                               <MapPin className="text-blue-600" size={28} />
                             </div>
                             <div className="mb-3">
-                              <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
+                              <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👎 {negativePercent}%</span><span>😐 {neutralPercent}%</span><span>👍 {positivePercent}%</span></div>
                               <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
-                                {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
+                                {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>} 
+                                
                                 {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
-                                {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
+                                {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
+                                
                               </div>
                             </div>
                             <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
@@ -1603,11 +1605,11 @@ export default function App() {
                             <User className="text-blue-600" size={28} />
                           </div>
                           <div className="mb-3">
-                            <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👍 {positivePercent}%</span><span>😐 {neutralPercent}%</span><span>👎 {negativePercent}%</span></div>
+                            <div className="flex justify-between text-xs font-medium text-gray-600 mb-2"><span>👎 {negativePercent}%</span><span>😐 {neutralPercent}%</span><span>👍 {positivePercent}%</span></div>
                             <div className="flex bg-gray-200 rounded-full h-3 overflow-hidden">
-                              {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
-                              {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
                               {negativePercent > 0 && <div className="bg-red-500" style={{ width: `${negativePercent}%` }}></div>}
+                              {neutralPercent > 0 && <div className="bg-blue-700" style={{ width: `${neutralPercent}%` }}></div>}
+                              {positivePercent > 0 && <div className="bg-green-500" style={{ width: `${positivePercent}%` }}></div>}
                             </div>
                           </div>
                           <div className="text-sm font-medium text-blue-600">Detayları gör →</div>
@@ -1638,6 +1640,10 @@ export default function App() {
             setSelectedPost(null);
             setViewedProfile(userId);
             dispatch(setActiveTab('profile'));
+          }}
+          onNavigateToVersionNotes={() => {
+            dispatch(setActiveTab('versionNotes'));
+            setShowNotifications(false);
           }}
           onNavigateToPost={async (postId) => {
             // Post'u mevcut state'lerden bul (posts veya confessions)

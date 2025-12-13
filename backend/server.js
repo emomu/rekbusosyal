@@ -28,12 +28,14 @@ const Comment = require('./models/Comment');
 const Notification = require('./models/Notification');
 const VersionNote = require('./models/VersionNote');
 
+const versionNotesRouter = require('./routes/versionNotes');
+
 const app = express();
 const path = require('path');
 
 // --- Resend Email Servisi ---
 const resend = new Resend(process.env.RESEND_API_KEY);
-
+app.use('/api/version-notes', versionNotesRouter);
 // Email servis kontrolü
 if (!process.env.RESEND_API_KEY) {
   console.log('⚠️ RESEND_API_KEY bulunamadı. Email gönderilemeyecek.');
