@@ -20,6 +20,13 @@ const { voteCooldown } = require('./middleware/cooldown');
 // Multer configuration for file uploads
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, 'uploads/profiles');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // Storage configuration
 const storage = multer.diskStorage({
@@ -1014,33 +1021,47 @@ app.get('/api/profile', async (req, res) => {
 });
 
 // Profil resmi güncelle (Multer ile dosya upload)
-app.post('/api/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "Dosya yüklenmedi" });
+app.post('/api/profile/picture', auth, (req, res) => {
+  upload.single('profilePicture')(req, res, async (err) => {
+    try {
+      // Handle multer errors
+      if (err instanceof multer.MulterError) {
+        console.error('Multer error:', err);
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: "Dosya boyutu en fazla 5MB olabilir" });
+        }
+        return res.status(400).json({ error: "Dosya yükleme hatası: " + err.message });
+      } else if (err) {
+        console.error('Upload error:', err);
+        return res.status(400).json({ error: err.message || "Dosya yüklenemedi" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "Dosya yüklenmedi" });
+      }
+
+      const user = await User.findById(req.userId);
+      if (!user) {
+        return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+      }
+
+      // Delete old profile picture if exists (optional)
+      // TODO: Implement old file deletion with fs.unlink if needed
+
+      // Save new profile picture URL
+      const profilePictureUrl = `${req.protocol}://${req.get('host')}/uploads/profiles/${req.file.filename}`;
+      user.profilePicture = profilePictureUrl;
+      await user.save();
+
+      res.json({
+        message: "Profil resmi güncellendi",
+        profilePicture: user.profilePicture
+      });
+    } catch (err) {
+      console.error('Profile picture upload error:', err);
+      res.status(500).json({ error: "Sunucu hatası: " + err.message });
     }
-
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
-    }
-
-    // Delete old profile picture if exists (optional)
-    // TODO: Implement old file deletion with fs.unlink if needed
-
-    // Save new profile picture URL
-    const profilePictureUrl = `${req.protocol}://${req.get('host')}/uploads/profiles/${req.file.filename}`;
-    user.profilePicture = profilePictureUrl;
-    await user.save();
-
-    res.json({
-      message: "Profil resmi güncellendi",
-      profilePicture: user.profilePicture
-    });
-  } catch (err) {
-    console.error('Profile picture upload error:', err);
-    res.status(500).json({ error: "Sunucu hatası" });
-  }
+  });
 });
 
 // Kullanıcı adı güncelle
