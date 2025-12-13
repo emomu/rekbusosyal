@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Check, X as XIcon, Gift, Star } from 'lucide-react';
+import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Gift, Star } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { setNotifications, appendNotifications, setPagination, setUnreadCount, markAsRead, markAllAsRead, deleteNotification, setLoading } from '../store/slices/notificationsSlice';
 import { API_URL } from '../config/api';
-import { ensureHttps } from '../utils/imageUtils';
+import CachedImage from './CachedImage';
 
 export default function NotificationsPage({ onClose, onNavigateToProfile, onNavigateToPost, onNavigateToComment, onNavigateToVersionNotes }) {
   const dispatch = useDispatch();
@@ -340,10 +340,15 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
                         <Gift size={24} className="text-white" />
                       </div>
                     ) : notification.sender?.profilePicture ? (
-                      <img
-                        src={ensureHttps(notification.sender.profilePicture)}
+                      <CachedImage
+                        src={notification.sender.profilePicture}
                         alt={notification.sender.fullName}
                         className="w-12 h-12 rounded-full object-cover"
+                        fallback={
+                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                            <UserPlus size={24} className="text-gray-400" />
+                          </div>
+                        }
                       />
                     ) : (
                       <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">

@@ -14,6 +14,7 @@ import MobileHeader from './components/MobileHeader';
 import NotificationsPage from './components/NotificationsPage';
 import LikeButton from './components/LikeButton';
 import VersionNotesPage from './components/VersionNotesPage';
+import CookieConsent from './components/CookieConsent';
 
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
@@ -1813,6 +1814,9 @@ export default function App() {
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+
+      {/* Cookie Consent Banner */}
+      <CookieConsent />
     </div>
   );
 }

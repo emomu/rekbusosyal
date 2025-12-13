@@ -9,6 +9,8 @@ import { setActiveTab } from '../store/slices/uiSlice';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
 import { ensureHttps } from '../utils/imageUtils';
+import { compressImage } from '../utils/imageCompression';
+import CachedImage from './CachedImage';
 
 export default function ProfilePage({ onMenuClick }) {
   const dispatch = useDispatch();
@@ -27,6 +29,8 @@ export default function ProfilePage({ onMenuClick }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const token = localStorage.getItem('token');
 
@@ -64,33 +68,76 @@ export default function ProfilePage({ onMenuClick }) {
       return;
     }
 
-    // Use FormData for file upload
-    const formData = new FormData();
-    formData.append('profilePicture', file);
-
     try {
-      toast.info('Profil resmi yükleniyor...', 0); // 0 = sonsuz süre
+      setIsUploading(true);
+      setUploadProgress(0);
 
-      const res = await fetch(`${API_URL}/api/profile/picture`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-          // Don't set Content-Type, browser will set it with boundary for multipart/form-data
-        },
-        body: formData
+      // Resmi sıkıştır
+      const compressedFile = await compressImage(file, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.85
       });
 
-      const data = await res.json();
+      // Sıkıştırılmış dosya boyutunu kontrol et
+      console.log(`Orijinal boyut: ${(file.size / 1024).toFixed(2)} KB`);
+      console.log(`Sıkıştırılmış boyut: ${(compressedFile.size / 1024).toFixed(2)} KB`);
 
-      if (res.ok) {
-        setProfile({ ...profile, profilePicture: data.profilePicture });
-        setIsEditingPicture(false);
-        toast.success('Profil resmi başarıyla güncellendi!');
-      } else {
-        toast.error(data.error || 'Profil resmi güncellenemedi');
-      }
+      // Use FormData for file upload
+      const formData = new FormData();
+      formData.append('profilePicture', compressedFile);
+
+      // XMLHttpRequest kullanarak progress tracking
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        // Progress event listener
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(percentComplete);
+          }
+        });
+
+        // Load event listener
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const data = JSON.parse(xhr.responseText);
+            setProfile({ ...profile, profilePicture: data.profilePicture });
+            setIsEditingPicture(false);
+            toast.success('Profil resmi başarıyla güncellendi!');
+            resolve(data);
+          } else {
+            const data = JSON.parse(xhr.responseText);
+            toast.error(data.error || 'Profil resmi güncellenemedi');
+            reject(new Error(data.error));
+          }
+        });
+
+        // Error event listener
+        xhr.addEventListener('error', () => {
+          toast.error('Yükleme sırasında bir hata oluştu');
+          reject(new Error('Upload failed'));
+        });
+
+        // Abort event listener
+        xhr.addEventListener('abort', () => {
+          toast.error('Yükleme iptal edildi');
+          reject(new Error('Upload aborted'));
+        });
+
+        // Open and send request
+        xhr.open('POST', `${API_URL}/api/profile/picture`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(formData);
+      });
+
     } catch (err) {
+      console.error('Profil resmi yükleme hatası:', err);
       toast.error('Bir hata oluştu. Lütfen tekrar dene.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -318,14 +365,15 @@ export default function ProfilePage({ onMenuClick }) {
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden border-2 border-gray-200">
                   {profile.profilePicture ? (
-                    <img
-                      src={ensureHttps(profile.profilePicture)}
+                    <CachedImage
+                      src={profile.profilePicture}
                       alt="Profil"
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.parentElement.innerHTML = '<div class="w-full h-full flex items-center justify-center text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>';
-                      }}
+                      fallback={
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <User size={32} />
+                        </div>
+                      }
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -356,9 +404,26 @@ export default function ProfilePage({ onMenuClick }) {
                     type="file"
                     accept="image/*"
                     onChange={handleFileUpload}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer"
+                    disabled={isUploading}
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <p className="text-xs text-gray-400 mt-1">Maksimum 5MB, JPG/PNG formatında</p>
+
+                  {/* Upload Progress Bar */}
+                  {isUploading && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-blue-600">Yükleniyor...</span>
+                        <span className="text-xs font-medium text-blue-600">{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="relative">
