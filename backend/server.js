@@ -69,7 +69,6 @@ const VersionNote = require('./models/VersionNote');
 const versionNotesRouter = require('./routes/versionNotes');
 
 const app = express();
-const path = require('path');
 
 // CORS ayarları
 app.use(cors({
