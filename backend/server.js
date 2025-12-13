@@ -900,7 +900,7 @@ app.get('/api/verify-email', async (req, res) => {
   const leftSideHTML = `
     <div class="left-side">
       <div class="left-overlay"></div>
-      <img src="https://i.hizliresim.com/22fuec9.png" alt="Campus Life" class="bg-image">
+
       <div class="left-content">
         <div class="brand-title">KBÜ<span class="text-red">Sosyal</span>.</div>
         <p class="brand-desc">Sadece KBÜ öğrencilerine özel, güvenli ve anonim sosyal platform.</p>

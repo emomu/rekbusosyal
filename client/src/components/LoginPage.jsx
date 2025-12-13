@@ -133,11 +133,7 @@ const LoginPage = ({ onLogin }) => {
       {/* SOL TARAF - GÖRSEL */}
       <div className="hidden lg:flex w-1/2 bg-blue-900 items-center justify-center relative overflow-hidden">
         <div className="absolute inset-0 bg-black/60 z-10"></div>
-        <img 
-          src="https://i.hizliresim.com/22fuec9.png" 
-          alt="Campus Life" 
-          className="absolute inset-0 w-full h-full object-cover"
-        />
+       
         <div className="relative z-20 text-white p-12 max-w-lg">
           <h1 className=" text-6xl font-bold mb-6 tracking-tighter">KBÜ<span className="text-red-500">Sosyal</span>.</h1>
           <p className="text-xl font-light opacity-90 leading-relaxed">
