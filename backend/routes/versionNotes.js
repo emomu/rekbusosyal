@@ -3,7 +3,7 @@ const router = express.Router();
 const VersionNote = require('../models/VersionNote');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
-const adminAuth = require('../middleware/adminAuth');
+const { adminAuth } = require('../middleware/adminAuth');
 
 // Get all version notes
 router.get('/', async (req, res) => {
