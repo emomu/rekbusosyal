@@ -46,7 +46,7 @@ export default function ProfilePage({ onMenuClick }) {
   }, [token]);
 
   // Profil resmi dosyadan yükle
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -60,34 +60,32 @@ export default function ProfilePage({ onMenuClick }) {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64String = reader.result;
+    // Use FormData for file upload
+    const formData = new FormData();
+    formData.append('profilePicture', file);
 
-      try {
-        const res = await fetch(`${API_URL}/api/profile/picture`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ profilePicture: base64String })
-        });
+    try {
+      const res = await fetch(`${API_URL}/api/profile/picture`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+          // Don't set Content-Type, browser will set it with boundary for multipart/form-data
+        },
+        body: formData
+      });
 
-        const data = await res.json();
-        if (res.ok) {
-          setProfile({ ...profile, profilePicture: data.profilePicture });
-          setIsEditingPicture(false);
-          setSuccess('Profil resmi güncellendi');
-          setTimeout(() => setSuccess(''), 3000);
-        } else {
-          setError(data.error);
-        }
-      } catch (err) {
-        setError('Bir hata oluştu');
+      const data = await res.json();
+      if (res.ok) {
+        setProfile({ ...profile, profilePicture: data.profilePicture });
+        setIsEditingPicture(false);
+        setSuccess('Profil resmi güncellendi');
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data.error);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setError('Bir hata oluştu');
+    }
   };
 
   // Profil resmi URL ile güncelle

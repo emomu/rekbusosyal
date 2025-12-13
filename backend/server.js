@@ -17,6 +17,44 @@ const { adminAuth, strictAdminAuth } = require('./middleware/adminAuth');
 const cooldown = require('./middleware/cooldown');
 const { voteCooldown } = require('./middleware/cooldown');
 
+// Multer configuration for file uploads
+const multer = require('multer');
+const path = require('path');
+
+// Storage configuration
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/profiles/');
+  },
+  filename: function (req, file, cb) {
+    // Unique filename: userId-timestamp.extension
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+// File filter - only images
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+
+  if (mimetype && extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Sadece resim dosyaları yüklenebilir!'));
+  }
+};
+
+// Multer upload configuration
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: fileFilter
+});
+
 // Modelleri Çağır
 const Post = require('./models/Post');
 const Campus = require('./models/Campus');
@@ -40,6 +78,9 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '50mb' }));
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- Resend Email Servisi ---
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -973,23 +1014,32 @@ app.get('/api/profile', async (req, res) => {
   }
 });
 
-// Profil resmi güncelle
-app.put('/api/profile/picture', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  const { profilePicture } = req.body;
-
+// Profil resmi güncelle (Multer ile dosya upload)
+app.post('/api/profile/picture', auth, upload.single('profilePicture'), async (req, res) => {
   try {
-    if (!token) return res.status(401).json({ error: "Oturum açmanız gerekiyor" });
+    if (!req.file) {
+      return res.status(400).json({ error: "Dosya yüklenmedi" });
+    }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id);
-    if (!user) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
 
-    user.profilePicture = profilePicture;
+    // Delete old profile picture if exists (optional)
+    // TODO: Implement old file deletion with fs.unlink if needed
+
+    // Save new profile picture URL
+    const profilePictureUrl = `${req.protocol}://${req.get('host')}/uploads/profiles/${req.file.filename}`;
+    user.profilePicture = profilePictureUrl;
     await user.save();
 
-    res.json({ message: "Profil resmi güncellendi", profilePicture: user.profilePicture });
+    res.json({
+      message: "Profil resmi güncellendi",
+      profilePicture: user.profilePicture
+    });
   } catch (err) {
+    console.error('Profile picture upload error:', err);
     res.status(500).json({ error: "Sunucu hatası" });
   }
 });
