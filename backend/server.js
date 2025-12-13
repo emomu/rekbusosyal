@@ -33,6 +33,14 @@ const versionNotesRouter = require('./routes/versionNotes');
 const app = express();
 const path = require('path');
 
+// CORS ayarları
+app.use(cors({
+  origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
+  credentials: true
+}));
+
+app.use(express.json({ limit: '50mb' }));
+
 // --- Resend Email Servisi ---
 const resend = new Resend(process.env.RESEND_API_KEY);
 app.use('/api/version-notes', versionNotesRouter);
@@ -43,34 +51,6 @@ if (!process.env.RESEND_API_KEY) {
   console.log('✅ Resend email servisi hazır');
 }
 // -------------------------------------
-
-// CORS - Manuel olarak tüm header'ları ekle
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  // Localhost'tan gelen tüm isteklere izin ver
-  if (origin && origin.includes('localhost')) {
-    res.header('Access-Control-Allow-Origin', origin);
-  } else {
-    res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL); // .env'den çekiliyor
-  }
-
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24 saat preflight cache
-
-  // Preflight OPTIONS isteklerine hemen 200 dön
-  if (req.method === 'OPTIONS') {
-    console.log('Preflight OPTIONS isteği alındı:', req.path);
-    return res.status(200).end();
-  }
-
-  next();
-});
-
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
 
 // MongoDB Bağlantısı (Kendi linkin varsa burayı değiştir)
 mongoose.connect(process.env.MONGO_URI) // .env'den çekiliyor
@@ -1805,6 +1785,7 @@ app.get('/api/admin/version-notes', adminAuth, async (req, res) => {
 // Yeni sürüm notu oluştur (Admin)
 app.post('/api/admin/version-notes', adminAuth, async (req, res) => {
   try {
+    console.log('[version-notes] Gelen body:', req.body);
     const { version, title, description, features, bugFixes, improvements, releaseDate, isPublished } = req.body;
 
     const newNote = new VersionNote({
@@ -1820,9 +1801,24 @@ app.post('/api/admin/version-notes', adminAuth, async (req, res) => {
     });
 
     await newNote.save();
+
+    // Create a notification for all users
+    const users = await User.find({}, '_id');
+    const notifications = users.map(user => ({
+      recipient: user._id,
+      sender: req.userId,
+      type: 'version_update',
+      title: 'Yeni sürüm mevcut!',
+      message: `KBÜ Sosyal ${version} sürümüne güncellendi. Yenilikleri görmek için tıkla!`,
+      link: '/version-notes'
+    }));
+
+    await Notification.insertMany(notifications);
+
     res.status(201).json(newNote);
   } catch (err) {
     console.error(err);
+    console.log(err);
     if (err.code === 11000) {
       return res.status(400).json({ error: 'Bu sürüm numarası zaten mevcut' });
     }

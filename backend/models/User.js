@@ -35,8 +35,6 @@ const UserSchema = new mongoose.Schema({
 });
 
 // Indexes for performance optimization
-UserSchema.index({ username: 1 }); // Username ile arama (zaten unique ama arama hızlandırma için)
-UserSchema.index({ email: 1 }); // Email ile arama (zaten unique ama arama hızlandırma için)
 UserSchema.index({ username: 'text', fullName: 'text' }); // Text search için (arama özelliği)
 UserSchema.index({ createdAt: -1 }); // Yeni kullanıcıları sıralama
 
