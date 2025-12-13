@@ -259,7 +259,7 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
       case 'suggestion': // YENİ
         return `Günün önerisi: ${senderName} kullanıcısının popüler gönderisine göz at!`;
       case 'version_update':
-        return `Yeni sürüm yayınlandı! ${notification.version || ''} sürümündeki yenilikleri keşfet.`;
+        return `Yeni sürüm geldi! ${notification.version || ''} sürümündeki yenilikleri keşfet.`;
       default:
         return 'Yeni bir bildirim';
     }
@@ -335,7 +335,11 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
                 <div className="flex items-start gap-3">
                   {/* Sender Profile Picture */}
                   <div className="relative">
-                    {notification.sender?.profilePicture ? (
+                    {notification.type === 'version_update' ? (
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-600 rounded-full flex items-center justify-center">
+                        <Gift size={24} className="text-white" />
+                      </div>
+                    ) : notification.sender?.profilePicture ? (
                       <img
                         src={ensureHttps(notification.sender.profilePicture)}
                         alt={notification.sender.fullName}
@@ -347,22 +351,30 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
                       </div>
                     )}
                     {/* Notification Type Icon */}
-                    <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
-                      {getNotificationIcon(notification.type)}
-                    </div>
+                    {notification.type !== 'version_update' && (
+                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
+                        {getNotificationIcon(notification.type)}
+                      </div>
+                    )}
                   </div>
 
                   {/* Notification Content */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-900">
-                      <span className="font-semibold">{notification.sender?.username || 'Kullanıcı'}</span>
-                      {' '}
-                      <span className="text-gray-600">
-                        {/* Eğer follow_request ise özel metni basıyoruz, değilse standart fonksiyonu kullanıyoruz */}
-                        {notification.type === 'follow_request' 
-                          ? 'seni takip etmek istiyor' 
-                          : getNotificationText(notification).split(notification.sender?.fullName || '')[1]}
-                      </span>
+                      {notification.type === 'version_update' ? (
+                        <span className="text-gray-900">{getNotificationText(notification)}</span>
+                      ) : (
+                        <>
+                          <span className="font-semibold">{notification.sender?.username || 'Kullanıcı'}</span>
+                          {' '}
+                          <span className="text-gray-600">
+                            {/* Eğer follow_request ise özel metni basıyoruz, değilse standart fonksiyonu kullanıyoruz */}
+                            {notification.type === 'follow_request'
+                              ? 'seni takip etmek istiyor'
+                              : getNotificationText(notification).split(notification.sender?.fullName || '')[1]}
+                          </span>
+                        </>
+                      )}
                     </p>
 
                     {notification.post?.content && (
