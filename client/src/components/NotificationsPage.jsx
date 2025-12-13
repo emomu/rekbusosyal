@@ -205,6 +205,14 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         }
         break;
 
+      case 'suggestion':
+        // Öneri bildirimi - önerilen post'a git
+        if (notification.post?._id) {
+          onNavigateToPost(notification.post._id);
+          onClose(); // Bildirim panelini kapat
+        }
+        break;
+
       case 'version_update':
         onNavigateToVersionNotes();
         onClose();
