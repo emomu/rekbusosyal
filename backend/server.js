@@ -1712,7 +1712,7 @@ app.put('/api/admin/users/:id/badges', adminAuth, async (req, res) => {
     }
 
     // Geçerli badge'leri kontrol et
-    const validBadges = ['founder', 'bug_hunter', 'admin', 'moderator', 'supporter', 'verified'];
+    const validBadges = ['founder','developer', 'bug_hunter', 'admin', 'moderator', 'supporter', 'verified'];
     const filteredBadges = badges.filter(badge => validBadges.includes(badge));
 
     user.badges = filteredBadges;
