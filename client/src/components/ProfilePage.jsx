@@ -8,6 +8,7 @@ import MobileHeader from './MobileHeader';
 import { setActiveTab } from '../store/slices/uiSlice';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
+import { ensureHttps } from '../utils/imageUtils';
 
 export default function ProfilePage({ onMenuClick }) {
   const dispatch = useDispatch();
@@ -318,7 +319,7 @@ export default function ProfilePage({ onMenuClick }) {
                 <div className="w-20 h-20 rounded-full bg-gray-100 overflow-hidden border-2 border-gray-200">
                   {profile.profilePicture ? (
                     <img
-                      src={profile.profilePicture}
+                      src={ensureHttps(profile.profilePicture)}
                       alt="Profil"
                       className="w-full h-full object-cover"
                       onError={(e) => {

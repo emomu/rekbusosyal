@@ -9,6 +9,7 @@ import LikeButton from './LikeButton';
 import PostDetailPage from './PostDetailPage';
 import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
 import { API_URL } from '../config/api';
+import { ensureHttps } from '../utils/imageUtils';
 
 export default function PublicProfilePage({ username, onClose, onMentionClick, currentUserProfilePic, onCommentClick }) {
   const dispatch = useDispatch();
@@ -251,7 +252,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
         <div className="flex items-start gap-4">
           {currentProfile.profilePicture && !imageError ? (
             <img
-              src={currentProfile.profilePicture}
+              src={ensureHttps(currentProfile.profilePicture)}
               alt={currentProfile.fullName}
               className="w-16 h-16 rounded-full object-cover shrink-0"
               onError={() => setImageError(true)}
@@ -334,7 +335,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                         <div className="flex items-center gap-3 mb-2">
                           {currentProfile.profilePicture ? (
                             <img
-                              src={currentProfile.profilePicture}
+                              src={ensureHttps(currentProfile.profilePicture)}
                               alt={currentProfile.fullName}
                               className="w-9 h-9 bg-gray-200 rounded-full object-cover"
                             />
@@ -388,7 +389,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                         <div className="flex items-center gap-3 mb-2">
                           {currentProfile.profilePicture ? (
                             <img
-                              src={currentProfile.profilePicture}
+                              src={ensureHttps(currentProfile.profilePicture)}
                               alt={currentProfile.fullName}
                               className="w-9 h-9 bg-gray-200 rounded-full object-cover"
                             />

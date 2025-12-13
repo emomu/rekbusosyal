@@ -3,6 +3,7 @@ import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, 
 import { API_URL } from '../config/api';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
+import { ensureHttps } from '../utils/imageUtils';
 
 export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState('users');
@@ -412,7 +413,7 @@ export default function AdminPanel() {
                         <div className="flex items-center gap-3">
                           {user.profilePicture ? (
                             <img
-                              src={user.profilePicture}
+                              src={ensureHttps(user.profilePicture)}
                               alt={user.username}
                               className="w-10 h-10 rounded-full object-cover"
                             />
@@ -622,7 +623,7 @@ export default function AdminPanel() {
                         <div className="flex items-center gap-3 mb-2">
                           {comment.author?.profilePicture ? (
                             <img
-                              src={comment.author.profilePicture}
+                              src={ensureHttps(comment.author.profilePicture)}
                               alt={comment.author.username}
                               className="w-8 h-8 rounded-full object-cover"
                             />
@@ -684,7 +685,7 @@ export default function AdminPanel() {
                         <div className="flex items-center gap-3 mb-2">
                           {post.author?.profilePicture ? (
                             <img
-                              src={post.author.profilePicture}
+                              src={ensureHttps(post.author.profilePicture)}
                               alt={post.author.username}
                               className="w-8 h-8 rounded-full object-cover"
                             />
@@ -833,7 +834,7 @@ export default function AdminPanel() {
               <div className="flex justify-center mb-4">
                 {selectedUser.profilePicture ? (
                   <img
-                    src={selectedUser.profilePicture}
+                    src={ensureHttps(selectedUser.profilePicture)}
                     alt={selectedUser.username}
                     className="w-24 h-24 rounded-full object-cover border-4 border-gray-200"
                   />

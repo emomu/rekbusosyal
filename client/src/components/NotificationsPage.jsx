@@ -5,6 +5,7 @@ import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { setNotifications, appendNotifications, setPagination, setUnreadCount, markAsRead, markAllAsRead, deleteNotification, setLoading } from '../store/slices/notificationsSlice';
 import { API_URL } from '../config/api';
+import { ensureHttps } from '../utils/imageUtils';
 
 export default function NotificationsPage({ onClose, onNavigateToProfile, onNavigateToPost, onNavigateToComment, onNavigateToVersionNotes }) {
   const dispatch = useDispatch();
@@ -336,7 +337,7 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
                   <div className="relative">
                     {notification.sender?.profilePicture ? (
                       <img
-                        src={notification.sender.profilePicture}
+                        src={ensureHttps(notification.sender.profilePicture)}
                         alt={notification.sender.fullName}
                         className="w-12 h-12 rounded-full object-cover"
                       />

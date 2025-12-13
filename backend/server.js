@@ -1049,7 +1049,9 @@ app.post('/api/profile/picture', auth, (req, res) => {
       // TODO: Implement old file deletion with fs.unlink if needed
 
       // Save new profile picture URL
-      const profilePictureUrl = `${req.protocol}://${req.get('host')}/uploads/profiles/${req.file.filename}`;
+      // Use HTTPS in production, HTTP in development
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+      const profilePictureUrl = `${protocol}://${req.get('host')}/uploads/profiles/${req.file.filename}`;
       user.profilePicture = profilePictureUrl;
       await user.save();
 

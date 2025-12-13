@@ -3,6 +3,7 @@ import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, Heart
 import { API_URL } from '../config/api';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
+import { ensureHttps } from '../utils/imageUtils';
 
 // --- LIKE BUTONU BİLEŞENİ ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -353,7 +354,7 @@ export default function CommentDetailPage({
           <div className="flex items-center gap-3">
             {comment.author?.profilePicture ? (
               <img
-                src={comment.author.profilePicture}
+                src={ensureHttps(comment.author.profilePicture)}
                 alt={comment.author.username}
                 className="w-10 h-10 rounded-full object-cover border border-gray-100"
               />
@@ -461,7 +462,7 @@ export default function CommentDetailPage({
                 {/* Avatar */}
                 <div className="flex-shrink-0">
                   {reply.author?.profilePicture ? (
-                    <img src={reply.author.profilePicture} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    <img src={ensureHttps(reply.author.profilePicture)} alt="" className="w-10 h-10 rounded-full object-cover" />
                   ) : (
                     <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"><User size={18} className="text-gray-500" /></div>
                   )}
