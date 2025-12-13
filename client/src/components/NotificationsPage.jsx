@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Check, X as XIcon, Gift } from 'lucide-react';
+import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Check, X as XIcon, Gift, Star } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { setNotifications, appendNotifications, setPagination, setUnreadCount, markAsRead, markAllAsRead, deleteNotification, setLoading } from '../store/slices/notificationsSlice';
