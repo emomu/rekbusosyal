@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { useCachedImage } from '../hooks/useCachedImage';
 
 /**
@@ -15,9 +15,10 @@ export default function CachedImage({
   ...props
 }) {
   const { src: cachedSrc, isLoading, error } = useCachedImage(src);
+  const [imageError, setImageError] = useState(false);
 
   // Hata durumunda fallback göster
-  if (error && fallback) {
+  if ((error || imageError) && fallback) {
     return fallback;
   }
 
@@ -38,17 +39,7 @@ export default function CachedImage({
       alt={alt}
       className={className}
       onError={(e) => {
-        // Fallback görseli varsa onu göster
-        if (fallback && e.target) {
-          e.target.style.display = 'none';
-          if (e.target.parentElement) {
-            e.target.parentElement.innerHTML = '';
-            if (typeof fallback === 'string') {
-              e.target.parentElement.innerHTML = fallback;
-            }
-          }
-        }
-        // Kullanıcı tanımlı onError callback'i varsa çağır
+        setImageError(true);
         if (onError) onError(e);
       }}
       {...props}
