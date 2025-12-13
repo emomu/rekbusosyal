@@ -6,9 +6,12 @@ import loaderAnimation from '../assets/loader.json';
 import { API_URL } from '../config/api';
 import MobileHeader from './MobileHeader';
 import { setActiveTab } from '../store/slices/uiSlice';
+import { useToast } from '../hooks/useToast';
+import { ToastContainer } from './Toast';
 
 export default function ProfilePage({ onMenuClick }) {
   const dispatch = useDispatch();
+  const toast = useToast();
   const [profile, setProfile] = useState(null);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [isEditingPassword, setIsEditingPassword] = useState(false);
@@ -51,12 +54,12 @@ export default function ProfilePage({ onMenuClick }) {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      setError('Dosya boyutu en fazla 5MB olabilir');
+      toast.error('Dosya boyutu en fazla 5MB olabilir');
       return;
     }
 
     if (!file.type.startsWith('image/')) {
-      setError('Sadece resim dosyaları yüklenebilir');
+      toast.error('Sadece resim dosyaları yüklenebilir');
       return;
     }
 
@@ -65,6 +68,8 @@ export default function ProfilePage({ onMenuClick }) {
     formData.append('profilePicture', file);
 
     try {
+      toast.info('Profil resmi yükleniyor...', 0); // 0 = sonsuz süre
+
       const res = await fetch(`${API_URL}/api/profile/picture`, {
         method: 'POST',
         headers: {
@@ -75,16 +80,16 @@ export default function ProfilePage({ onMenuClick }) {
       });
 
       const data = await res.json();
+
       if (res.ok) {
         setProfile({ ...profile, profilePicture: data.profilePicture });
         setIsEditingPicture(false);
-        setSuccess('Profil resmi güncellendi');
-        setTimeout(() => setSuccess(''), 3000);
+        toast.success('Profil resmi başarıyla güncellendi!');
       } else {
-        setError(data.error);
+        toast.error(data.error || 'Profil resmi güncellenemedi');
       }
     } catch (err) {
-      setError('Bir hata oluştu');
+      toast.error('Bir hata oluştu. Lütfen tekrar dene.');
     }
   };
 
@@ -663,8 +668,11 @@ export default function ProfilePage({ onMenuClick }) {
           </button>
         </div>
 
-       
+
       </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
     </>
   );
 }

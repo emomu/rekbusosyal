@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, BarChart2, Heart } from 'lucide-react';
 import { API_URL } from '../config/api';
+import { useToast } from '../hooks/useToast';
+import { ToastContainer } from './Toast';
 
 // --- LIKE BUTONU BİLEŞENİ (Dokunulmadı, aynen korundu) ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -121,6 +123,7 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
 // --- ANA SAYFA BİLEŞENİ (POST DETAIL PAGE) ---
 
 export default function PostDetailPage({ post, onClose, token, currentUserId, onLike, currentUserProfilePic, onMentionClick, onCommentClick }) {
+  const toast = useToast();
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -219,14 +222,22 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
       });
 
       const data = await res.json();
+
+      if (res.status === 429) {
+        toast.error(`${data.error || 'Çok fazla istek'}. ${data.remainingSeconds || 60} saniye sonra tekrar dene.`);
+        return;
+      }
+
       if (res.ok) {
         setComments([data, ...comments]);
         setNewComment('');
+        toast.success('Yorum gönderildi!');
       } else {
-        alert(data.message || 'Yorum gönderilemedi');
+        toast.error(data.message || 'Yorum gönderilemedi');
       }
     } catch (err) {
       console.error('Yorum gönderme hatası:', err);
+      toast.error('Bir hata oluştu. Lütfen tekrar dene.');
     } finally {
       setSubmitting(false);
     }
@@ -256,9 +267,13 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
       });
       if (res.ok) {
         setComments(comments.filter(c => c._id !== commentId));
+        toast.success('Yorum silindi');
+      } else {
+        toast.error('Yorum silinemedi');
       }
     } catch (err) {
       console.error(err);
+      toast.error('Bir hata oluştu');
     }
   };
 
@@ -274,7 +289,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(shareData.url);
-        alert('Gönderi bağlantısı kopyalandı!');
+        toast.success('Gönderi bağlantısı kopyalandı!');
       }
     } catch (err) {
       console.error('Paylaşım hatası:', err);
@@ -506,6 +521,9 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
           ))
         )}
       </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
     </div>
   );
 }

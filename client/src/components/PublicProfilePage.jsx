@@ -10,7 +10,7 @@ import PostDetailPage from './PostDetailPage';
 import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
 import { API_URL } from '../config/api';
 
-export default function PublicProfilePage({ username, onClose, onMentionClick, currentUserProfilePic }) {
+export default function PublicProfilePage({ username, onClose, onMentionClick, currentUserProfilePic, onCommentClick }) {
   const dispatch = useDispatch();
   const token = useSelector(state => state.auth.token);
   const currentUserId = useSelector(state => state.auth.userId);
@@ -227,6 +227,10 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
         onMentionClick={(username) => {
           setSelectedPost(null);
           if (onMentionClick) onMentionClick(username);
+        }}
+        onCommentClick={(comment) => {
+          setSelectedPost(null);
+          if (onCommentClick) onCommentClick(comment);
         }}
       />
     );

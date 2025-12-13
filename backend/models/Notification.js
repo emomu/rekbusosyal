@@ -10,12 +10,12 @@ const notificationSchema = new mongoose.Schema({
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: false  // version_update için sender gerekmeyebilir
   },
   type: {
     type: String,
-    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion', 'comment_reply'
-    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'comment_reply', 'suggestion'],
+    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion', 'comment_reply', 'version_update'
+    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'comment_reply', 'suggestion', 'version_update'],
     required: true
   },
   post: {
@@ -31,6 +31,16 @@ const notificationSchema = new mongoose.Schema({
   reply: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Comment'
+  },
+  // Sürüm güncellemeleri için title ve message
+  title: {
+    type: String
+  },
+  message: {
+    type: String
+  },
+  link: {
+    type: String
   },
   isRead: {
     type: Boolean,

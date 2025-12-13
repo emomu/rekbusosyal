@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, Heart } from 'lucide-react';
 import { API_URL } from '../config/api';
+import { useToast } from '../hooks/useToast';
+import { ToastContainer } from './Toast';
 
 // --- LIKE BUTONU BİLEŞENİ ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -128,6 +130,7 @@ export default function CommentDetailPage({
   currentUserProfilePic,
   onMentionClick
 }) {
+  const toast = useToast();
   const [comment, setComment] = useState(initialComment);
   const [replies, setReplies] = useState([]);
   const [newReply, setNewReply] = useState('');
@@ -217,16 +220,24 @@ export default function CommentDetailPage({
       });
 
       const data = await res.json();
+
+      if (res.status === 429) {
+        toast.error(`${data.error || 'Çok fazla istek'}. ${data.remainingSeconds || 60} saniye sonra tekrar dene.`);
+        return;
+      }
+
       if (res.ok) {
         setReplies([data, ...replies]);
         setNewReply('');
         // Update reply count locally
         setComment({ ...comment, replyCount: (comment.replyCount || 0) + 1 });
+        toast.success('Cevap gönderildi!');
       } else {
-        alert(data.message || 'Cevap gönderilemedi');
+        toast.error(data.message || 'Cevap gönderilemedi');
       }
     } catch (err) {
       console.error('Cevap gönderme hatası:', err);
+      toast.error('Bir hata oluştu. Lütfen tekrar dene.');
     } finally {
       setSubmitting(false);
     }
@@ -263,9 +274,13 @@ export default function CommentDetailPage({
         setReplies(replies.filter(r => r._id !== replyId));
         // Update reply count
         setComment({ ...comment, replyCount: Math.max(0, (comment.replyCount || 0) - 1) });
+        toast.success('Cevap silindi');
+      } else {
+        toast.error('Cevap silinemedi');
       }
     } catch (err) {
       console.error(err);
+      toast.error('Bir hata oluştu');
     }
   };
 
@@ -281,10 +296,13 @@ export default function CommentDetailPage({
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(shareData.url);
-        alert('Yorum bağlantısı kopyalandı!');
+        toast.success('Yorum bağlantısı kopyalandı!');
       }
     } catch (err) {
       console.error('Paylaşım hatası:', err);
+      if (err.name !== 'AbortError') {
+        toast.error('Paylaşım başarısız oldu');
+      }
     }
   };
 
@@ -492,6 +510,9 @@ export default function CommentDetailPage({
           ))
         )}
       </div>
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
     </div>
   );
 }

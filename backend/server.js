@@ -1851,18 +1851,21 @@ app.post('/api/admin/version-notes', adminAuth, async (req, res) => {
 
     await newNote.save();
 
-    // Create a notification for all users
-    const users = await User.find({}, '_id');
-    const notifications = users.map(user => ({
-      recipient: user._id,
-      sender: req.userId,
-      type: 'version_update',
-      title: 'Yeni sürüm mevcut!',
-      message: `KBÜ Sosyal ${version} sürümüne güncellendi. Yenilikleri görmek için tıkla!`,
-      link: '/version-notes'
-    }));
+    // Sadece yayınlanmış sürüm notları için tüm kullanıcılara bildirim gönder
+    if (isPublished) {
+      const users = await User.find({}, '_id');
+      const notifications = users.map(user => ({
+        recipient: user._id,
+        type: 'version_update',
+        title: 'Yeni sürüm mevcut!',
+        message: `KBÜ Sosyal ${version} sürümüne güncellendi. Yenilikleri görmek için tıkla!`,
+        link: '/version-notes',
+        isRead: false
+      }));
 
-    await Notification.insertMany(notifications);
+      await Notification.insertMany(notifications);
+      console.log(`✅ ${users.length} kullanıcıya sürüm ${version} bildirimi gönderildi`);
+    }
 
     res.status(201).json(newNote);
   } catch (err) {
@@ -1880,6 +1883,14 @@ app.put('/api/admin/version-notes/:id', adminAuth, async (req, res) => {
   try {
     const { version, title, description, features, bugFixes, improvements, releaseDate, isPublished } = req.body;
 
+    // Eski durumu kontrol et
+    const oldNote = await VersionNote.findById(req.params.id);
+    if (!oldNote) {
+      return res.status(404).json({ error: 'Sürüm notu bulunamadı' });
+    }
+
+    const wasUnpublished = !oldNote.isPublished;
+
     const updatedNote = await VersionNote.findByIdAndUpdate(
       req.params.id,
       {
@@ -1895,8 +1906,20 @@ app.put('/api/admin/version-notes/:id', adminAuth, async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!updatedNote) {
-      return res.status(404).json({ error: 'Sürüm notu bulunamadı' });
+    // Eğer yayınlanmamış bir not yayınlanıyorsa, tüm kullanıcılara bildirim gönder
+    if (wasUnpublished && isPublished) {
+      const users = await User.find({}, '_id');
+      const notifications = users.map(user => ({
+        recipient: user._id,
+        type: 'version_update',
+        title: 'Yeni sürüm mevcut!',
+        message: `KBÜ Sosyal ${version} sürümüne güncellendi. Yenilikleri görmek için tıkla!`,
+        link: '/version-notes',
+        isRead: false
+      }));
+
+      await Notification.insertMany(notifications);
+      console.log(`✅ ${users.length} kullanıcıya sürüm ${version} bildirimi gönderildi (güncelleme)`);
     }
 
     res.json(updatedNote);
@@ -2638,21 +2661,45 @@ if (process.env.NODE_ENV === 'production') {
 cron.schedule('0 12,20 * * *', async () => {
   console.log('🔄 Öneri sistemi çalışıyor...');
   try {
-    // 1. Son 24 saatte en çok beğenilen postu bul
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // 1. Son 7 günde en çok beğenilen ve yakın zamanda popülerleşmiş postu bul
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const popularPost = await Post.findOne({
-      createdAt: { $gt: oneDayAgo },
-      isAnonymous: false, // Anonim postları önerme (tercihen)
-      category: 'Geyik'   // Sadece genel akıştan öner
-    })
-    .sort({ 'likes.length': -1 }) // En çok beğenilen (likes array'inin uzunluğuna göre)
-    .select('_id author'); // Sadece gerekli alanları çek
+    // Aggregate ile en çok beğeni alan postu bul (tüm kategorilerden)
+    const popularPosts = await Post.aggregate([
+      {
+        $match: {
+          createdAt: { $gt: sevenDaysAgo },
+          isAnonymous: false // Anonim postları önerme
+        }
+      },
+      {
+        $addFields: {
+          likeCount: { $size: '$likes' }
+        }
+      },
+      {
+        $match: {
+          likeCount: { $gte: 3 } // En az 3 beğeni olmalı
+        }
+      },
+      {
+        $sort: { likeCount: -1 }
+      },
+      {
+        $limit: 1
+      },
+      {
+        $project: { _id: 1, author: 1, likeCount: 1 }
+      }
+    ]);
 
-    if (!popularPost) {
-      console.log('📭 Son 24 saatte önerilecek popüler post bulunamadı.');
+    if (!popularPosts || popularPosts.length === 0) {
+      console.log('📭 Son 7 günde önerilecek popüler post bulunamadı (en az 3 beğeni gerekli).');
       return;
     }
+
+    const popularPost = popularPosts[0];
+    console.log(`📌 Öneri: Post ${popularPost._id} (${popularPost.likeCount} beğeni)`);
 
     // 2. OPTİMİZE EDİLMİŞ BİLDİRİM SİSTEMİ
     // Tüm kullanıcıları RAM'e çekmek yerine, batch (toplu) işlem yapıyoruz
@@ -2699,14 +2746,22 @@ cron.schedule('0 12,20 * * *', async () => {
       }
 
       // Bu batch için bildirimleri hazırla
-      const notifications = usersToNotify.map(user => ({
-        recipient: user._id,
-        sender: popularPost.author,
-        type: 'suggestion',
-        post: popularPost._id,
-        isRead: false,
-        createdAt: new Date()
-      }));
+      const notifications = usersToNotify.map(user => {
+        const notification = {
+          recipient: user._id,
+          type: 'suggestion',
+          post: popularPost._id,
+          isRead: false,
+          createdAt: new Date()
+        };
+
+        // Eğer post yazarı varsa sender olarak ekle
+        if (popularPost.author) {
+          notification.sender = popularPost.author;
+        }
+
+        return notification;
+      });
 
       // Batch olarak veritabanına ekle
       // insertMany ordered:false ile hata olsa bile diğerlerine devam eder

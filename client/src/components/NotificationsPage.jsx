@@ -258,7 +258,7 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
       case 'suggestion': // YENİ
         return `Günün önerisi: ${senderName} kullanıcısının popüler gönderisine göz at!`;
       case 'version_update':
-        return `${notification.title} ${notification.message}`;
+        return `Yeni sürüm yayınlandı! ${notification.version || ''} sürümündeki yenilikleri keşfet.`;
       default:
         return 'Yeni bir bildirim';
     }

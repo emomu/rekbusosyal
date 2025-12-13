@@ -1249,6 +1249,9 @@ export default function App() {
             onMentionClick={(username) => {
               setViewedProfile(username);
             }}
+            onCommentClick={(comment) => {
+              setSelectedComment(comment);
+            }}
             currentUserProfilePic={currentUserInfo?.profilePicture}
           />
 
@@ -1260,6 +1263,9 @@ export default function App() {
             onClose={() => dispatch(setActiveTab('akis'))}
             onMentionClick={(username) => {
               setViewedProfile(username);
+            }}
+            onCommentClick={(comment) => {
+              setSelectedComment(comment);
             }}
             currentUserProfilePic={currentUserInfo?.profilePicture}
           />
