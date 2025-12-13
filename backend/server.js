@@ -213,7 +213,7 @@ app.get('/api/posts', async (req, res) => {
 
     const [posts, totalCount] = await Promise.all([
       Post.find({ isAnonymous: false, category: 'Geyik' })
-        .populate('author', 'username profilePicture')
+        .populate('author', 'username profilePicture badges fullName')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -246,7 +246,7 @@ app.post('/api/posts', auth, cooldown('post'), async (req, res) => {
     
     let savedPost = await newPost.save();
     // Kaydedilen postu yazar bilgisiyle birlikte geri döndür
-    savedPost = await savedPost.populate('author', 'username profilePicture');
+    savedPost = await savedPost.populate('author', 'username profilePicture badges fullName');
     
     res.status(201).json(savedPost);
   } catch (err) {
@@ -265,7 +265,7 @@ app.get('/api/confessions', async (req, res) => {
 
     const [confessions, totalCount] = await Promise.all([
       Post.find({ category: 'İtiraf' })
-        .populate('author', 'username profilePicture')
+        .populate('author', 'username profilePicture badges fullName')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -301,7 +301,7 @@ app.post('/api/confessions', auth, cooldown('confession'), async (req, res) => {
     
     // Eğer anonim değilse, yazar bilgisiyle birlikte geri döndür
     if (!savedConfession.isAnonymous) {
-      savedConfession = await savedConfession.populate('author', 'username profilePicture');
+      savedConfession = await savedConfession.populate('author', 'username profilePicture badges fullName');
     }
     
     res.status(201).json(savedConfession);
@@ -371,7 +371,7 @@ app.post('/api/posts/:id/like', auth, async (req, res) => {
     // Frontend için yazar bilgisini populate et
     // Not: Anonim post ise frontend'de yazar gizlenmeli ama veri dolu gitmeli
     if (updatedPost.author) { 
-      updatedPost = await updatedPost.populate('author', 'username profilePicture');
+      updatedPost = await updatedPost.populate('author', 'username profilePicture badges fullName');
     }
 
     res.json(updatedPost);
@@ -387,7 +387,7 @@ app.get('/api/posts/:id', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
       .select('+author') // author field'ı dahil et
-      .populate('author', 'username profilePicture');
+      .populate('author', 'username profilePicture badges fullName');
 
     if (!post) {
       return res.status(404).json({ error: 'Post bulunamadı' });
@@ -496,7 +496,7 @@ app.post('/api/campus/:id/vote', voteCooldown, async (req, res) => {
 app.get('/api/campus/:id/comments', async (req, res) => {
   try {
     const comments = await CampusComment.find({ campusId: req.params.id })
-      .populate('author', 'username profilePicture')
+      .populate('author', 'username profilePicture badges')
       .sort({ createdAt: -1 });
     res.json(comments);
   } catch (err) {
@@ -522,7 +522,7 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, r
 
     const comment = new Comment({ content, author: userId, post: postId });
     await comment.save();
-    await comment.populate('author', 'username profilePicture fullName');
+    await comment.populate('author', 'username profilePicture fullName badges');
 
     // 1. Post Sahibine Bildirim
     // DÜZELTME: !post.isAnonymous kontrolü kaldırıldı.
@@ -585,7 +585,7 @@ app.post('/api/campus/comments/:id/like', auth, async (req, res) => {
     }
 
     let updatedComment = await comment.save();
-    updatedComment = await updatedComment.populate('author', 'username profilePicture');
+    updatedComment = await updatedComment.populate('author', 'username profilePicture badges fullName');
     res.json(updatedComment);
   } catch (err) {
     console.error("Yorum beğenme hatası:", err);
@@ -614,7 +614,7 @@ app.put('/api/campus/comments/:id', auth, async (req, res) => {
 
     comment.content = req.body.content;
     let updatedComment = await comment.save();
-    updatedComment = await updatedComment.populate('author', 'username profilePicture');
+    updatedComment = await updatedComment.populate('author', 'username profilePicture badges fullName');
     res.json(updatedComment);
   } catch (err) {
     console.error("Yorum düzenleme hatası:", err);
@@ -1000,6 +1000,14 @@ app.post('/api/login', async (req, res) => {
     }
     // -----------------------------------
 
+    // --- BAN KONTROLÜ ---
+    if (user.isBanned) {
+      return res.status(403).json({
+        error: `Hesabınız yasaklandı. Neden: ${user.banReason || 'Belirtilmemiş'}`
+      });
+    }
+    // -----------------------------------
+
     // Giriş bileti (Token) oluştur
     const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET);
     res.json({
@@ -1259,7 +1267,7 @@ app.get('/api/users/:username', async (req, res) => {
   try {
     // Eğer kod buraya giriyorsa, username "search" değildir.
     const user = await User.findOne({ username: req.params.username })
-      .select('-password -votedCampuses -votedCommunities')
+      .select('-password -email -verificationToken -birthDate -votedCampuses -votedCommunities')   
       .populate('followers', 'username fullName profilePicture')
       .populate('following', 'username fullName profilePicture');
 
@@ -1286,7 +1294,7 @@ app.get('/api/users/:userId/posts', async (req, res) => {
     // Kullanıcının postlarını çek (Geyik kategorisi, anonim olmayanlar)
     const [posts, totalCount] = await Promise.all([
       Post.find({ author: userId, isAnonymous: false, category: 'Geyik' })
-        .populate('author', 'username profilePicture')
+        .populate('author', 'username profilePicture badges')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -1320,7 +1328,7 @@ app.get('/api/users/:userId/confessions', async (req, res) => {
 
     const [confessions, totalCount] = await Promise.all([
       Post.find({ author: userId, isAnonymous: false, category: 'İtiraf' })
-        .populate('author', 'username profilePicture')
+        .populate('author', 'username profilePicture badges')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -1626,6 +1634,103 @@ app.delete('/api/admin/users/:id', strictAdminAuth, async (req, res) => {
   }
 });
 
+// Kullanıcıyı banla
+app.put('/api/admin/users/:id/ban', adminAuth, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    // Admin kendini banlayamaz
+    if (user._id.toString() === req.userId) {
+      return res.status(400).json({ error: "Kendinizi banlayamazsınız" });
+    }
+
+    // Diğer adminleri banlayamaz (sadece strictAdmin banlayabilir)
+    if (user.role === 'admin') {
+      return res.status(403).json({ error: "Admin kullanıcıları banlayamazsınız" });
+    }
+
+    user.isBanned = true;
+    user.banReason = reason || 'Topluluk kurallarını ihlal';
+    user.bannedAt = new Date();
+    await user.save();
+
+    res.json({
+      message: "Kullanıcı başarıyla banlandı",
+      user: {
+        _id: user._id,
+        username: user.username,
+        isBanned: user.isBanned,
+        banReason: user.banReason,
+        bannedAt: user.bannedAt
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Kullanıcı banlanamadı: " + err.message });
+  }
+});
+
+// Kullanıcının banını kaldır
+app.put('/api/admin/users/:id/unban', adminAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    user.isBanned = false;
+    user.banReason = '';
+    user.bannedAt = null;
+    await user.save();
+
+    res.json({
+      message: "Kullanıcının banı kaldırıldı",
+      user: {
+        _id: user._id,
+        username: user.username,
+        isBanned: user.isBanned
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Ban kaldırılamadı: " + err.message });
+  }
+});
+
+// Kullanıcıya badge ekle/kaldır
+app.put('/api/admin/users/:id/badges', adminAuth, async (req, res) => {
+  try {
+    const { badges } = req.body; // badges array olarak gönderilmeli
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    // Geçerli badge'leri kontrol et
+    const validBadges = ['founder', 'bug_hunter', 'admin', 'moderator', 'supporter', 'verified'];
+    const filteredBadges = badges.filter(badge => validBadges.includes(badge));
+
+    user.badges = filteredBadges;
+    await user.save();
+
+    res.json({
+      message: "Kullanıcı rozetleri güncellendi",
+      user: {
+        _id: user._id,
+        username: user.username,
+        badges: user.badges
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Rozetler güncellenemedi: " + err.message });
+  }
+});
+
 // --- REKLAM YÖNETİMİ ---
 // Tüm reklamları listele
 app.get('/api/admin/advertisements', adminAuth, async (req, res) => {
@@ -1828,7 +1933,7 @@ app.get('/api/admin/comments', adminAuth, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const comments = await CampusComment.find()
-      .populate('author', 'username profilePicture')
+      .populate('author', 'username profilePicture badges')
       .populate('campusId', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -1857,7 +1962,7 @@ app.get('/api/admin/posts', adminAuth, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const posts = await Post.find()
-      .populate('author', 'username profilePicture')
+      .populate('author', 'username profilePicture badges')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -2105,7 +2210,7 @@ app.post('/api/community/:id/vote', voteCooldown, async (req, res) => {
 app.get('/api/community/:id/comments', async (req, res) => {
   try {
     const comments = await CommunityComment.find({ community: req.params.id })
-      .populate('author', 'username profilePicture')
+      .populate('author', 'username profilePicture badges')
       .sort({ createdAt: -1 });
     res.json(comments);
   } catch (err) {
@@ -2147,7 +2252,7 @@ app.post('/api/community/:id/comments', auth, cooldown('comment'), async (req, r
       await targetComment.save();
     }
 
-    const populatedComment = await targetComment.populate('author', 'username profilePicture');
+    const populatedComment = await targetComment.populate('author', 'username profilePicture badges fullName');
     res.json(populatedComment);
 
   } catch (err) {
@@ -2172,7 +2277,7 @@ app.post('/api/community/comments/:id/like', auth, async (req, res) => {
     }
 
     await comment.save();
-    const populatedComment = await comment.populate('author', 'username profilePicture');
+    const populatedComment = await comment.populate('author', 'username profilePicture badges fullName');
     res.json(populatedComment);
   } catch (err) {
     console.error(err);
@@ -2200,7 +2305,7 @@ app.put('/api/community/comments/:id', auth, async (req, res) => {
     comment.content = req.body.content;
     await comment.save();
 
-    const populatedComment = await comment.populate('author', 'username profilePicture');
+    const populatedComment = await comment.populate('author', 'username profilePicture badges fullName');
     res.json(populatedComment);
   } catch (err) {
     console.error(err);
@@ -2404,7 +2509,7 @@ app.delete('/api/notifications/:id', auth, async (req, res) => {
 
 // Helper function to extract mentions from text
 function extractMentions(text) {
-  const mentionRegex = /@(\w+)/g;
+  const mentionRegex = /@([a-zA-Z0-9_.]+)/g;
   const mentions = [];
   let match;
   while ((match = mentionRegex.exec(text)) !== null) {
@@ -2420,7 +2525,7 @@ app.get('/api/posts/:postId/comments', async (req, res) => {
       post: req.params.postId,
       parentComment: null  // Sadece ana yorumlar
     })
-      .populate('author', 'username profilePicture fullName')
+      .populate('author', 'username profilePicture fullName badges')
       .sort({ createdAt: -1 });
     res.json(comments);
   } catch (err) {
@@ -2452,7 +2557,7 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, r
     await comment.save();
     
     // Frontend için yazar bilgisini ekle
-    await comment.populate('author', 'username profilePicture fullName');
+    await comment.populate('author', 'username profilePicture fullName badges');
 
     // 3. Bildirim: Post Sahibine (Kendi postu değilse)
     if (post.author && userId.toString() !== post.author.toString() && !post.isAnonymous) {
@@ -2543,7 +2648,7 @@ app.post('/api/comments/:commentId/like', auth, async (req, res) => {
 
     await comment.save();
     // Yazar bilgisini ekle
-    await comment.populate('author', 'username profilePicture fullName');
+    await comment.populate('author', 'username profilePicture fullName badges');
     
     res.json(comment);
   } catch (err) {
@@ -2575,7 +2680,7 @@ app.put('/api/comments/:commentId', auth, async (req, res) => {
 
     comment.content = content;
     await comment.save();
-    await comment.populate('author', 'username profilePicture fullName');
+    await comment.populate('author', 'username profilePicture fullName badges');
 
     res.json(comment);
   } catch (err) {
@@ -2619,7 +2724,7 @@ app.delete('/api/comments/:commentId', auth, async (req, res) => {
 app.get('/api/comments/:commentId', async (req, res) => {
   try {
     const comment = await Comment.findById(req.params.commentId)
-      .populate('author', 'username profilePicture fullName')
+      .populate('author', 'username profilePicture fullName badges')
       .populate('post', '_id');
 
     if (!comment) {
@@ -2639,7 +2744,7 @@ app.get('/api/comments/:commentId/replies', async (req, res) => {
     const replies = await Comment.find({
       parentComment: req.params.commentId
     })
-      .populate('author', 'username profilePicture fullName')
+      .populate('author', 'username profilePicture fullName badges')
       .sort({ createdAt: -1 });
 
     res.json(replies);
@@ -2684,7 +2789,7 @@ app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), async (r
     await parentComment.save();
 
     // Frontend için yazar bilgisini ekle
-    await reply.populate('author', 'username profilePicture fullName');
+    await reply.populate('author', 'username profilePicture fullName badges');
 
     // Bildirim: Parent comment sahibine (kendi yorumu değilse)
     if (parentComment.author && userId.toString() !== parentComment.author.toString()) {

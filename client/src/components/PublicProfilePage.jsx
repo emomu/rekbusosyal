@@ -10,6 +10,7 @@ import PostDetailPage from './PostDetailPage';
 import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
 import { API_URL } from '../config/api';
 import { ensureHttps } from '../utils/imageUtils';
+import UserBadges from './UserBadges';
 
 export default function PublicProfilePage({ username, onClose, onMentionClick, currentUserProfilePic, onCommentClick }) {
   const dispatch = useDispatch();
@@ -265,7 +266,12 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-2 gap-2">
               <div className="min-w-0">
-                <h2 className="font-bold text-base text-gray-900 truncate">{currentProfile.fullName}</h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-bold text-base text-gray-900 truncate">{currentProfile.fullName}</h2>
+                  {currentProfile.badges && currentProfile.badges.length > 0 && (
+                    <UserBadges badges={currentProfile.badges} size="sm" />
+                  )}
+                </div>
                 <p className="text-gray-500 text-sm truncate">@{currentProfile.username}</p>
               </div>
               {!isOwnProfile && (
@@ -345,8 +351,13 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                             </div>
                           )}
                           <div>
-                            <div className="font-bold text-sm text-gray-900">{currentProfile.username}</div>
-                            <div className="text-xs text-gray-400">{new Date(post.createdAt).toLocaleDateString('tr-TR')}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-bold text-sm text-gray-900">{currentProfile.fullName}</div>
+                              {currentProfile.badges && currentProfile.badges.length > 0 && (
+                                <UserBadges badges={currentProfile.badges} size="sm" />
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400">@{currentProfile.username} · {new Date(post.createdAt).toLocaleDateString('tr-TR')}</div>
                           </div>
                         </div>
                         <div className="text-gray-800 mb-3 whitespace-pre-wrap">
@@ -399,8 +410,13 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                             </div>
                           )}
                           <div>
-                            <div className="font-bold text-sm text-gray-900">{currentProfile.username}</div>
-                            <div className="text-xs text-gray-400">{new Date(confession.createdAt).toLocaleDateString('tr-TR')}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="font-bold text-sm text-gray-900">{currentProfile.fullName}</div>
+                              {currentProfile.badges && currentProfile.badges.length > 0 && (
+                                <UserBadges badges={currentProfile.badges} size="sm" />
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400">@{currentProfile.username} · {new Date(confession.createdAt).toLocaleDateString('tr-TR')}</div>
                           </div>
                         </div>
                         <div className="text-gray-800 mb-3 whitespace-pre-wrap">

@@ -15,6 +15,7 @@ import NotificationsPage from './components/NotificationsPage';
 import LikeButton from './components/LikeButton';
 import VersionNotesPage from './components/VersionNotesPage';
 import CookieConsent from './components/CookieConsent';
+import UserBadges from './components/UserBadges';
 
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
@@ -1335,10 +1336,15 @@ export default function App() {
                                 )}
                               </div>
                               <div>
-                                <div className="font-bold text-sm text-gray-900 hover:underline" onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
-                                  {item.author?.username || 'Anonim'}
+                                <div className="flex items-center gap-2">
+                                  <div className="font-bold text-sm text-gray-900 hover:underline" onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
+                                    {item.author?.fullName || 'Anonim'}
+                                  </div>
+                                  {item.author?.badges && item.author.badges.length > 0 && (
+                                    <UserBadges badges={item.author.badges} size="sm" />
+                                  )}
                                 </div>
-                                <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
+                                <div className="text-xs text-gray-400">@{item.author?.username} · {new Date(item.createdAt).toLocaleDateString()}</div>
                               </div>
                             </div>
                             <div className="text-gray-800 mb-3 whitespace-pre-wrap">
@@ -1417,10 +1423,24 @@ export default function App() {
                                 </div>
                               )}
                               <div>
-                                <div className={`font-bold text-sm text-gray-900 ${!item.isAnonymous ? 'hover:underline' : ''}`} onClick={(e) => !item.isAnonymous && (e.stopPropagation() || setViewedProfile(item.author?.username))}>
-                                  {item.isAnonymous ? 'Anonim' : item.author?.username}
-                                </div>
-                                <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
+                                {item.isAnonymous ? (
+                                  <div>
+                                    <div className="font-bold text-sm text-gray-900">Anonim</div>
+                                    <div className="text-xs text-gray-400">{new Date(item.createdAt).toLocaleDateString()}</div>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="font-bold text-sm text-gray-900 hover:underline" onClick={(e) => { e.stopPropagation(); setViewedProfile(item.author?.username); }}>
+                                        {item.author?.fullName }
+                                      </div>
+                                      {item.author?.badges && item.author.badges.length > 0 && (
+                                        <UserBadges badges={item.author.badges} size="sm" />
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-gray-400">@{item.author?.username} · {new Date(item.createdAt).toLocaleDateString()}</div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="text-gray-800 mb-3 whitespace-pre-wrap">
@@ -1484,7 +1504,10 @@ export default function App() {
                                 <div className="flex-1">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <div className="font-bold text-sm text-gray-900">{comment.author?.username || 'Anonim'}</div>
+                                      <div className="font-bold text-sm text-gray-900">{comment.author?.fullName || comment.author?.username || 'Anonim'}</div>
+                                      {comment.author?.badges && comment.author.badges.length > 0 && (
+                                        <UserBadges badges={comment.author.badges} size="sm" />
+                                      )}
                                       {badge && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shadow-sm ${badge.color}`}>{badge.icon} {badge.label}</span>}
                                     </div>
                                     <div className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleDateString('tr-TR')}</div>
@@ -1586,7 +1609,10 @@ export default function App() {
                                 <div className="flex-1">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                      <div className="font-bold text-sm text-gray-900">{comment.author?.username || 'Anonim'}</div>
+                                      <div className="font-bold text-sm text-gray-900">{comment.author?.fullName || 'Anonim'}</div>
+                                      {comment.author?.badges && comment.author.badges.length > 0 && (
+                                        <UserBadges badges={comment.author.badges} size="sm" />
+                                      )}
                                       {badge && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 shadow-sm ${badge.color}`}>{badge.icon} {badge.label}</span>}
                                     </div>
                                     <div className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleDateString('tr-TR')}</div>

@@ -4,6 +4,7 @@ import { API_URL } from '../config/api';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
 import { ensureHttps } from '../utils/imageUtils';
+import UserBadges from './UserBadges';
 
 // --- LIKE BUTONU BİLEŞENİ (Dokunulmadı, aynen korundu) ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -354,8 +355,13 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
               </div>
             )}
             <div className="flex flex-col">
-              <span className="font-bold text-gray-900 text-base">{post.author?.username || 'Anonim'}</span>
-              <span className="text-gray-500 text-sm">{timeAgo(post.createdAt)} önce</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-gray-900 text-base">{post.author?.fullName || post.author?.username || 'Anonim'}</span>
+                {post.author?.badges && post.author.badges.length > 0 && (
+                  <UserBadges badges={post.author.badges} size="sm" />
+                )}
+              </div>
+              <span className="text-gray-500 text-sm">@{post.author?.username} · {timeAgo(post.createdAt)} önce</span>
             </div>
           </div>
           <button className="text-gray-400 hover:text-blue-500 transition">
@@ -477,7 +483,10 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="font-bold text-gray-900 truncate">{comment.author?.username || 'Kullanıcı'}</span>
+                      <span className="font-bold text-gray-900 truncate">{comment.author?.fullName || comment.author?.username || 'Kullanıcı'}</span>
+                      {comment.author?.badges && comment.author.badges.length > 0 && (
+                        <UserBadges badges={comment.author.badges} size="sm" />
+                      )}
                       <span className="text-gray-500 text-sm">· {timeAgo(comment.createdAt)}</span>
                     </div>
 

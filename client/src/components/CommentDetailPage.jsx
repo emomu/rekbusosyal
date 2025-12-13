@@ -4,6 +4,7 @@ import { API_URL } from '../config/api';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
 import { ensureHttps } from '../utils/imageUtils';
+import UserBadges from './UserBadges';
 
 // --- LIKE BUTONU BİLEŞENİ ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -364,8 +365,13 @@ export default function CommentDetailPage({
               </div>
             )}
             <div className="flex flex-col">
-              <span className="font-bold text-gray-900 text-base">{comment.author?.username || 'Anonim'}</span>
-              <span className="text-gray-500 text-sm">{timeAgo(comment.createdAt)} önce</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-gray-900 text-base">{comment.author?.fullName || comment.author?.username || 'Anonim'}</span>
+                {comment.author?.badges && comment.author.badges.length > 0 && (
+                  <UserBadges badges={comment.author.badges} size="sm" />
+                )}
+              </div>
+              <span className="text-gray-500 text-sm">@{comment.author?.username} · {timeAgo(comment.createdAt)} önce</span>
             </div>
           </div>
           <button className="text-gray-400 hover:text-blue-500 transition">
@@ -472,7 +478,10 @@ export default function CommentDetailPage({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="font-bold text-gray-900 truncate">{reply.author?.username || 'Kullanıcı'}</span>
+                      <span className="font-bold text-gray-900 truncate">{reply.author?.fullName || reply.author?.username || 'Kullanıcı'}</span>
+                      {reply.author?.badges && reply.author.badges.length > 0 && (
+                        <UserBadges badges={reply.author.badges} size="sm" />
+                      )}
                       <span className="text-gray-500 text-sm">· {timeAgo(reply.createdAt)}</span>
                     </div>
 

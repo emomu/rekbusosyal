@@ -11,6 +11,7 @@ import { ToastContainer } from './Toast';
 import { ensureHttps } from '../utils/imageUtils';
 import { compressImage } from '../utils/imageCompression';
 import CachedImage from './CachedImage';
+import UserBadges from './UserBadges';
 
 export default function ProfilePage({ onMenuClick }) {
   const dispatch = useDispatch();
@@ -390,8 +391,13 @@ export default function ProfilePage({ onMenuClick }) {
               </div>
 
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-gray-900">{profile.fullName}</h3>
-                <p className="text-gray-500 text-sm">@{profile.username}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-gray-900">{profile.fullName}</h3>
+                  {profile.badges && profile.badges.length > 0 && (
+                    <UserBadges badges={profile.badges} size="sm" />
+                  )}
+                </div>
+                <p className="text-gray-500 text-sm mt-1">@{profile.username}</p>
                 <p className="text-gray-400 text-xs mt-1">{profile.email}</p>
               </div>
             </div>

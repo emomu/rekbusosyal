@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User } from 'lucide-react';
+import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User, Ban, Award } from 'lucide-react';
 import { API_URL } from '../config/api';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { ensureHttps } from '../utils/imageUtils';
+import { BADGE_INFO } from '../utils/badgeUtils';
+import UserBadges from './UserBadges';
 
 export default function AdminPanel() {
   const [activeSection, setActiveSection] = useState('users');
@@ -195,6 +197,97 @@ export default function AdminPanel() {
         alert('Kullanıcı silindi');
       }
     } catch (err) { console.error(err); }
+  };
+
+  // Kullanıcıyı banla
+  const banUser = async (userId) => {
+    const reason = prompt('Ban nedeni:');
+    if (!reason) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/ban`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert('Kullanıcı başarıyla banlandı');
+        loadUsers();
+        // Eğer detay modalı açıksa, kullanıcıyı güncelle
+        if (selectedUser && selectedUser._id === userId) {
+          setSelectedUser(data.user);
+        }
+      } else {
+        alert(data.error || 'Kullanıcı banlanamadı');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  // Kullanıcının banını kaldır
+  const unbanUser = async (userId) => {
+    if (!confirm('Bu kullanıcının banını kaldırmak istediğinize emin misiniz?')) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/unban`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert('Kullanıcının banı kaldırıldı');
+        loadUsers();
+        // Eğer detay modalı açıksa, kullanıcıyı güncelle
+        if (selectedUser && selectedUser._id === userId) {
+          setSelectedUser(data.user);
+        }
+      } else {
+        alert(data.error || 'Ban kaldırılamadı');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  // Kullanıcı badge'lerini güncelle
+  const updateUserBadges = async (userId, badges) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${userId}/badges`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ badges })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        alert('Rozetler güncellendi');
+        loadUsers();
+        // Eğer detay modalı açıksa, kullanıcıyı güncelle
+        if (selectedUser && selectedUser._id === userId) {
+          setSelectedUser({ ...selectedUser, badges: data.user.badges });
+        }
+      } else {
+        alert(data.error || 'Rozetler güncellenemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Bir hata oluştu');
+    }
   };
 
   // Reklam sil
@@ -442,16 +535,24 @@ export default function AdminPanel() {
                         </select>
                       </td>
                       <td className="p-4" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => toggleUserVerification(user._id, user.isVerified)}
-                          className={`text-xs px-3 py-1.5 rounded-full font-medium transition ${
-                            user.isVerified
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                              : 'bg-red-100 text-red-700 hover:bg-red-200'
-                          }`}
-                        >
-                          {user.isVerified ? 'Doğrulanmış' : 'Doğrulanmamış'}
-                        </button>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            onClick={() => toggleUserVerification(user._id, user.isVerified)}
+                            className={`text-xs px-3 py-1.5 rounded-full font-medium transition ${
+                              user.isVerified
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            }`}
+                          >
+                            {user.isVerified ? 'Doğrulanmış' : 'Doğrulanmamış'}
+                          </button>
+                          {user.isBanned && (
+                            <span className="text-xs px-3 py-1.5 rounded-full font-medium bg-red-100 text-red-700 flex items-center gap-1">
+                              <Ban size={12} />
+                              Banlı
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="p-4 text-sm text-gray-600">
                         {new Date(user.createdAt).toLocaleDateString('tr-TR')}
@@ -901,7 +1002,43 @@ export default function AdminPanel() {
                     {selectedUser.isPrivate ? 'Gizli' : 'Açık'}
                   </span>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Ban Durumu</label>
+                  <span className={`inline-block text-xs px-3 py-1 rounded-full font-medium ${
+                    selectedUser.isBanned
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    {selectedUser.isBanned ? 'Banlı' : 'Aktif'}
+                  </span>
+                </div>
               </div>
+
+              {/* Ban Info */}
+              {selectedUser.isBanned && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-xs font-medium text-red-700 mb-1">Ban Nedeni</label>
+                      <p className="text-sm text-red-900">{selectedUser.banReason || 'Belirtilmemiş'}</p>
+                    </div>
+                    {selectedUser.bannedAt && (
+                      <div>
+                        <label className="block text-xs font-medium text-red-700 mb-1">Ban Tarihi</label>
+                        <p className="text-sm text-red-900">
+                          {new Date(selectedUser.bannedAt).toLocaleDateString('tr-TR', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Bio */}
               {selectedUser.bio && (
@@ -943,9 +1080,83 @@ export default function AdminPanel() {
                   </div>
                 </div>
               )}
+
+              {/* Current Badges */}
+              <div>
+                <label className="block text-sm font-medium text-gray-500 mb-2">Mevcut Rozetler</label>
+                {selectedUser.badges && selectedUser.badges.length > 0 ? (
+                  <UserBadges badges={selectedUser.badges} size="lg" />
+                ) : (
+                  <p className="text-sm text-gray-400">Rozet yok</p>
+                )}
+              </div>
+
+              {/* Badge Management */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Rozet Yönetimi</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.values(BADGE_INFO).map((badge) => {
+                    const isSelected = selectedUser.badges?.includes(badge.id) || false;
+                    return (
+                      <label
+                        key={badge.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const newBadges = e.target.checked
+                              ? [...(selectedUser.badges || []), badge.id]
+                              : (selectedUser.badges || []).filter(b => b !== badge.id);
+
+                            updateUserBadges(selectedUser._id, newBadges);
+                          }}
+                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                        />
+                        <img
+                          src={badge.image}
+                          alt={badge.name}
+                          className="w-6 h-6 object-contain"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{badge.name}</p>
+                          <p className="text-xs text-gray-500">{badge.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="p-6 border-t border-gray-200 flex gap-3">
+              {selectedUser.isBanned ? (
+                <button
+                  onClick={() => {
+                    unbanUser(selectedUser._id);
+                  }}
+                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-medium"
+                >
+                  Banı Kaldır
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    banUser(selectedUser._id);
+                  }}
+                  className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium"
+                >
+                  Kullanıcıyı Banla
+                </button>
+              )}
               <button
                 onClick={() => setShowUserDetails(false)}
                 className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition font-medium"

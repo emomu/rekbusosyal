@@ -12,6 +12,9 @@ const UserSchema = new mongoose.Schema({
   // --- EKLENEN KISIM BAŞLANGIÇ ---
   isVerified: { type: Boolean, default: false }, // Hesap onaylı mı?
   verificationToken: { type: String }, // Onaylama linki için kod
+  isBanned: { type: Boolean, default: false }, // Kullanıcı banlandı mı?
+  banReason: { type: String, default: '' }, // Ban nedeni
+  bannedAt: { type: Date }, // Ban tarihi
   // --- EKLENEN KISIM BİTİŞ ---
 
   votedCampuses: [{
@@ -31,6 +34,10 @@ const UserSchema = new mongoose.Schema({
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   followRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  badges: [{
+    type: String,
+    enum: ['founder', 'developer', 'bug_hunter', 'admin', 'moderator', 'supporter', 'verified']
+  }],
   createdAt: { type: Date, default: Date.now }
 });
 
