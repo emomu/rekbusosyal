@@ -37,7 +37,10 @@ export const useCachedImage = (imageUrl) => {
         setIsLoading(true);
 
         // Resmi fetch et
-        const response = await fetch(url);
+        const response = await fetch(url, {
+          mode: 'cors',
+          credentials: 'same-origin'
+        });
         if (!response.ok) {
           throw new Error('Resim yüklenemedi');
         }

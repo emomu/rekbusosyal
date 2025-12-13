@@ -650,7 +650,7 @@ app.post('/api/register', async (req, res) => {
 
     try {
       const { data, error } = await resend.emails.send({
-        from: 'KBÜ Sosyal <onboarding@resend.dev>',
+        from: 'KBÜ Sosyal <noreply@kbusosyal.com>',
         to: email,
         subject: '🎓 Hoş Geldin! Hesabını Doğrula - KBÜ Sosyal',
         html: `
@@ -751,7 +751,18 @@ app.post('/api/register', async (req, res) => {
   </table>
 </body>
 </html>
-        `
+        `,
+         headers: {
+    'X-Entity-Ref-ID': crypto.randomBytes(16).toString('hex'),
+    'X-Mailer': 'KBU-Sosyal-Platform',
+    'Return-Path': process.env.RESEND_FROM_EMAIL,
+    'Reply-To': process.env.RESEND_FROM_EMAIL,
+    'List-Unsubscribe': '<mailto:unsubscribe@kbusosyal.com>',
+    'Precedence': 'bulk',
+    'X-Priority': '1',
+    'Importance': 'high',
+    'X-MSMail-Priority': 'High' // Microsoft için özel
+  }
       });
 
       if (error) {
@@ -1045,13 +1056,21 @@ app.post('/api/profile/picture', auth, (req, res) => {
         return res.status(404).json({ error: "Kullanıcı bulunamadı" });
       }
 
-      // Delete old profile picture if exists (optional)
-      // TODO: Implement old file deletion with fs.unlink if needed
+      // Delete old profile picture if exists
+      if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+        const oldFilePath = path.join(__dirname, user.profilePicture);
+        if (fs.existsSync(oldFilePath)) {
+          try {
+            fs.unlinkSync(oldFilePath);
+          } catch (err) {
+            console.error('Eski profil resmi silinemedi:', err);
+          }
+        }
+      }
 
-      // Save new profile picture URL
-      // Use HTTPS in production, HTTP in development
-      const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
-      const profilePictureUrl = `${protocol}://${req.get('host')}/uploads/profiles/${req.file.filename}`;
+      // Save new profile picture as relative path (browser will use current origin)
+      // This prevents mixed content issues with HTTPS
+      const profilePictureUrl = `/uploads/profiles/${req.file.filename}`;
       user.profilePicture = profilePictureUrl;
       await user.save();
 
@@ -1064,6 +1083,42 @@ app.post('/api/profile/picture', auth, (req, res) => {
       res.status(500).json({ error: "Sunucu hatası: " + err.message });
     }
   });
+});
+
+// Profil resmi URL ile güncelle veya kaldır
+app.put('/api/profile/picture', auth, async (req, res) => {
+  try {
+    const { profilePicture } = req.body;
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    // Delete old profile picture if it was a local upload
+    if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
+      const oldFilePath = path.join(__dirname, user.profilePicture);
+      if (fs.existsSync(oldFilePath)) {
+        try {
+          fs.unlinkSync(oldFilePath);
+        } catch (err) {
+          console.error('Eski profil resmi silinemedi:', err);
+        }
+      }
+    }
+
+    // Update or remove profile picture
+    user.profilePicture = profilePicture || null;
+    await user.save();
+
+    res.json({
+      message: profilePicture ? "Profil resmi güncellendi" : "Profil resmi kaldırıldı",
+      profilePicture: user.profilePicture
+    });
+  } catch (err) {
+    console.error('Profile picture update error:', err);
+    res.status(500).json({ error: "Sunucu hatası: " + err.message });
+  }
 });
 
 // Kullanıcı adı güncelle
@@ -2180,7 +2235,7 @@ app.post('/api/resend-verification', async (req, res) => {
     // Resend ile mail gönder
     try {
       const { data, error } = await resend.emails.send({
-        from: 'KBÜ Sosyal <onboarding@resend.dev>',
+        from: 'KBÜ Sosyal <noreply@kbusosyal.com>',
         to: user.email,
         subject: 'KBÜ Sosyal - Yeni Doğrulama Linki',
         html: `
@@ -2190,7 +2245,18 @@ app.post('/api/resend-verification', async (req, res) => {
             <a href="${verificationLink}" style="background-color: #1e3a8a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px;">Hesabımı Doğrula</a>
             <p style="margin-top: 20px; font-size: 12px; color: #777;">Bu işlemi sen yapmadıysan, bu maili dikkate alma.</p>
           </div>
-        `
+        `,
+         headers: {
+    'X-Entity-Ref-ID': crypto.randomBytes(16).toString('hex'),
+    'X-Mailer': 'KBU-Sosyal-Platform',
+    'Return-Path': process.env.RESEND_FROM_EMAIL,
+    'Reply-To': process.env.RESEND_FROM_EMAIL,
+    'List-Unsubscribe': '<mailto:unsubscribe@kbusosyal.com>',
+    'Precedence': 'bulk',
+    'X-Priority': '1',
+    'Importance': 'high',
+    'X-MSMail-Priority': 'High' // Microsoft için özel
+  }
       });
 
       if (error) {
