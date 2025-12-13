@@ -14,8 +14,8 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion'
-    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'suggestion'],
+    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion', 'comment_reply'
+    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'comment_reply', 'suggestion'],
     required: true
   },
   post: {
@@ -24,6 +24,11 @@ const notificationSchema = new mongoose.Schema({
   },
   // YENİ ALAN: Yorum beğenileri için
   comment: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Comment'
+  },
+  // YENİ ALAN: Yoruma cevap için (reply)
+  reply: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Comment'
   },
