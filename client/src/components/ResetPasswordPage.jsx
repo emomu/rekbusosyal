@@ -52,7 +52,7 @@ const ResetPasswordPage = () => {
       if (res.ok) {
         setStatus('success');
         success('Şifreniz başarıyla güncellendi! Giriş sayfasına yönlendiriliyorsunuz...');
-        setTimeout(() => navigate('/login'), 3000);
+        setTimeout(() => navigate('/'), 3000);
       } else {
         // --- GÜNCELLENEN KISIM BURASI ---
         
