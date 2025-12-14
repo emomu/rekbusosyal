@@ -343,20 +343,40 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
         {/* Yazar Bilgisi */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            {post.author?.profilePicture ? (
-              <img
-                src={ensureHttps(post.author.profilePicture)}
-                alt={post.author.username}
-                className="w-10 h-10 rounded-full object-cover border border-gray-100"
-              />
-            ) : (
-              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500">
-                <User size={20} />
-              </div>
-            )}
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                if (post.author?.username && onMentionClick) {
+                  onMentionClick(post.author.username);
+                }
+              }}
+              className="cursor-pointer hover:opacity-80 transition"
+            >
+              {post.author?.profilePicture ? (
+                <img
+                  src={ensureHttps(post.author.profilePicture)}
+                  alt={post.author.username}
+                  className="w-10 h-10 rounded-full object-cover border border-gray-100"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500">
+                  <User size={20} />
+                </div>
+              )}
+            </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <span className="font-bold text-gray-900 text-base">{post.author?.fullName || post.author?.username || 'Anonim'}</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (post.author?.username && onMentionClick) {
+                      onMentionClick(post.author.username);
+                    }
+                  }}
+                  className="font-bold text-gray-900 text-base hover:underline cursor-pointer"
+                >
+                  {post.author?.fullName || post.author?.username || 'Anonim'}
+                </span>
                 {post.author?.badges && post.author.badges.length > 0 && (
                   <UserBadges badges={post.author.badges} size="sm" />
                 )}
@@ -471,7 +491,15 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
             >
               <div className="flex gap-3">
                 {/* Avatar */}
-                <div className="flex-shrink-0">
+                <div
+                  className="flex-shrink-0 cursor-pointer hover:opacity-80 transition"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (comment.author?.username && onMentionClick) {
+                      onMentionClick(comment.author.username);
+                    }
+                  }}
+                >
                   {comment.author?.profilePicture ? (
                     <img src={ensureHttps(comment.author.profilePicture)} alt="" className="w-10 h-10 rounded-full object-cover" />
                   ) : (
@@ -483,7 +511,17 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <span className="font-bold text-gray-900 truncate">{comment.author?.fullName || comment.author?.username || 'Kullanıcı'}</span>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (comment.author?.username && onMentionClick) {
+                            onMentionClick(comment.author.username);
+                          }
+                        }}
+                        className="font-bold text-gray-900 truncate hover:underline cursor-pointer"
+                      >
+                        {comment.author?.fullName || comment.author?.username || 'Kullanıcı'}
+                      </span>
                       {comment.author?.badges && comment.author.badges.length > 0 && (
                         <UserBadges badges={comment.author.badges} size="sm" />
                       )}

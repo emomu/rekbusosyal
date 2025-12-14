@@ -339,20 +339,27 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                     {userPosts.map((post) => (
                       <div key={post._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(post)}>
                         <div className="flex items-center gap-3 mb-2">
-                          {currentProfile.profilePicture ? (
-                            <img
-                              src={ensureHttps(currentProfile.profilePicture)}
-                              alt={currentProfile.fullName}
-                              className="w-9 h-9 bg-gray-200 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center">
-                              <User size={18} className="text-gray-400" />
-                            </div>
-                          )}
+                          <div onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }} className="cursor-pointer hover:opacity-80 transition">
+                            {currentProfile.profilePicture ? (
+                              <img
+                                src={ensureHttps(currentProfile.profilePicture)}
+                                alt={currentProfile.fullName}
+                                className="w-9 h-9 bg-gray-200 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center">
+                                <User size={18} className="text-gray-400" />
+                              </div>
+                            )}
+                          </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <div className="font-bold text-sm text-gray-900">{currentProfile.fullName}</div>
+                              <div
+                                className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
+                                onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }}
+                              >
+                                {currentProfile.fullName}
+                              </div>
                               {currentProfile.badges && currentProfile.badges.length > 0 && (
                                 <UserBadges badges={currentProfile.badges} size="sm" />
                               )}
@@ -398,20 +405,27 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                     {userConfessions.map((confession) => (
                       <div key={confession._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(confession)}>
                         <div className="flex items-center gap-3 mb-2">
-                          {currentProfile.profilePicture ? (
-                            <img
-                              src={ensureHttps(currentProfile.profilePicture)}
-                              alt={currentProfile.fullName}
-                              className="w-9 h-9 bg-gray-200 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center">
-                              <User size={18} className="text-gray-400" />
-                            </div>
-                          )}
+                          <div onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }} className="cursor-pointer hover:opacity-80 transition">
+                            {currentProfile.profilePicture ? (
+                              <img
+                                src={ensureHttps(currentProfile.profilePicture)}
+                                alt={currentProfile.fullName}
+                                className="w-9 h-9 bg-gray-200 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center">
+                                <User size={18} className="text-gray-400" />
+                              </div>
+                            )}
+                          </div>
                           <div>
                             <div className="flex items-center gap-2">
-                              <div className="font-bold text-sm text-gray-900">{currentProfile.fullName}</div>
+                              <div
+                                className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
+                                onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }}
+                              >
+                                {currentProfile.fullName}
+                              </div>
                               {currentProfile.badges && currentProfile.badges.length > 0 && (
                                 <UserBadges badges={currentProfile.badges} size="sm" />
                               )}

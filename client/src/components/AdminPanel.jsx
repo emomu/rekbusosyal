@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User, Ban, Award } from 'lucide-react';
+import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User, Ban, Award, Menu } from 'lucide-react';
 import { API_URL } from '../config/api';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
@@ -24,6 +24,9 @@ export default function AdminPanel() {
   // User details dialog
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserDetails, setShowUserDetails] = useState(false);
+
+  // Mobile menu
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Pagination state
   const [commentsPage, setCommentsPage] = useState(1);
@@ -405,7 +408,10 @@ export default function AdminPanel() {
   // Sol menü
   const AdminMenuItem = ({ id, icon: Icon, label, badge }) => (
     <div
-      onClick={() => setActiveSection(id)}
+      onClick={() => {
+        setActiveSection(id);
+        setShowMobileMenu(false);
+      }}
       className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
         activeSection === id ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'
       }`}
@@ -414,7 +420,7 @@ export default function AdminPanel() {
         <Icon size={20} />
         <span className="font-medium text-sm">{label}</span>
       </div>
-      {badge && (
+      {badge > 0 && (
         <span className={`text-xs px-2 py-0.5 rounded-full ${
           activeSection === id ? 'bg-white/20' : 'bg-gray-200'
         }`}>
@@ -438,11 +444,32 @@ export default function AdminPanel() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Mobil Overlay */}
+      {showMobileMenu && (
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setShowMobileMenu(false)}
+        />
+      )}
+
       {/* Sol Panel */}
-      <aside className="w-64 bg-white border-r border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-8">
-          <Shield size={28} className="text-blue-600" />
-          <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
+      <aside className={`
+        fixed md:static inset-y-0 left-0 z-50
+        w-64 bg-white border-r border-gray-200 p-6
+        transform transition-transform duration-300 ease-in-out
+        ${showMobileMenu ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <Shield size={28} className="text-blue-600" />
+            <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
+          </div>
+          <button
+            onClick={() => setShowMobileMenu(false)}
+            className="md:hidden text-gray-500 hover:text-gray-700"
+          >
+            <X size={24} />
+          </button>
         </div>
 
         <nav className="space-y-2">
@@ -457,52 +484,62 @@ export default function AdminPanel() {
       </aside>
 
       {/* Ana İçerik */}
-      <main className="flex-1 overflow-y-auto">
-        <header className="bg-white border-b border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">
-              {activeSection === 'users' && 'Kullanıcı Yönetimi'}
-              {activeSection === 'ads' && 'Reklam Yönetimi'}
-              {activeSection === 'campuses' && 'Kampüs Yönetimi'}
-              {activeSection === 'communities' && 'Topluluk Yönetimi'}
-              {activeSection === 'moderation' && 'Yorum Moderasyonu'}
-              {activeSection === 'posts' && 'Post Moderasyonu'}
-              {activeSection === 'versions' && 'Sürüm Notları Yönetimi'}
-            </h2>
+      <main className="flex-1 overflow-y-auto w-full md:w-auto">
+        <header className="bg-white border-b border-gray-200 p-4 md:p-6 sticky top-0 z-30">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowMobileMenu(true)}
+                className="md:hidden text-gray-700 hover:text-gray-900"
+              >
+                <Menu size={24} />
+              </button>
+              <h2 className="text-lg md:text-2xl font-bold text-gray-900 truncate">
+                {activeSection === 'users' && 'Kullanıcılar'}
+                {activeSection === 'ads' && 'Reklamlar'}
+                {activeSection === 'campuses' && 'Kampüsler'}
+                {activeSection === 'communities' && 'Topluluklar'}
+                {activeSection === 'moderation' && 'Yorumlar'}
+                {activeSection === 'posts' && 'Postlar'}
+                {activeSection === 'versions' && 'Sürüm Notları'}
+              </h2>
+            </div>
             {(activeSection === 'ads' || activeSection === 'campuses' || activeSection === 'communities') && (
               <button
                 onClick={() => openModal(activeSection)}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 md:px-4 rounded-lg hover:bg-blue-700 transition text-sm md:text-base"
               >
                 <Plus size={18} />
-                Yeni Ekle
+                <span className="hidden sm:inline">Yeni Ekle</span>
               </button>
             )}
           </div>
         </header>
 
-        <div className="p-6">
+        <div className="p-3 md:p-6">
           {/* Kullanıcılar */}
           {activeSection === 'users' && (
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-700">Kullanıcı</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-700">Email</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-700">Rol</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-700">Durum</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-700">Kayıt Tarihi</th>
-                    <th className="text-left p-4 text-sm font-semibold text-gray-700">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {users.map(user => (
-                    <tr key={user._id} className="hover:bg-gray-50 transition">
-                      <td
-                        className="p-4 cursor-pointer"
-                        onClick={() => showUserDetailsDialog(user)}
-                      >
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block bg-white rounded-xl shadow-sm overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left p-4 text-sm font-semibold text-gray-700">Kullanıcı</th>
+                      <th className="text-left p-4 text-sm font-semibold text-gray-700">Email</th>
+                      <th className="text-left p-4 text-sm font-semibold text-gray-700">Rol</th>
+                      <th className="text-left p-4 text-sm font-semibold text-gray-700">Durum</th>
+                      <th className="text-left p-4 text-sm font-semibold text-gray-700">Kayıt Tarihi</th>
+                      <th className="text-left p-4 text-sm font-semibold text-gray-700">İşlemler</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {users.map(user => (
+                      <tr key={user._id} className="hover:bg-gray-50 transition">
+                        <td
+                          className="p-4 cursor-pointer"
+                          onClick={() => showUserDetailsDialog(user)}
+                        >
                         <div className="flex items-center gap-3">
                           {user.profilePicture ? (
                             <img
@@ -567,26 +604,77 @@ export default function AdminPanel() {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="md:hidden space-y-3">
+                  {users.map(user => (
+                    <div
+                      key={user._id}
+                      onClick={() => showUserDetailsDialog(user)}
+                      className="bg-white rounded-lg shadow-sm p-4 active:bg-gray-50 transition"
+                    >
+                      <div className="flex items-start gap-3 mb-3">
+                        {user.profilePicture ? (
+                          <img
+                            src={ensureHttps(user.profilePicture)}
+                            alt={user.username}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                            <User size={20} className="text-gray-400" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-gray-900 truncate">{user.fullName}</div>
+                          <div className="text-sm text-gray-500 truncate">@{user.username}</div>
+                          <div className="text-xs text-gray-400 truncate mt-0.5">{user.email}</div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                          {user.role === 'admin' ? 'Admin' : user.role === 'moderator' ? 'Moderator' : user.role === 'club_manager' ? 'Kulüp Yöneticisi' : 'User'}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full font-medium ${
+                          user.isVerified ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {user.isVerified ? '✓ Doğrulanmış' : '✗ Doğrulanmamış'}
+                        </span>
+                        {user.isBanned && (
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium flex items-center gap-1">
+                            <Ban size={10} />
+                            Banlı
+                          </span>
+                        )}
+                        {user.badges && user.badges.length > 0 && (
+                          <UserBadges badges={user.badges} size="sm" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
           {/* Reklamlar */}
           {activeSection === 'ads' && (
-            <div className="grid gap-4">
+            <div className="grid gap-3 md:gap-4">
               {advertisements.map(ad => (
-                <div key={ad._id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-bold text-gray-900">{ad.title}</h3>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
+                <div key={ad._id} className="bg-white rounded-xl shadow-sm p-4 md:p-6 hover:shadow-md transition">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <h3 className="text-base md:text-lg font-bold text-gray-900 truncate">{ad.title}</h3>
+                        <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
                           ad.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                         }`}>
                           {ad.isActive ? 'Aktif' : 'Pasif'}
                         </span>
-                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">
                           {ad.placement}
                         </span>
                       </div>
@@ -620,18 +708,18 @@ export default function AdminPanel() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col md:flex-row items-center gap-2">
                       <button
                         onClick={() => openModal('ads', ad)}
                         className="text-blue-600 hover:text-blue-700 p-2 hover:bg-blue-50 rounded-lg transition"
                       >
-                        <Edit size={16} />
+                        <Edit size={18} />
                       </button>
                       <button
                         onClick={() => deleteAd(ad._id)}
                         className="text-red-600 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </div>

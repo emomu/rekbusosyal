@@ -10,6 +10,7 @@ import LoadMoreButton from './components/LoadMoreButton';
 import { FeedShimmer, GridShimmer } from './components/LoadingShimmer';
 import { ToastContainer } from './components/Toast';
 import { useToast } from './hooks/useToast';
+import { usePullToRefresh } from './hooks/usePullToRefresh';
 import MobileHeader from './components/MobileHeader';
 import NotificationsPage from './components/NotificationsPage';
 import LikeButton from './components/LikeButton';
@@ -20,7 +21,7 @@ import UserBadges from './components/UserBadges';
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
 // Loader2 ikonu eklendi
-import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X, Bell, Loader2 } from 'lucide-react';
+import { Home, MessageSquare, User, ChevronLeft, Send, MapPin, Search, LogOut, Heart, Lock, Shield, Settings2Icon, Settings, MoreHorizontal, X, Bell, Loader2, RefreshCw } from 'lucide-react';
 import { API_URL } from './config/api';
 import PostDetailPage from './components/PostDetailPage';
 import CommentDetailPage from './components/CommentDetailPage';
@@ -156,6 +157,10 @@ export default function App() {
   const [showNotifications, setShowNotifications] = useState(false);
   // Selected post for detail modal
   const [selectedPost, setSelectedPost] = useState(null);
+
+  // Pull-to-refresh hooks
+  const postsRefresh = usePullToRefresh(() => refreshPosts());
+  const confessionsRefresh = usePullToRefresh(() => refreshConfessions());
   // Selected comment for detail modal
   const [selectedComment, setSelectedComment] = useState(null);
 
@@ -424,7 +429,65 @@ export default function App() {
     }
   }, [activeTab, token, confessions.length, dispatch]);
 
-  // Bu useEffect artık gereksiz - initial loading'de çekiliyor
+  // Refresh Posts (Sessiz yenileme - loading göstermez)
+  const refreshPosts = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/posts?page=1&limit=10`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.posts) {
+        dispatch(setPosts(data.posts));
+        dispatch(setPostsPagination(data.pagination));
+      }
+    } catch (err) {
+      console.error('Postlar yenilenemedi:', err);
+    }
+  };
+
+  // Refresh Confessions (Sessiz yenileme - loading göstermez)
+  const refreshConfessions = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/confessions?page=1&limit=10`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.posts) {
+        dispatch(setConfessions(data.posts));
+        dispatch(setConfessionsPagination(data.pagination));
+      }
+    } catch (err) {
+      console.error('İtiraflar yenilenemedi:', err);
+    }
+  };
+
+  // Tab değiştiğinde otomatik yenile
+  useEffect(() => {
+    if (!token) return;
+
+    if (activeTab === 'akis' && posts.length > 0) {
+      refreshPosts();
+    } else if (activeTab === 'itiraflar' && confessions.length > 0) {
+      refreshConfessions();
+    }
+  }, [activeTab]);
+
+  // 30 saniyede bir otomatik yenile (polling)
+  useEffect(() => {
+    if (!token) return;
+
+    const interval = setInterval(() => {
+      if (activeTab === 'akis') {
+        refreshPosts();
+      } else if (activeTab === 'itiraflar') {
+        refreshConfessions();
+      }
+    }, 30000); // 30 saniye
+
+    return () => clearInterval(interval);
+  }, [activeTab, token]);
 
   // Load More Posts Handler
   const handleLoadMorePosts = async () => {
@@ -1199,8 +1262,23 @@ export default function App() {
       {/* ORTA PANEL - MAIN START */}
       <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen">
 
-        {/* --- 1. ÖNCELİK: YORUM DETAY SAYFASI --- */}
-        {selectedComment ? (
+        {/* --- 1. ÖNCELİK: BAŞKA BİR KULLANICININ PROFİLİ --- */}
+        {viewedProfile ? (
+          <PublicProfilePage
+            username={viewedProfile}
+            onClose={() => {
+              setViewedProfile(null); // Profili kapat
+            }}
+            onMentionClick={(username) => {
+              setViewedProfile(username);
+            }}
+            onCommentClick={(comment) => {
+              setSelectedComment(comment);
+            }}
+            currentUserProfilePic={currentUserInfo?.profilePicture}
+          />
+        ) : selectedComment ? (
+          /* --- 2. ÖNCELİK: YORUM DETAY SAYFASI --- */
           <CommentDetailPage
             comment={selectedComment}
             onClose={() => setSelectedComment(null)}
@@ -1208,12 +1286,11 @@ export default function App() {
             currentUserId={userId}
             currentUserProfilePic={currentUserInfo?.profilePicture}
             onMentionClick={(username) => {
-              setSelectedComment(null);
               setViewedProfile(username);
             }}
           />
         ) : selectedPost ? (
-          /* --- 2. ÖNCELİK: GÖNDERİ DETAY SAYFASI (Twitter Tarzı) --- */
+          /* --- 3. ÖNCELİK: GÖNDERİ DETAY SAYFASI (Twitter Tarzı) --- */
           <PostDetailPage
             post={selectedPost}
             onClose={() => setSelectedPost(null)}
@@ -1222,41 +1299,12 @@ export default function App() {
             onLike={(postId) => handleLike(postId, selectedPost.category === 'İtiraf' ? 'confession' : 'post')}
             currentUserProfilePic={currentUserInfo?.profilePicture}
             onMentionClick={(username) => {
-              setSelectedPost(null);
               setViewedProfile(username);
             }}
             onCommentClick={(comment) => {
               setSelectedComment(comment);
             }}
           />
-        ) : viewedProfile ? (
-
-
-
-          /* --- 2. ÖNCELİK: BAŞKA BİR KULLANICININ PROFİLİ --- */
-          <PublicProfilePage
-            username={viewedProfile}
-            onClose={() => {
-              setViewedProfile(null); // 1. Profili kapat
-
-              // 2. Arkada geçerli bir sekme açık mı kontrol et
-              // Bu sekmelerden biri açıksa dokunma (kullanıcı orada kalır)
-              const validTabs = ['akis', 'kampusler', 'itiraflar', 'topluluklar', 'profil', 'publicProfil'];
-
-              // Eğer geçerli bir sekme yoksa (boşluğa düşecekse) Akış'a gönder
-              if (!validTabs.includes(activeTab)) {
-                dispatch(setActiveTab('akis'));
-              }
-            }}
-            onMentionClick={(username) => {
-              setViewedProfile(username);
-            }}
-            onCommentClick={(comment) => {
-              setSelectedComment(comment);
-            }}
-            currentUserProfilePic={currentUserInfo?.profilePicture}
-          />
-
         ) : activeTab === 'publicProfil' ? (
 
           /* --- 3. ÖNCELİK: KENDİ PUBLIC PROFİLİN --- */
@@ -1278,7 +1326,22 @@ export default function App() {
 
             {/* --- AKIŞ SEKMESİ --- */}
             {activeTab === 'akis' && (
-              <>
+              <div ref={postsRefresh.containerRef} className="relative overflow-y-auto h-full">
+                {/* Pull-to-refresh indicator */}
+                {postsRefresh.pullDistance > 0 && (
+                  <div
+                    className="absolute top-0 left-0 right-0 flex items-center justify-center transition-all"
+                    style={{ height: `${postsRefresh.pullDistance}px` }}
+                  >
+                    <div className={`transition-transform ${postsRefresh.isPulling ? 'scale-100' : 'scale-75'}`}>
+                      <RefreshCw
+                        size={24}
+                        className={`text-blue-600 ${postsRefresh.isPulling ? 'animate-spin' : ''}`}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <MobileHeader
                   onMenuClick={() => setIsMobileMenuOpen(true)}
                   onNotificationsClick={() => setShowNotifications(true)}
@@ -1370,12 +1433,27 @@ export default function App() {
                     </>
                   )}
                 </div>
-              </>
+              </div>
             )}
 
             {/* --- İTİRAFLAR SEKMESİ --- */}
             {activeTab === 'itiraflar' && (
-              <>
+              <div ref={confessionsRefresh.containerRef} className="relative overflow-y-auto h-full">
+                {/* Pull-to-refresh indicator */}
+                {confessionsRefresh.pullDistance > 0 && (
+                  <div
+                    className="absolute top-0 left-0 right-0 flex items-center justify-center transition-all z-50"
+                    style={{ height: `${confessionsRefresh.pullDistance}px` }}
+                  >
+                    <div className={`transition-transform ${confessionsRefresh.isPulling ? 'scale-100' : 'scale-75'}`}>
+                      <RefreshCw
+                        size={24}
+                        className={`text-red-600 ${confessionsRefresh.isPulling ? 'animate-spin' : ''}`}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <MobileHeader
                   onMenuClick={() => setIsMobileMenuOpen(true)}
                   onNotificationsClick={() => setShowNotifications(true)}
@@ -1460,7 +1538,7 @@ export default function App() {
                     </>
                   )}
                 </div>
-              </>
+              </div>
             )}
 
             {/* --- KAMPÜSLER SEKMESİ --- */}
