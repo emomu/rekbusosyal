@@ -983,6 +983,90 @@ app.get('/api/verify-email', async (req, res) => {
     res.status(500).send("Sunucu hatası");
   }
 });
+// --- ŞİFRE SIFIRLAMA İŞLEMLERİ ---
+
+// 1. Şifre Sıfırlama İsteği (Mail Gönderme)
+app.post('/api/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  
+  try {
+    const user = await User.findOne({ 
+      $or: [{ email: email }, { username: email }] // Kullanıcı adı veya email ile arama
+    });
+
+    if (!user) {
+      // Güvenlik: Kullanıcı bulunamasa bile "Mail gönderildi" de (User Enumeration saldırısını önlemek için)
+      // Ancak geliştirme aşamasında hatayı görmek isteyebilirsin.
+      return res.status(404).json({ error: "Bu mail adresine kayıtlı kullanıcı bulunamadı." });
+    }
+
+    // Token oluştur
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 saat geçerli
+    await user.save();
+
+    // Reset Linki (Frontend'deki yeni sayfaya yönlendirecek)
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    // Mail Gönderimi
+    const { data, error } = await resend.emails.send({
+      from: 'KBÜ Sosyal <noreply@kbusosyal.com>',
+      to: user.email,
+      subject: '🔒 Şifre Sıfırlama Talebi',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #1e3a8a;">Şifreni mi unuttun?</h2>
+          <p>Endişelenme, aşağıdaki butona tıklayarak yeni bir şifre oluşturabilirsin:</p>
+          <a href="${resetLink}" style="background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 20px 0; font-weight: bold;">Şifremi Sıfırla</a>
+          <p style="font-size: 13px; color: #666;">Bu link 1 saat süreyle geçerlidir.</p>
+          <p style="font-size: 12px; color: #999;">Eğer bu talebi sen yapmadıysan, bu maili görmezden gel.</p>
+        </div>
+      `
+    });
+
+    if (error) throw error;
+
+    res.json({ message: "Sıfırlama bağlantısı mail adresine gönderildi." });
+
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    res.status(500).json({ error: "Mail gönderilemedi." });
+  }
+});
+
+// 2. Yeni Şifre Belirleme
+app.post('/api/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() } // Süresi dolmamış token
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Geçersiz veya süresi dolmuş bağlantı." });
+    }
+
+    // Yeni şifreyi hashle
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    
+    // Tokenları temizle
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    
+    await user.save();
+
+    res.json({ message: "Şifreniz başarıyla güncellendi! Giriş yapabilirsiniz." });
+
+  } catch (err) {
+    console.error("Reset password error:", err);
+    res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });
+  }
+});
+
 // Giriş Yap (GÜNCELLENMİŞ)
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
@@ -2976,6 +3060,7 @@ cron.schedule('0 12,20 * * *', async () => {
     console.error('❌ Öneri sistemi hatası:', err);
   }
 });
+
 const PORT = process.env.PORT || 5001; // .env'den çekiliyor veya 5001
 app.listen(PORT, () => {
   console.log(`Sunucu ${PORT} portunda çalışıyor...`);

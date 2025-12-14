@@ -12,6 +12,8 @@ const UserSchema = new mongoose.Schema({
   // --- EKLENEN KISIM BAŞLANGIÇ ---
   isVerified: { type: Boolean, default: false }, // Hesap onaylı mı?
   verificationToken: { type: String }, // Onaylama linki için kod
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
   isBanned: { type: Boolean, default: false }, // Kullanıcı banlandı mı?
   banReason: { type: String, default: '' }, // Ban nedeni
   bannedAt: { type: Date }, // Ban tarihi
