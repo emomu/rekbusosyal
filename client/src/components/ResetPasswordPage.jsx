@@ -52,15 +52,25 @@ const ResetPasswordPage = () => {
       if (res.ok) {
         setStatus('success');
         success('Şifreniz başarıyla güncellendi! Giriş sayfasına yönlendiriliyorsunuz...');
-        setTimeout(() => navigate('/'), 3000);
+        setTimeout(() => navigate('/login'), 3000);
       } else {
-        // Backend'den 400 veya 404 dönerse bu genellikle token hatasıdır
-        if (res.status === 400 || res.status === 404 || (data.error && data.error.includes('bağlantı'))) {
+        // --- GÜNCELLENEN KISIM BURASI ---
+        
+        // 1. Eğer hata mesajı "aynı olamaz" içeriyorsa, bu token hatası değil form hatasıdır.
+        if (data.error && data.error.includes('aynı olamaz')) {
+          setFormError(data.error);
+          setStatus('idle'); // Formu ekranda tutmaya devam et
+        } 
+        // 2. Eğer bu değilse ve 400/404 ise, o zaman Token hatasıdır.
+        else if (res.status === 400 || res.status === 404 || (data.error && data.error.includes('bağlantı'))) {
           setStatus('invalid_token');
-        } else {
+        } 
+        // 3. Diğer genel hatalar
+        else {
           setFormError(data.error || 'Bir hata oluştu.');
           setStatus('idle');
         }
+        // -------------------------------
       }
     } catch (err) {
       setFormError('Sunucu hatası oluştu.');
