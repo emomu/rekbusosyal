@@ -1048,6 +1048,11 @@ app.post('/api/reset-password', async (req, res) => {
     if (!user) {
       return res.status(400).json({ error: "Geçersiz veya süresi dolmuş bağlantı." });
     }
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+
+    if (isSamePassword) {
+      return res.status(400).json({ error: "Yeni şifreniz eski şifrenizle aynı olamaz. Lütfen farklı bir şifre deneyin." });
+    }
 
     // Yeni şifreyi hashle
     const salt = await bcrypt.genSalt(10);

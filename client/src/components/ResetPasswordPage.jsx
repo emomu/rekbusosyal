@@ -52,7 +52,7 @@ const ResetPasswordPage = () => {
       if (res.ok) {
         setStatus('success');
         success('Şifreniz başarıyla güncellendi! Giriş sayfasına yönlendiriliyorsunuz...');
-        setTimeout(() => navigate('/login'), 3000);
+        setTimeout(() => navigate('/'), 3000);
       } else {
         // Backend'den 400 veya 404 dönerse bu genellikle token hatasıdır
         if (res.status === 400 || res.status === 404 || (data.error && data.error.includes('bağlantı'))) {
