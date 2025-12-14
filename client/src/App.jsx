@@ -17,6 +17,7 @@ import LikeButton from './components/LikeButton';
 import VersionNotesPage from './components/VersionNotesPage';
 import CookieConsent from './components/CookieConsent';
 import UserBadges from './components/UserBadges';
+import ResetPasswordPage from './components/ResetPasswordPage'; // <-- YENİ EKLENECEK
 
 import Lottie from 'lottie-react';
 import loaderAnimation from './assets/loader.json';
@@ -995,6 +996,16 @@ export default function App() {
 
   // Kullanıcının bu topluluğa OYU var mı kontrol et
   const hasUserVotedCommunity = selectedCommunity && communityComments.some(c => c.author?._id === userId);
+
+  if (window.location.pathname === '/reset-password') {
+    return (
+      <>
+        <ResetPasswordPage />
+        <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+      </>
+    );
+  }
+  // 👆👆👆 BURAYI EKLE (BİTİŞ) 👆👆👆
 
   if (!isAuthenticated) {
     return (
