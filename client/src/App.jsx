@@ -14,6 +14,7 @@ import { usePullToRefresh } from './hooks/usePullToRefresh';
 import MobileHeader from './components/MobileHeader';
 import NotificationsPage from './components/NotificationsPage';
 import LikeButton from './components/LikeButton';
+import { useLocation } from 'react-router-dom';
 import VersionNotesPage from './components/VersionNotesPage';
 import CookieConsent from './components/CookieConsent';
 import UserBadges from './components/UserBadges';
@@ -997,7 +998,7 @@ export default function App() {
   // Kullanıcının bu topluluğa OYU var mı kontrol et
   const hasUserVotedCommunity = selectedCommunity && communityComments.some(c => c.author?._id === userId);
 
-  if (window.location.pathname === '/reset-password') {
+if (location.pathname === '/reset-password') {
     return (
       <>
         <ResetPasswordPage />
@@ -1005,7 +1006,7 @@ export default function App() {
       </>
     );
   }
-  // 👆👆👆 BURAYI EKLE (BİTİŞ) 👆👆👆
+  // -------------------------------
 
   if (!isAuthenticated) {
     return (
@@ -1015,7 +1016,6 @@ export default function App() {
       </>
     );
   }
-
   // İlk yükleme ekranı
   if (isInitialLoading) {
     return <InitialLoadingScreen />;
