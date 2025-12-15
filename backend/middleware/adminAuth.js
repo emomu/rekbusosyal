@@ -18,7 +18,7 @@ const adminAuth = async (req, res, next) => {
       return res.status(404).json({ error: "Kullanıcı bulunamadı" });
     }
 
-    if (user.role !== 'admin' || user.role !== 'moderator') {
+    if (user.role !== 'admin' && user.role !== 'moderator') {
       return res.status(403).json({ error: "Bu işlem için yetkiniz yok" });
     }
 
