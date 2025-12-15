@@ -84,8 +84,8 @@ app.use(express.json({ limit: '50mb' }));
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Apply maintenance mode middleware globally (after CORS and body parsing)
-app.use(maintenanceMode);
+// Apply maintenance mode middleware only to API routes (not static files)
+app.use('/api', maintenanceMode);
 
 // --- Resend Email Servisi ---
 const resend = new Resend(process.env.RESEND_API_KEY);
