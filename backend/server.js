@@ -78,6 +78,16 @@ const versionNotesRouter = require('./routes/versionNotes');
 
 const app = express();
 
+// SECURITY: Reduced from 50MB to 10MB to prevent DoS attacks
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// CORS ayarları
+app.use(cors({
+  origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
+  credentials: true
+}));
+
 // SECURITY: Apply security headers with helmet
 app.use(helmet({
   contentSecurityPolicy: {
@@ -91,17 +101,13 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Allow external images (Cloudinary)
 }));
 
-// SECURITY: Prevent NoSQL injection
-app.use(mongoSanitize());
-
-// CORS ayarları
-app.use(cors({
-  origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
-  credentials: true
+// SECURITY: Prevent NoSQL injection (must be after body parsing middleware)
+app.use(mongoSanitize({
+  replaceWith: '_',
+  onSanitize: ({ req, key }) => {
+    console.warn(`NoSQL injection attempt detected: ${key}`);
+  }
 }));
-
-// SECURITY: Reduced from 50MB to 10MB to prevent DoS attacks
-app.use(express.json({ limit: '10mb' }));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
