@@ -15,7 +15,7 @@ const JWT_SECRET = process.env.JWT_SECRET; // .env'den çekiliyor
 // SECURITY: Rate limiting and security headers
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
+// Note: express-mongo-sanitize removed due to compatibility issues, using custom implementation
 
 const auth = require('./middleware/auth');
 const { adminAuth, strictAdminAuth } = require('./middleware/adminAuth');
@@ -101,13 +101,40 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Allow external images (Cloudinary)
 }));
 
-// SECURITY: Prevent NoSQL injection (must be after body parsing middleware)
-app.use(mongoSanitize({
-  replaceWith: '_',
-  onSanitize: ({ req, key }) => {
-    console.warn(`NoSQL injection attempt detected: ${key}`);
+// SECURITY: Custom NoSQL injection prevention (express-mongo-sanitize has compatibility issues)
+app.use((req, res, next) => {
+  // Sanitize request body
+  if (req.body && typeof req.body === 'object') {
+    req.body = sanitizeObject(req.body);
   }
-}));
+  // Sanitize URL params
+  if (req.params && typeof req.params === 'object') {
+    req.params = sanitizeObject(req.params);
+  }
+  next();
+});
+
+// Helper function to remove $ and . from objects recursively
+function sanitizeObject(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObject(item));
+  }
+
+  const sanitized = {};
+  for (const key in obj) {
+    // Remove keys that start with $ or contain .
+    if (key.startsWith('$') || key.includes('.')) {
+      console.warn(`NoSQL injection attempt blocked: ${key}`);
+      continue;
+    }
+    sanitized[key] = sanitizeObject(obj[key]);
+  }
+  return sanitized;
+}
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
