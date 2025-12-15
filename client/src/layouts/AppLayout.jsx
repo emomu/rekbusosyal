@@ -14,7 +14,6 @@ import CookieConsent from '../components/CookieConsent';
 import { setActiveTab, setSelectedImage } from '../store/slices/uiSlice';
 import { setUnreadCount } from '../store/slices/notificationsSlice';
 import loaderAnimation from '../assets/loader.json';
-import MaintenanceCheck from '../components/MaintenanceCheck';
 
 /**
  * AppLayout - Main application layout with fixed sidebar, mobile menu, and search panel
@@ -168,8 +167,7 @@ export default function AppLayout() {
   }, [selectedImage, dispatch]);
 
   return (
-    <MaintenanceCheck>
-      <div className="min-h-screen bg-white text-gray-900 font-sans flex justify-center">
+    <div className="min-h-screen bg-white text-gray-900 font-sans flex justify-center">
       {/* LEFT SIDEBAR - Fixed on desktop, hidden on mobile */}
       <aside className="w-64 hidden md:flex flex-col h-screen sticky top-0 border-r border-gray-200 p-6">
         <h1 className="text-2xl font-bold tracking-tighter mb-8 text-blue-900">
@@ -546,7 +544,6 @@ export default function AppLayout() {
 
       {/* COOKIE CONSENT */}
       <CookieConsent />
-      </div>
-    </MaintenanceCheck>
+    </div>
   );
 }

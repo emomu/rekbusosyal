@@ -7,6 +7,7 @@ import ErrorPage from '../pages/ErrorPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MaintenancePage from '../pages/MaintenancePage';
+import MaintenanceWrapper from '../components/MaintenanceWrapper';
 import LoginPage from '../components/LoginPage';
 import ResetPasswordPage from '../components/ResetPasswordPage';
 
@@ -41,35 +42,36 @@ import {
  * Application Routes Configuration
  * All routes are protected by authentication unless specified
  * RootErrorBoundary handles all errors at top level for full-page error display
+ * MaintenanceWrapper checks maintenance mode for ALL routes
  */
 const router = createBrowserRouter([
   {
-    path: '/giris',
-    element: <LoginPage />,
-    errorElement: <RootErrorBoundary />
-  },
-  {
-    path: '/sifre-sifirlama',
-    element: <ResetPasswordPage />,
-    errorElement: <RootErrorBoundary />
-  },
-  {
-    path: '/admin',
-    element: (
-      <ProtectedRoute requiredRole={['admin', 'moderator']}>
-        <AdminPanel />
-      </ProtectedRoute>
-    ),
-    errorElement: <RootErrorBoundary />
-  },
-  {
-    path: '/',
-    element: (
-      <ProtectedRoute>
-        <AppLayout />
-      </ProtectedRoute>
-    ),
+    element: <MaintenanceWrapper />,
     errorElement: <RootErrorBoundary />,
+    children: [
+      {
+        path: '/giris',
+        element: <LoginPage />
+      },
+      {
+        path: '/sifre-sifirlama',
+        element: <ResetPasswordPage />
+      },
+      {
+        path: '/admin',
+        element: (
+          <ProtectedRoute requiredRole={['admin', 'moderator']}>
+            <AdminPanel />
+          </ProtectedRoute>
+        )
+      },
+      {
+        path: '/',
+        element: (
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        ),
     children: [
       {
         index: true,
@@ -131,21 +133,23 @@ const router = createBrowserRouter([
       }
     ]
   },
-  {
-    path: '/hata',
-    element: <ErrorPage />
-  },
-  {
-    path: '/yetkisiz',
-    element: <UnauthorizedPage />
-  },
-  {
-    path: '/bakim',
-    element: <MaintenancePage />
-  },
-  {
-    path: '*',
-    element: <NotFoundPage />
+      {
+        path: '/hata',
+        element: <ErrorPage />
+      },
+      {
+        path: '/yetkisiz',
+        element: <UnauthorizedPage />
+      },
+      {
+        path: '/bakim',
+        element: <MaintenancePage />
+      },
+      {
+        path: '*',
+        element: <NotFoundPage />
+      }
+    ]
   }
 ], {
   future: {
