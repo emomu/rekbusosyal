@@ -11,9 +11,11 @@ import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, a
 import { API_URL } from '../config/api';
 import { ensureHttps } from '../utils/imageUtils';
 import UserBadges from './UserBadges';
+import { useProfileNavigate } from '../hooks/useSmartNavigate';
 
 export default function PublicProfilePage() {
   const navigate = useNavigate();
+  const navigateToProfile = useProfileNavigate();
   const { username } = useParams();
   const profileData = useLoaderData();
   const dispatch = useDispatch();
@@ -30,6 +32,12 @@ export default function PublicProfilePage() {
   const [selectedPost, setSelectedPost] = useState(null);
 
   const isOwnProfile = currentUsername === username;
+
+  // Kullanıcı profil linki tıklama handler'ı
+  const handleProfileClick = (e, targetUsername) => {
+    e.stopPropagation();
+    navigateToProfile(targetUsername);
+  };
 
   // --- Veri Çekme İşlemleri ---
   useEffect(() => {
@@ -92,7 +100,7 @@ export default function PublicProfilePage() {
             key={index}
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/kullanici/${user}`);
+              navigateToProfile(user);
             }}
             className="text-blue-600 font-bold hover:underline cursor-pointer"
           >
@@ -320,7 +328,7 @@ export default function PublicProfilePage() {
                     {userPosts.map((post) => (
                       <div key={post._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => navigate(`/akis/${post._id}`)}>
                         <div className="flex items-center gap-3 mb-2">
-                          <div onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }} className="cursor-pointer hover:opacity-80 transition">
+                          <div onClick={(e) => handleProfileClick(e, currentProfile.username)} className="cursor-pointer hover:opacity-80 transition">
                             {currentProfile.profilePicture ? (
                               <img
                                 src={ensureHttps(currentProfile.profilePicture)}
@@ -337,7 +345,7 @@ export default function PublicProfilePage() {
                             <div className="flex items-center gap-2">
                               <div
                                 className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
-                                onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }}
+                                onClick={(e) => handleProfileClick(e, currentProfile.username)}
                               >
                                 {currentProfile.fullName}
                               </div>
@@ -386,7 +394,7 @@ export default function PublicProfilePage() {
                     {userConfessions.map((confession) => (
                       <div key={confession._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => navigate(`/itiraf/${confession._id}`)}>
                         <div className="flex items-center gap-3 mb-2">
-                          <div onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }} className="cursor-pointer hover:opacity-80 transition">
+                          <div onClick={(e) => handleProfileClick(e, currentProfile.username)} className="cursor-pointer hover:opacity-80 transition">
                             {currentProfile.profilePicture ? (
                               <img
                                 src={ensureHttps(currentProfile.profilePicture)}
@@ -403,7 +411,7 @@ export default function PublicProfilePage() {
                             <div className="flex items-center gap-2">
                               <div
                                 className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
-                                onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }}
+                                onClick={(e) => handleProfileClick(e, currentProfile.username)}
                               >
                                 {currentProfile.fullName}
                               </div>

@@ -671,96 +671,85 @@ app.post('/api/register', async (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hesabını Doğrula</title>
+  <title>Hesabını Doğrula - KBÜ Sosyal</title>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+<body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f3f4f6; padding: 40px 0;">
     <tr>
       <td align="center">
-        <!-- Main Container -->
-        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-
-          <!-- Header with Logo and Background -->
+        
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); border: 1px solid #e5e7eb; max-width: 600px; width: 100%;">
+          
           <tr>
-            <td style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 40px 30px; text-align: center;">
-              <div style="background-color: white; display: inline-block; padding: 15px 30px; border-radius: 12px; margin-bottom: 20px;">
-                <h1 style="margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -1px; color: #1e3a8a;">
-                  KBÜ<span style="color: #dc2626;">Sosyal</span>
-                </h1>
+            <td align="center" style="background-color: #1e3a8a; padding: 40px 0;">
+              <div style="background-color: #ffffff; display: inline-block; padding: 12px 24px; border-radius: 8px;">
+                 <span style="font-size: 24px; font-weight: 800; color: #1e3a8a; letter-spacing: -1px;">KBÜ</span><span style="font-size: 24px; font-weight: 800; color: #dc2626; letter-spacing: -1px;">Sosyal</span>
               </div>
-              <h2 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">
-                Hesabını Doğrula
-              </h2>
             </td>
           </tr>
 
-          <!-- Content -->
           <tr>
-            <td style="padding: 40px 30px;">
-              <h1 style="color: #1f2937; font-size: 28px; margin: 0 0 20px 0; font-weight: 700;">
-                Merhaba ${fullName}! 👋
+            <td style="padding: 40px 40px 20px 40px; text-align: left;">
+              
+              <h1 style="margin: 0 0 20px 0; color: #111827; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">
+                Aramıza Hoş Geldin, ${fullName}! 👋
               </h1>
 
-              <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
-                KBÜ Sosyal'e hoş geldin! Karabük Üniversitesi öğrencilerine özel platformumuza katıldığın için çok mutluyuz.
+              <p style="margin: 0 0 24px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">
+                Karabük Üniversitesi'nin en aktif öğrenci platformuna kaydın başarıyla alındı. Hesabını güvene almak ve topluluğa katılmak için son bir adım kaldı.
               </p>
 
-              <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin: 0 0 30px 0;">
-                Hesabını aktif etmek ve aramıza katılmak için aşağıdaki butona tıklaman yeterli:
-              </p>
-
-              <!-- CTA Button -->
-              <table width="100%" cellpadding="0" cellspacing="0">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td align="center" style="padding: 20px 0;">
-                    <a href="${verificationLink}" style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);">
-                      ✓ Hesabımı Doğrula
+                  <td align="center" style="padding: 10px 0 30px 0;">
+                    <a href="${verificationLink}" target="_blank" style="display: inline-block; background-color: #1e3a8a; color: #ffffff; font-size: 16px; font-weight: 700; text-decoration: none; padding: 16px 48px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.2);">
+                      Hesabımı Doğrula
                     </a>
                   </td>
                 </tr>
               </table>
 
-              <!-- Features Box -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px; background-color: #f9fafb; border-radius: 12px; padding: 20px;">
-                <tr>
-                  <td>
-                    <p style="color: #1f2937; font-size: 14px; font-weight: 600; margin: 0 0 15px 0;">
-                      📱 Seni Neler Bekliyor?
-                    </p>
-                    <ul style="color: #6b7280; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
-                      <li>Kampüs hayatını paylaş</li>
-                      <li>Öğrenci topluluklarına katıl</li>
-                      <li>Kampüsler hakkında görüş bildir</li>
-                      <li>Anonim itiraflar yap</li>
-                    </ul>
-                  </td>
-                </tr>
-              </table>
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0 0 30px 0;">
 
-              <!-- Alternative Link -->
-              <p style="color: #9ca3af; font-size: 13px; line-height: 1.6; margin: 30px 0 0 0; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                Buton çalışmıyorsa, aşağıdaki linki tarayıcına kopyala:<br>
-                <a href="${verificationLink}" style="color: #3b82f6; word-break: break-all;">${verificationLink}</a>
+              <p style="margin: 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
+                <strong>Neden doğrulama yapıyoruz?</strong><br>
+                Platformun sadece KBÜ öğrencilerine özel kalması ve güvenli bir ortam sunabilmemiz için öğrenci mailini doğrulaman gerekiyor.
               </p>
+              
+              <div style="margin-top: 30px; background-color: #f9fafb; padding: 15px; border-radius: 6px; font-size: 12px; color: #6b7280; word-break: break-all;">
+                Buton çalışmıyorsa bu linki tarayıcıya yapıştır:<br>
+                <a href="${verificationLink}" style="color: #2563eb; text-decoration: none;">${verificationLink}</a>
+              </div>
+
             </td>
           </tr>
 
-          <!-- Footer -->
           <tr>
-            <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
-              <p style="color: #6b7280; font-size: 13px; margin: 0 0 10px 0;">
-                Bu maili sen talep etmediysen, güvenle görmezden gelebilirsin.
+            <td style="background-color: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 10px 0; color: #9ca3af; font-size: 12px;">
+                Bu işlemi sen yapmadıysan bu maili görmezden gelebilirsin.
               </p>
-              <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-                © 2024 KBÜ Sosyal • Karabük Üniversitesi Öğrenci Platformu
+              <p style="margin: 0; color: #9ca3af; font-size: 12px; font-weight: 500;">
+                © 2025 KBÜ Sosyal
               </p>
             </td>
           </tr>
 
         </table>
+        
+        <table width="600" border="0" cellspacing="0" cellpadding="0">
+           <tr>
+             <td align="center" style="padding-top: 20px;">
+               <p style="font-size: 12px; color: #9ca3af;">Karabük Üniversitesi Öğrenci Platformu</p>
+             </td>
+           </tr>
+        </table>
+
       </td>
     </tr>
   </table>
+
 </body>
 </html>
         `,
@@ -3016,10 +3005,15 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
 
   // Tüm diğer route'lar için index.html'i döndür (SPA routing için)
-  // API route'ları hariç, tüm istekler için SPA index.html'i serve et
+  // API route'ları ve static asset'ler hariç, tüm istekler için SPA index.html'i serve et
   app.use((req, res, next) => {
     // API route'larını atla
     if (req.path.startsWith('/api')) {
+      return next();
+    }
+    // Static asset'leri atla (chunk dosyaları, CSS, resimler vs.)
+    if (req.path.startsWith('/assets/') ||
+        req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json)$/)) {
       return next();
     }
     // SPA için index.html döndür
