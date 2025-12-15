@@ -54,8 +54,12 @@ const router = createBrowserRouter([
         element: <LoginPage />
       },
       {
-        path: '/sifre-sifirlama',
+        path: '/reset-password',
         element: <ResetPasswordPage />
+      },
+      {
+        path: '/sifre-sifirlama',
+        element: <Navigate to="/reset-password" replace />
       },
       {
         path: '/admin',

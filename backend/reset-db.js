@@ -1,3 +1,4 @@
+require('dotenv').config(); // Load environment variables
 const mongoose = require('mongoose');
 
 // Modellerini çağır (Dosya yollarının doğru olduğundan emin ol)
@@ -6,8 +7,17 @@ const Campus = require('./models/Campus');
 const User = require('./models/User');
 const Post = require('./models/Post');
 
+// CRITICAL: MongoDB URI must be loaded from environment variables for security
+const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL;
+
+if (!MONGODB_URI) {
+    console.error('❌ FATAL ERROR: MONGODB_URI is not defined in environment variables!');
+    console.error('Please set MONGODB_URI or DATABASE_URL in your .env file');
+    process.exit(1);
+}
+
 // MongoDB Bağlantısı
-mongoose.connect('mongodb://localhost:27017/kbu-sosyal')
+mongoose.connect(MONGODB_URI)
   .then(() => {
     console.log('MongoDB Bağlandı. Temizlik başlıyor...');
     resetData();

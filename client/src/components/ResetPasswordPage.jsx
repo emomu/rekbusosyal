@@ -53,8 +53,16 @@ const ResetPasswordPage = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setFormError('Şifre en az 6 karakter olmalıdır.');
+    if (password.length < 8) {
+      setFormError('Şifre en az 8 karakter olmalıdır.');
+      return;
+    }
+
+    // Password strength validation
+    const hasLetter = /[a-zA-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    if (!hasLetter || !hasNumber) {
+      setFormError('Şifre en az bir harf ve bir rakam içermelidir.');
       return;
     }
 
@@ -203,8 +211,8 @@ const ResetPasswordPage = () => {
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-500">
-          <button 
-            onClick={() => navigate('/login')}
+          <button
+            onClick={() => navigate('/giris')}
             className="text-gray-500 font-medium hover:text-gray-800 transition flex items-center justify-center gap-1 mx-auto"
           >
             <span>←</span> Giriş Ekranına Dön

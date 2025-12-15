@@ -1,6 +1,13 @@
 // Cooldown Middleware - Twitter tarzı içerik paylaşım sınırlaması
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = "cok_gizli_anahtar_kelime";
+
+// CRITICAL: JWT_SECRET must be loaded from environment variables for security
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    console.error('❌ FATAL ERROR: JWT_SECRET is not defined in environment variables!');
+    process.exit(1);
+}
 
 const cooldowns = new Map();
 
@@ -60,7 +67,8 @@ const voteCooldown = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // SECURITY: Specify algorithm to prevent algorithm confusion attacks
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     const userId = decoded.id;
 
     const key = `${userId}-vote`;

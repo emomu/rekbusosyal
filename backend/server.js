@@ -12,6 +12,11 @@ const { SitemapStream, streamToPromise } = require('sitemap');
 const { createGzip } = require('zlib');
 const JWT_SECRET = process.env.JWT_SECRET; // .env'den çekiliyor
 
+// SECURITY: Rate limiting and security headers
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+
 const auth = require('./middleware/auth');
 const { adminAuth, strictAdminAuth } = require('./middleware/adminAuth');
 const cooldown = require('./middleware/cooldown');
@@ -73,19 +78,61 @@ const versionNotesRouter = require('./routes/versionNotes');
 
 const app = express();
 
+// SECURITY: Apply security headers with helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Allow external images (Cloudinary)
+}));
+
+// SECURITY: Prevent NoSQL injection
+app.use(mongoSanitize());
+
 // CORS ayarları
 app.use(cors({
   origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
   credentials: true
 }));
 
-app.use(express.json({ limit: '50mb' }));
+// SECURITY: Reduced from 50MB to 10MB to prevent DoS attacks
+app.use(express.json({ limit: '10mb' }));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Apply maintenance mode middleware only to API routes (not static files)
 app.use('/api', maintenanceMode);
+
+// SECURITY: Rate limiters for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per window
+  message: 'Çok fazla giriş denemesi yaptınız. Lütfen 15 dakika sonra tekrar deneyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // 3 requests per window
+  message: 'Çok fazla kayıt denemesi yaptınız. Lütfen 1 saat sonra tekrar deneyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // 3 requests per window
+  message: 'Çok fazla şifre sıfırlama talebi gönderdiniz. Lütfen 1 saat sonra tekrar deneyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // --- Resend Email Servisi ---
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -636,14 +683,32 @@ app.put('/api/campus/comments/:id', auth, async (req, res) => {
 
 // --- KULLANICI İŞLEMLERİ (AUTH) ---
 
-// Kayıt Ol (GÜNCELLENMİŞ - MAİL DOĞRULAMA EKLENDİ)
-app.post('/api/register', async (req, res) => {
+// Import validation utilities
+const { validatePassword, validateEmail, validateUsername } = require('./utils/validation');
+
+// Kayıt Ol (GÜNCELLENMİŞ - MAİL DOĞRULAMA + VALİDASYON + RATE LIMIT)
+app.post('/api/register', registerLimiter, async (req, res) => {
   const { fullName, username, email, birthDate, password } = req.body;
 
   try {
-    // 1. Email Kontrolü (Domain Doğrulama)
-    if (!email.endsWith('@ogrenci.karabuk.edu.tr')) {
-      return res.status(400).json({ error: "Sadece @ogrenci.karabuk.edu.tr mail adresi ile kayıt olunabilir." });
+    // 1. Input Validation (SECURITY)
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      return res.status(400).json({ error: emailValidation.error });
+    }
+
+    const usernameValidation = validateUsername(username);
+    if (!usernameValidation.valid) {
+      return res.status(400).json({ error: usernameValidation.error });
+    }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.error });
+    }
+
+    if (!fullName || fullName.trim().length < 2) {
+      return res.status(400).json({ error: "Ad soyad en az 2 karakter olmalıdır" });
     }
 
     // 2. Kullanıcı Adı veya Email daha önce alınmış mı?
@@ -986,8 +1051,8 @@ app.get('/api/verify-email', async (req, res) => {
 });
 // --- ŞİFRE SIFIRLAMA İŞLEMLERİ ---
 
-// 1. Şifre Sıfırlama İsteği (Mail Gönderme)
-app.post('/api/forgot-password', async (req, res) => {
+// 1. Şifre Sıfırlama İsteği (Mail Gönderme + RATE LIMIT)
+app.post('/api/forgot-password', passwordResetLimiter, async (req, res) => {
   const { email } = req.body;
   
   try {
@@ -1036,11 +1101,17 @@ app.post('/api/forgot-password', async (req, res) => {
   }
 });
 
-// 2. Yeni Şifre Belirleme
-app.post('/api/reset-password', async (req, res) => {
+// 2. Yeni Şifre Belirleme (RATE LIMIT)
+app.post('/api/reset-password', passwordResetLimiter, async (req, res) => {
   const { token, newPassword } = req.body;
 
   try {
+    // SECURITY: Validate new password
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.error });
+    }
+
     const user = await User.findOne({
       resetPasswordToken: token,
       resetPasswordExpires: { $gt: Date.now() } // Süresi dolmamış token
@@ -1073,8 +1144,8 @@ app.post('/api/reset-password', async (req, res) => {
   }
 });
 
-// Giriş Yap (GÜNCELLENMİŞ)
-app.post('/api/login', async (req, res) => {
+// Giriş Yap (GÜNCELLENMİŞ + RATE LIMIT)
+app.post('/api/login', authLimiter, async (req, res) => {
   const { username, password } = req.body;
   try {
     const user = await User.findOne({ username });
@@ -1099,7 +1170,19 @@ app.post('/api/login', async (req, res) => {
     // -----------------------------------
 
     // Giriş bileti (Token) oluştur
-    const token = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET);
+    // SECURITY: Token expires in 7 days for better security
+    const token = jwt.sign(
+      {
+        id: user._id,
+        username: user.username,
+        role: user.role || 'user' // Role'ü token içine de ekle
+      },
+      JWT_SECRET,
+      {
+        expiresIn: '7d', // 7 gün sonra otomatik expire
+        algorithm: 'HS256' // Algoritma belirt (algorithm confusion attack prevention)
+      }
+    );
     res.json({
       token,
       username: user.username,
@@ -1266,7 +1349,19 @@ app.put('/api/profile/username', async (req, res) => {
     await user.save();
 
     // Yeni token oluştur
-    const newToken = jwt.sign({ id: user._id, username: user.username }, JWT_SECRET);
+    // SECURITY: Token expires in 7 days
+    const newToken = jwt.sign(
+      {
+        id: user._id,
+        username: user.username,
+        role: user.role || 'user'
+      },
+      JWT_SECRET,
+      {
+        expiresIn: '7d',
+        algorithm: 'HS256'
+      }
+    );
     res.json({ message: "Kullanıcı adı güncellendi", token: newToken, username: user.username });
   } catch (err) {
     res.status(500).json({ error: "Sunucu hatası" });
@@ -1281,7 +1376,13 @@ app.put('/api/profile/password', async (req, res) => {
   try {
     if (!token) return res.status(401).json({ error: "Oturum açmanız gerekiyor" });
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // SECURITY: Validate new password
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ error: passwordValidation.error });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
 

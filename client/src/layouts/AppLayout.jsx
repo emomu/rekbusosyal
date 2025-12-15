@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
-import { Outlet, useLocation, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, NavLink, useNavigate, useNavigation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { Home, MessageSquare, User, MapPin, Search, LogOut, Settings, Shield, X, Bell } from 'lucide-react';
 import Lottie from 'lottie-react';
@@ -22,11 +22,15 @@ import loaderAnimation from '../assets/loader.json';
 export default function AppLayout() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const navigation = useNavigation();
   const location = useLocation();
   const toast = useToast();
   const { userId, token, userRole } = useSelector((state) => state.auth);
   const { selectedImage } = useSelector((state) => state.ui);
   const { unreadCount } = useSelector((state) => state.notifications);
+
+  // Check if navigation is in loading state
+  const isNavigating = navigation.state === 'loading';
 
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -450,7 +454,14 @@ export default function AppLayout() {
       )}
 
       {/* CENTER CONTENT AREA - Scrollable, changes with routes */}
-      <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen overflow-y-auto">
+      <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen overflow-y-auto relative">
+        {/* Global Navigation Loading Bar */}
+        {isNavigating && (
+          <div className="absolute top-0 left-0 right-0 z-50 h-1 bg-blue-100 overflow-hidden">
+            <div className="h-full w-1/3 bg-gradient-to-r from-transparent via-blue-600 to-transparent animate-progress" />
+          </div>
+        )}
+
         {/* Render routes here */}
         <Suspense fallback={
           <div className="flex items-center justify-center h-screen">

@@ -1,6 +1,13 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const JWT_SECRET = "cok_gizli_anahtar_kelime";
+
+// CRITICAL: JWT_SECRET must be loaded from environment variables for security
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    console.error('❌ FATAL ERROR: JWT_SECRET is not defined in environment variables!');
+    process.exit(1);
+}
 
 // Admin veya Moderator kontrolü
 const adminAuth = async (req, res, next) => {
@@ -11,7 +18,8 @@ const adminAuth = async (req, res, next) => {
       return res.status(401).json({ error: "Yetkilendirme token'ı bulunamadı" });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // SECURITY: Specify algorithm to prevent algorithm confusion attacks
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     const user = await User.findById(decoded.id);
 
     if (!user) {
@@ -26,6 +34,9 @@ const adminAuth = async (req, res, next) => {
     req.userRole = user.role;
     next();
   } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: "Oturumunuz sona erdi. Lütfen tekrar giriş yapın." });
+    }
     return res.status(401).json({ error: "Geçersiz token" });
   }
 };
@@ -39,7 +50,8 @@ const strictAdminAuth = async (req, res, next) => {
       return res.status(401).json({ error: "Yetkilendirme token'ı bulunamadı" });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // SECURITY: Specify algorithm to prevent algorithm confusion attacks
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
     const user = await User.findById(decoded.id);
 
     if (!user) {
@@ -54,6 +66,9 @@ const strictAdminAuth = async (req, res, next) => {
     req.userRole = user.role;
     next();
   } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: "Oturumunuz sona erdi. Lütfen tekrar giriş yapın." });
+    }
     return res.status(401).json({ error: "Geçersiz token" });
   }
 };

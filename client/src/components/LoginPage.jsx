@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { setCredentials, setUserRole } from '../store/slices/authSlice';
@@ -35,8 +35,42 @@ const LoginPage = () => {
   const [forgotEmail, setForgotEmail] = useState("");
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    // Username için sadece İngilizce karakter, rakam, nokta ve alt çizgi
+    if (name === 'username') {
+      const sanitizedValue = value.replace(/[^a-zA-Z0-9._]/g, '');
+      setFormData({ ...formData, [name]: sanitizedValue });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
+
+  // Şifre gücü hesaplama
+  const passwordStrength = useMemo(() => {
+    const pwd = formData.password;
+    if (!pwd) return { score: 0, text: '', color: '' };
+
+    let score = 0;
+    const checks = {
+      length: pwd.length >= 8,
+      hasLetter: /[a-zA-Z]/.test(pwd),
+      hasNumber: /[0-9]/.test(pwd),
+      hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(pwd),
+      longEnough: pwd.length >= 12
+    };
+
+    if (checks.length) score++;
+    if (checks.hasLetter) score++;
+    if (checks.hasNumber) score++;
+    if (checks.hasSpecial) score++;
+    if (checks.longEnough) score++;
+
+    if (score <= 2) return { score, text: 'Zayıf', color: 'bg-red-500', textColor: 'text-red-600' };
+    if (score === 3) return { score, text: 'Orta', color: 'bg-yellow-500', textColor: 'text-yellow-600' };
+    if (score === 4) return { score, text: 'İyi', color: 'bg-blue-500', textColor: 'text-blue-600' };
+    return { score, text: 'Güçlü', color: 'bg-green-500', textColor: 'text-green-600' };
+  }, [formData.password]);
 
   // --- 1. FONKSİYON: ŞİFRE SIFIRLAMA MAİLİ GÖNDER ---
   const handleForgotPassword = async (e) => {
@@ -326,19 +360,63 @@ const LoginPage = () => {
               )}
 
               {/* Ortak Alanlar */}
-              <input
-                type="text" name="username" placeholder="Kullanıcı Adı" required
-                value={formData.username}
-                onChange={handleChange}
-                className={inputStyle}
-              />
+              <div>
+                <input
+                  type="text" name="username" placeholder="Kullanıcı Adı" required
+                  value={formData.username}
+                  onChange={handleChange}
+                  className={inputStyle}
+                />
+                {view === 'register' && (
+                  <div className="text-[10px] text-gray-400 mt-1 ml-1">
+                    * Sadece İngilizce harf, rakam, nokta (.) ve alt çizgi (_) kullanılabilir.
+                  </div>
+                )}
+              </div>
 
-              <input
-                type="password" name="password" placeholder="Şifre" required
-                value={formData.password}
-                onChange={handleChange}
-                className={inputStyle}
-              />
+              <div>
+                <input
+                  type="password" name="password" placeholder="Şifre" required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={inputStyle}
+                />
+
+                {/* Şifre Gücü Göstergesi (Sadece Register modunda ve şifre girildiğinde) */}
+                {view === 'register' && formData.password && (
+                  <div className="mt-2 space-y-1">
+                    {/* Güç Barı */}
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map((level) => (
+                        <div
+                          key={level}
+                          className={`h-1.5 flex-1 rounded-full transition-all ${
+                            level <= passwordStrength.score
+                              ? passwordStrength.color
+                              : 'bg-gray-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    {/* Güç Metni */}
+                    <div className={`text-xs font-medium ${passwordStrength.textColor}`}>
+                      Şifre Gücü: {passwordStrength.text}
+                    </div>
+                    {/* Gereksinimler */}
+                    <div className="text-[10px] text-gray-500 space-y-0.5">
+                      <div className={formData.password.length >= 8 ? 'text-green-600' : ''}>
+                        {formData.password.length >= 8 ? '✓' : '○'} En az 8 karakter
+                      </div>
+                      <div className={/[a-zA-Z]/.test(formData.password) && /[0-9]/.test(formData.password) ? 'text-green-600' : ''}>
+                        {/[a-zA-Z]/.test(formData.password) && /[0-9]/.test(formData.password) ? '✓' : '○'} Harf ve rakam içermeli
+                      </div>
+                      <div className={/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? 'text-green-600' : 'text-gray-400'}>
+                        {/[!@#$%^&*(),.?":{}|<>]/.test(formData.password) ? '✓' : '○'} Özel karakter (isteğe bağlı)
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {view === 'register' && (
                 <input
