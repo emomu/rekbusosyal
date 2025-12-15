@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { setCredentials } from '../store/slices/authSlice';
+import { useNavigate } from 'react-router-dom';
+import { setCredentials, setUserRole } from '../store/slices/authSlice';
 import { API_URL } from '../config/api';
 import { ToastContainer } from './Toast';
 import { useToast } from '../hooks/useToast';
 
-const LoginPage = ({ onLogin }) => {
+const LoginPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   
   // GÖRÜNÜM STATE'İ: 'login' | 'register' | 'forgot'
   const [view, setView] = useState('login'); 
@@ -154,7 +156,14 @@ const LoginPage = ({ onLogin }) => {
           username: data.username,
           interests: data.interests || []
         }));
-        onLogin();
+
+        // Set user role if available
+        if (data.role) {
+          dispatch(setUserRole(data.role));
+        }
+
+        // Redirect to home page
+        navigate('/', { replace: true });
       } else {
         // Kayıt başarılı
         success(data.message || "Kayıt başarılı! Lütfen mail adresinizi doğrulayın.", 5000);

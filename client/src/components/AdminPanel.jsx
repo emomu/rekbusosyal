@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User, Ban, Award, Menu } from 'lucide-react';
+import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User, Ban, Award, Menu, ArrowLeft, Settings, Wrench, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../config/api';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
@@ -8,6 +9,7 @@ import { BADGE_INFO } from '../utils/badgeUtils';
 import UserBadges from './UserBadges';
 
 export default function AdminPanel() {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('users');
   const [users, setUsers] = useState([]);
   const [advertisements, setAdvertisements] = useState([]);
@@ -16,6 +18,8 @@ export default function AdminPanel() {
   const [comments, setComments] = useState([]);
   const [posts, setPosts] = useState([]);
   const [versionNotes, setVersionNotes] = useState([]);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('');
@@ -53,12 +57,30 @@ export default function AdminPanel() {
         loadCommunities(),
         loadComments(),
         loadPosts(),
-        loadVersionNotes()
+        loadVersionNotes(),
+        loadMaintenanceStatus()
       ]);
       setInitialLoading(false);
     };
     loadAllData();
   }, []);
+
+  const loadMaintenanceStatus = async () => {
+    try {
+      setMaintenanceLoading(true);
+      const res = await fetch(`${API_URL}/api/admin/maintenance-status`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMaintenanceMode(data.maintenanceMode);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setMaintenanceLoading(false);
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -459,7 +481,7 @@ export default function AdminPanel() {
         transform transition-transform duration-300 ease-in-out
         ${showMobileMenu ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Shield size={28} className="text-blue-600" />
             <h1 className="text-xl font-bold text-gray-900">Admin Panel</h1>
@@ -472,6 +494,14 @@ export default function AdminPanel() {
           </button>
         </div>
 
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6 transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span>Ana Sayfaya Dön</span>
+        </button>
+
         <nav className="space-y-2">
           <AdminMenuItem id="users" icon={Users} label="Kullanıcılar" badge={users.length} />
           <AdminMenuItem id="ads" icon={Megaphone} label="Reklamlar" badge={advertisements.length} />
@@ -480,6 +510,7 @@ export default function AdminPanel() {
           <AdminMenuItem id="moderation" icon={MessageSquare} label="Yorumlar" badge={comments.length} />
           <AdminMenuItem id="posts" icon={FileText} label="Postlar" badge={posts.length} />
           <AdminMenuItem id="versions" icon={Package} label="Sürüm Notları" badge={versionNotes.length} />
+          <AdminMenuItem id="settings" icon={Settings} label="Sistem Ayarları" />
         </nav>
       </aside>
 
@@ -502,6 +533,7 @@ export default function AdminPanel() {
                 {activeSection === 'moderation' && 'Yorumlar'}
                 {activeSection === 'posts' && 'Postlar'}
                 {activeSection === 'versions' && 'Sürüm Notları'}
+                {activeSection === 'settings' && 'Sistem Ayarları'}
               </h2>
             </div>
             {(activeSection === 'ads' || activeSection === 'campuses' || activeSection === 'communities') && (
@@ -978,6 +1010,128 @@ export default function AdminPanel() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sistem Ayarları */}
+          {activeSection === 'settings' && (
+            <div className="space-y-6">
+              {/* Bakım Modu Durumu */}
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex items-start gap-4">
+                  <div className={`p-3 rounded-lg ${maintenanceMode ? 'bg-orange-100' : 'bg-green-100'}`}>
+                    <Wrench size={24} className={maintenanceMode ? 'text-orange-600' : 'text-green-600'} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-bold text-gray-900">Bakım Modu Durumu</h3>
+                      {maintenanceLoading ? (
+                        <div className="w-5 h-5">
+                          <Lottie animationData={loaderAnimation} loop={true} />
+                        </div>
+                      ) : (
+                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                          maintenanceMode
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {maintenanceMode ? 'Aktif' : 'Pasif'}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">
+                      {maintenanceMode
+                        ? 'Site şu anda bakım modunda. Normal kullanıcılar erişim sağlayamıyor.'
+                        : 'Site normal şekilde çalışıyor. Tüm kullanıcılar erişim sağlayabiliyor.'}
+                    </p>
+                    <button
+                      onClick={loadMaintenanceStatus}
+                      disabled={maintenanceLoading}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <span>Durumu Yenile</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Railway Deployment Talimatları */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  <AlertTriangle size={24} className="text-blue-600 flex-shrink-0 mt-1" />
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">Bakım Modunu Değiştirme</h3>
+                    <p className="text-sm text-gray-700 mb-4">
+                      Bakım modu environment variable üzerinden kontrol edilir. Değişiklik yapmak için Railway Dashboard kullanmalısınız.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/60 rounded-lg p-4 space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <span className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
+                      Railway Dashboard'a Girin
+                    </h4>
+                    <p className="text-sm text-gray-600 ml-8">
+                      <a href="https://railway.app" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        railway.app
+                      </a> adresinden projenize giriş yapın
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <span className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                      Variables Sekmesine Gidin
+                    </h4>
+                    <p className="text-sm text-gray-600 ml-8">
+                      Projenizi seçin ve <span className="font-mono bg-gray-100 px-2 py-0.5 rounded">Variables</span> sekmesine tıklayın
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <span className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">3</span>
+                      Environment Variable Ekleyin/Güncelleyin
+                    </h4>
+                    <div className="text-sm text-gray-600 ml-8 space-y-2">
+                      <div>
+                        <p className="font-medium text-gray-700 mb-1">Backend için:</p>
+                        <div className="bg-gray-900 text-gray-100 px-3 py-2 rounded font-mono text-xs">
+                          MAINTENANCE_MODE=true
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-700 mb-1">Frontend için:</p>
+                        <div className="bg-gray-900 text-gray-100 px-3 py-2 rounded font-mono text-xs">
+                          VITE_MAINTENANCE_MODE=true
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Kapatmak için değeri <span className="font-mono">false</span> yapın
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                      <span className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">4</span>
+                      Deploy Tamamlanmasını Bekleyin
+                    </h4>
+                    <p className="text-sm text-gray-600 ml-8">
+                      Railway değişiklikleri algılayınca otomatik olarak yeniden deploy edecektir
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-xs text-yellow-800">
+                    <strong>Not:</strong> Admin kullanıcılar (sizin gibi) bakım modunda bile siteye erişmeye devam edebilir.
+                    Değişikliği test etmek için normal bir hesap kullanın veya çıkış yapın.
+                  </p>
+                </div>
               </div>
             </div>
           )}

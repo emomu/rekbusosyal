@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLoaderData, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, BarChart2, Heart } from 'lucide-react';
 import { API_URL } from '../config/api';
 import { useToast } from '../hooks/useToast';
@@ -124,17 +126,22 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
 
 // --- ANA SAYFA BİLEŞENİ (POST DETAIL PAGE) ---
 
-export default function PostDetailPage({ post, onClose, token, currentUserId, onLike, currentUserProfilePic, onMentionClick, onCommentClick }) {
+export default function PostDetailPage() {
+  const navigate = useNavigate();
   const toast = useToast();
+  const post = useLoaderData();
+  const { userId: currentUserId, token } = useSelector((state) => state.auth);
+
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(null);
+  const [currentUserProfilePic, setCurrentUserProfilePic] = useState(null);
 
   // Yerel State
-  const [isLiked, setIsLiked] = useState(post.likes?.includes(currentUserId) || false);
-  const [likeCount, setLikeCount] = useState(post.likes?.length || 0);
+  const [isLiked, setIsLiked] = useState(post?.likes?.includes(currentUserId) || false);
+  const [likeCount, setLikeCount] = useState(post?.likes?.length || 0);
 
   const commentInputRef = useRef(null);
 
@@ -143,8 +150,29 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
     window.scrollTo(0, 0);
   }, []);
 
+  // Fetch current user profile picture
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUserProfilePic(data.profilePicture);
+        }
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+
+    if (token) {
+      fetchUserProfile();
+    }
+  }, [token]);
+
   // --- SORUNU ÇÖZEN KISIM 1: Veri Senkronizasyonu ---
-  // Eğer post prop'u değişirse (örneğin parent component güncellerse), 
+  // Eğer post prop'u değişirse (örneğin parent component güncellerse),
   // yerel state'i güncelle ki veriler tutarlı kalsın.
   useEffect(() => {
     if (post) {
@@ -154,7 +182,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
   }, [post, currentUserId]);
 
   // --- SORUNU ÇÖZEN KISIM 2: Temiz Toggle Mantığı ---
-  const handleLikeToggle = () => {
+  const handleLikeToggle = async () => {
     // 1. Yeni durumu hesapla
     const nextIsLiked = !isLiked;
 
@@ -166,8 +194,19 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
     setLikeCount((prev) => nextIsLiked ? prev + 1 : prev - 1);
 
     // 3. API çağrısı
-    if (onLike) {
-      onLike(post._id);
+    try {
+      await fetch(`${API_URL}/api/posts/${post._id}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    } catch (err) {
+      console.error('Like error:', err);
+      // Revert on error
+      setIsLiked(!nextIsLiked);
+      setLikeCount((prev) => nextIsLiked ? prev - 1 : prev + 1);
     }
   };
   const renderWithMentions = (text) => {
@@ -181,7 +220,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
             key={index}
             onClick={(e) => {
               e.stopPropagation();
-              if (onMentionClick) onMentionClick(username);
+              navigate(`/kullanici/${username}`);
             }}
             className="text-blue-600 font-bold hover:underline cursor-pointer"
           >
@@ -330,7 +369,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
       {/* 1. HEADER (Sticky) */}
       <div className="sticky top-0 z-20 bg-white/100 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-6">
         <button
-          onClick={onClose}
+          onClick={() => navigate(-1)}
           className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
         >
           <ChevronLeft size={20} className="text-gray-900" />
@@ -346,8 +385,8 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
             <div
               onClick={(e) => {
                 e.stopPropagation();
-                if (post.author?.username && onMentionClick) {
-                  onMentionClick(post.author.username);
+                if (post.author?.username) {
+                  navigate(`/kullanici/${post.author.username}`);
                 }
               }}
               className="cursor-pointer hover:opacity-80 transition"
@@ -369,8 +408,8 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                 <span
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (post.author?.username && onMentionClick) {
-                      onMentionClick(post.author.username);
+                    if (post.author?.username) {
+                      navigate(`/kullanici/${post.author.username}`);
                     }
                   }}
                   className="font-bold text-gray-900 text-base hover:underline cursor-pointer"
@@ -487,7 +526,7 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
             <div
               key={comment._id}
               className="p-4 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
-              onClick={() => onCommentClick && onCommentClick(comment)}
+              onClick={() => navigate(`/yorum/${comment._id}`)}
             >
               <div className="flex gap-3">
                 {/* Avatar */}
@@ -495,8 +534,8 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                   className="flex-shrink-0 cursor-pointer hover:opacity-80 transition"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (comment.author?.username && onMentionClick) {
-                      onMentionClick(comment.author.username);
+                    if (comment.author?.username) {
+                      navigate(`/kullanici/${comment.author.username}`);
                     }
                   }}
                 >
@@ -514,8 +553,8 @@ export default function PostDetailPage({ post, onClose, token, currentUserId, on
                       <span
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (comment.author?.username && onMentionClick) {
-                            onMentionClick(comment.author.username);
+                          if (comment.author?.username) {
+                            navigate(`/kullanici/${comment.author.username}`);
                           }
                         }}
                         className="font-bold text-gray-900 truncate hover:underline cursor-pointer"

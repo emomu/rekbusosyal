@@ -16,29 +16,25 @@ const auth = require('./middleware/auth');
 const { adminAuth, strictAdminAuth } = require('./middleware/adminAuth');
 const cooldown = require('./middleware/cooldown');
 const { voteCooldown } = require('./middleware/cooldown');
+const maintenanceMode = require('./middleware/maintenanceMode');
 
 // Multer configuration for file uploads
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Ensure uploads directory exists
-const uploadDir = path.join(__dirname, 'uploads/profiles');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Cloudinary Configuration
+const cloudinary = require('cloudinary').v2;
 
-// Storage configuration
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/profiles/');
-  },
-  filename: function (req, file, cb) {
-    // Unique filename: userId-timestamp.extension
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
-  }
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+// Multer memory storage - we'll upload to Cloudinary manually
+const storage = multer.memoryStorage();
 
 // File filter - only images
 const fileFilter = (req, file, cb) => {
@@ -87,6 +83,9 @@ app.use(express.json({ limit: '50mb' }));
 
 // Serve uploaded files statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Apply maintenance mode middleware globally (after CORS and body parsing)
+app.use(maintenanceMode);
 
 // --- Resend Email Servisi ---
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -410,6 +409,19 @@ app.get('/api/campus', async (req, res) => {
   }
 });
 
+// Get single campus by ID
+app.get('/api/campus/:id', async (req, res) => {
+  try {
+    const campus = await Campus.findById(req.params.id);
+    if (!campus) {
+      return res.status(404).json({ error: 'Kampüs bulunamadı' });
+    }
+    res.json(campus);
+  } catch (err) {
+    console.error('Kampüs getirme hatası:', err);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
 
 // 1. OYLAMA ENDPOINT'İ (GÜNCELLENMİŞ) - 5 saniye cooldown
 // 1. OYLAMA ENDPOINT'İ (TERMINATÖR MODU: Eskileri temizler)
@@ -1103,7 +1115,8 @@ app.post('/api/login', async (req, res) => {
       token,
       username: user.username,
       profilePicture: user.profilePicture,
-      interests: user.interests || [] // Kullanıcı ilgi alanlarını da gönder
+      interests: user.interests || [], // Kullanıcı ilgi alanlarını da gönder
+      role: user.role || 'user' // Kullanıcı rolünü de gönder
     });
   } catch (err) {
     res.status(500).json(err);
@@ -1128,7 +1141,7 @@ app.get('/api/profile', async (req, res) => {
   }
 });
 
-// Profil resmi güncelle (Multer ile dosya upload)
+// Profil resmi güncelle (Cloudinary ile dosya upload)
 app.post('/api/profile/picture', auth, (req, res) => {
   upload.single('profilePicture')(req, res, async (err) => {
     try {
@@ -1153,28 +1166,51 @@ app.post('/api/profile/picture', auth, (req, res) => {
         return res.status(404).json({ error: "Kullanıcı bulunamadı" });
       }
 
-      // Delete old profile picture if exists
-      if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
-        const oldFilePath = path.join(__dirname, user.profilePicture);
-        if (fs.existsSync(oldFilePath)) {
-          try {
-            fs.unlinkSync(oldFilePath);
-          } catch (err) {
-            console.error('Eski profil resmi silinemedi:', err);
-          }
+      // Delete old profile picture from Cloudinary if exists
+      if (user.profilePicture && user.profilePicture.includes('cloudinary.com')) {
+        try {
+          // Extract public_id from Cloudinary URL
+          const urlParts = user.profilePicture.split('/');
+          const filename = urlParts[urlParts.length - 1];
+          const publicId = 'kbu-sosyal/profiles/' + filename.split('.')[0];
+          await cloudinary.uploader.destroy(publicId);
+          console.log('✅ Eski Cloudinary resmi silindi:', publicId);
+        } catch (err) {
+          console.error('⚠️ Eski profil resmi Cloudinary\'den silinemedi:', err);
         }
       }
 
-      // Save new profile picture as relative path (browser will use current origin)
-      // This prevents mixed content issues with HTTPS
-      const profilePictureUrl = `/uploads/profiles/${req.file.filename}`;
-      user.profilePicture = profilePictureUrl;
-      await user.save();
+      // Upload to Cloudinary manually using upload_stream
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'kbu-sosyal/profiles',
+          allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+          transformation: [{ width: 500, height: 500, crop: 'limit' }],
+          public_id: `profile-${Date.now()}-${Math.round(Math.random() * 1E9)}`
+        },
+        async (error, result) => {
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            return res.status(500).json({ error: "Cloudinary'ye yükleme başarısız: " + error.message });
+          }
 
-      res.json({
-        message: "Profil resmi güncellendi",
-        profilePicture: user.profilePicture
-      });
+          // Save Cloudinary URL
+          user.profilePicture = result.secure_url;
+          await user.save();
+
+          console.log('✅ Profil resmi Cloudinary\'ye yüklendi:', result.secure_url);
+
+          res.json({
+            message: "Profil resmi güncellendi",
+            profilePicture: user.profilePicture
+          });
+        }
+      );
+
+      // Convert buffer to stream and pipe to Cloudinary
+      const bufferStream = require('stream').Readable.from(req.file.buffer);
+      bufferStream.pipe(uploadStream);
+
     } catch (err) {
       console.error('Profile picture upload error:', err);
       res.status(500).json({ error: "Sunucu hatası: " + err.message });
@@ -1192,15 +1228,16 @@ app.put('/api/profile/picture', auth, async (req, res) => {
       return res.status(404).json({ error: "Kullanıcı bulunamadı" });
     }
 
-    // Delete old profile picture if it was a local upload
-    if (user.profilePicture && user.profilePicture.startsWith('/uploads/')) {
-      const oldFilePath = path.join(__dirname, user.profilePicture);
-      if (fs.existsSync(oldFilePath)) {
-        try {
-          fs.unlinkSync(oldFilePath);
-        } catch (err) {
-          console.error('Eski profil resmi silinemedi:', err);
-        }
+    // Delete old profile picture from Cloudinary if exists
+    if (user.profilePicture && user.profilePicture.includes('cloudinary.com')) {
+      try {
+        const urlParts = user.profilePicture.split('/');
+        const filename = urlParts[urlParts.length - 1];
+        const publicId = 'kbu-sosyal/profiles/' + filename.split('.')[0];
+        await cloudinary.uploader.destroy(publicId);
+        console.log('✅ Eski Cloudinary resmi silindi:', publicId);
+      } catch (err) {
+        console.error('⚠️ Eski profil resmi Cloudinary\'den silinemedi:', err);
       }
     }
 
@@ -1975,6 +2012,22 @@ app.get('/api/communities', async (req, res) => {
   }
 });
 
+// Get single community by ID
+app.get('/api/communities/:id', async (req, res) => {
+  try {
+    const community = await Community.findById(req.params.id)
+      .populate('manager', 'username profilePicture')
+      .populate('createdBy', 'username');
+    if (!community) {
+      return res.status(404).json({ error: 'Topluluk bulunamadı' });
+    }
+    res.json(community);
+  } catch (err) {
+    console.error('Topluluk getirme hatası:', err);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
 // Topluluk oluştur
 app.post('/api/admin/communities', adminAuth, async (req, res) => {
   try {
@@ -2069,6 +2122,40 @@ app.delete('/api/admin/posts/:id', adminAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Post silinemedi" });
   }
+});
+
+// ============================================
+// BAKIM MODU (MAINTENANCE MODE) YÖNETİMİ
+// ============================================
+
+// Bakım modu durumunu al (sadece admin)
+app.get('/api/admin/maintenance-status', strictAdminAuth, async (req, res) => {
+  try {
+    const isMaintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+    res.json({
+      maintenanceMode: isMaintenanceMode,
+      message: isMaintenanceMode ? 'Bakım modu aktif' : 'Site normal çalışıyor'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Bakım modu durumu alınamadı' });
+  }
+});
+
+// Bakım modunu değiştir (sadece admin, runtime'da .env değiştiremeyiz)
+// Not: Bu endpoint sadece bilgilendirme amaçlıdır
+// Railway'de environment variable olarak manuel değiştirilmelidir
+app.post('/api/admin/toggle-maintenance', strictAdminAuth, async (req, res) => {
+  res.status(501).json({
+    error: 'Bakım modu değiştirme desteklenmiyor',
+    message: 'Bakım modunu aktifleştirmek için Railway Dashboard\'dan MAINTENANCE_MODE environment variable\'ını değiştirin.',
+    instructions: [
+      '1. Railway Dashboard\'a gidin',
+      '2. Projenizi seçin',
+      '3. Variables sekmesine tıklayın',
+      '4. MAINTENANCE_MODE değerini true/false olarak değiştirin',
+      '5. Otomatik deploy olacaktır'
+    ]
+  });
 });
 
 // ============================================

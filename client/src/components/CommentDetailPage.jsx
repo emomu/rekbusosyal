@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLoaderData } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, Heart } from 'lucide-react';
 import { API_URL } from '../config/api';
 import { useToast } from '../hooks/useToast';
@@ -124,27 +126,46 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
 
 // --- ANA COMPONENT (COMMENT DETAIL PAGE) ---
 
-export default function CommentDetailPage({
-  comment: initialComment,
-  onClose,
-  token,
-  currentUserId,
-  currentUserProfilePic,
-  onMentionClick
-}) {
+export default function CommentDetailPage() {
+  const navigate = useNavigate();
   const toast = useToast();
+  const initialComment = useLoaderData();
+  const { userId: currentUserId, token } = useSelector((state) => state.auth);
+
   const [comment, setComment] = useState(initialComment);
   const [replies, setReplies] = useState([]);
   const [newReply, setNewReply] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(null);
+  const [currentUserProfilePic, setCurrentUserProfilePic] = useState(null);
 
   // Yerel State - Ana yorum için
   const [isLiked, setIsLiked] = useState(comment?.likes?.includes(currentUserId) || false);
   const [likeCount, setLikeCount] = useState(comment?.likes?.length || 0);
 
   const replyInputRef = useRef(null);
+
+  // Fetch current user profile picture
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/profile`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setCurrentUserProfilePic(data.profilePicture);
+        }
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+
+    if (token) {
+      fetchUserProfile();
+    }
+  }, [token]);
 
   useEffect(() => {
     fetchReplies();
@@ -179,7 +200,7 @@ export default function CommentDetailPage({
             key={index}
             onClick={(e) => {
               e.stopPropagation();
-              if (onMentionClick) onMentionClick(username);
+              navigate(`/kullanici/${username}`);
             }}
             className="text-blue-600 font-bold hover:underline cursor-pointer"
           >
@@ -334,13 +355,33 @@ export default function CommentDetailPage({
     }).format(date);
   };
 
+  // Loading or error check
+  if (!comment || !comment.author) {
+    return (
+      <div className="bg-white min-h-screen">
+        <div className="sticky top-0 z-20 bg-white/100 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <ChevronLeft size={20} className="text-gray-900" />
+          </button>
+          <h2 className="text-lg font-bold text-gray-900">Yorum</h2>
+        </div>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-gray-500">Yorum yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white min-h-screen animate-in slide-in-from-right duration-300">
 
       {/* 1. HEADER (Sticky) */}
       <div className="sticky top-0 z-20 bg-white/100 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-6">
         <button
-          onClick={onClose}
+          onClick={() => navigate(-1)}
           className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
         >
           <ChevronLeft size={20} className="text-gray-900" />
@@ -356,8 +397,8 @@ export default function CommentDetailPage({
             <div
               onClick={(e) => {
                 e.stopPropagation();
-                if (comment.author?.username && onMentionClick) {
-                  onMentionClick(comment.author.username);
+                if (comment.author?.username) {
+                  navigate(`/kullanici/${comment.author.username}`);
                 }
               }}
               className="cursor-pointer hover:opacity-80 transition"
@@ -379,8 +420,8 @@ export default function CommentDetailPage({
                 <span
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (comment.author?.username && onMentionClick) {
-                      onMentionClick(comment.author.username);
+                    if (comment.author?.username) {
+                      navigate(`/kullanici/${comment.author.username}`);
                     }
                   }}
                   className="font-bold text-gray-900 text-base hover:underline cursor-pointer"
@@ -490,8 +531,8 @@ export default function CommentDetailPage({
                   className="flex-shrink-0 cursor-pointer hover:opacity-80 transition"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (reply.author?.username && onMentionClick) {
-                      onMentionClick(reply.author.username);
+                    if (reply.author?.username) {
+                      navigate(`/kullanici/${reply.author.username}`);
                     }
                   }}
                 >
@@ -509,8 +550,8 @@ export default function CommentDetailPage({
                       <span
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (reply.author?.username && onMentionClick) {
-                            onMentionClick(reply.author.username);
+                          if (reply.author?.username) {
+                            navigate(`/kullanici/${reply.author.username}`);
                           }
                         }}
                         className="font-bold text-gray-900 truncate hover:underline cursor-pointer"

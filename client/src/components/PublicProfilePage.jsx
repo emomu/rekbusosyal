@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLoaderData, useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { ChevronLeft, Calendar, Lock, User, MessageSquare } from 'lucide-react';
 import Lottie from 'lottie-react';
@@ -6,13 +7,15 @@ import loaderAnimation from '../assets/loader.json';
 import FollowButton from './FollowButton';
 import LoadMoreButton from './LoadMoreButton';
 import LikeButton from './LikeButton';
-import PostDetailPage from './PostDetailPage';
 import { setCurrentProfile, setUserPosts, appendUserPosts, setUserConfessions, appendUserConfessions, setPostsPagination, setConfessionsPagination, setIsFollowing, setFollowRequestPending, clearProfile } from '../store/slices/userProfileSlice';
 import { API_URL } from '../config/api';
 import { ensureHttps } from '../utils/imageUtils';
 import UserBadges from './UserBadges';
 
-export default function PublicProfilePage({ username, onClose, onMentionClick, currentUserProfilePic, onCommentClick }) {
+export default function PublicProfilePage() {
+  const navigate = useNavigate();
+  const { username } = useParams();
+  const profileData = useLoaderData();
   const dispatch = useDispatch();
   const token = useSelector(state => state.auth.token);
   const currentUserId = useSelector(state => state.auth.userId);
@@ -89,7 +92,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
             key={index}
             onClick={(e) => {
               e.stopPropagation();
-              if (onMentionClick) onMentionClick(user);
+              navigate(`/kullanici/${user}`);
             }}
             className="text-blue-600 font-bold hover:underline cursor-pointer"
           >
@@ -216,33 +219,11 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
 
   const isPrivateAndNotFollowing = currentProfile.isPrivate && !isFollowing && !isOwnProfile;
 
-  // Eğer post detay sayfası açıksa, onu göster
-  if (selectedPost) {
-    return (
-      <PostDetailPage
-        post={selectedPost}
-        onClose={() => setSelectedPost(null)}
-        token={token}
-        currentUserId={currentUserId}
-        onLike={(postId) => handleLike(postId, selectedPost.category === 'İtiraf' ? 'confession' : 'post')}
-        currentUserProfilePic={currentUserProfilePic}
-        onMentionClick={(username) => {
-          setSelectedPost(null);
-          if (onMentionClick) onMentionClick(username);
-        }}
-        onCommentClick={(comment) => {
-          setSelectedPost(null);
-          if (onCommentClick) onCommentClick(comment);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="relative min-h-screen bg-white">
       <header className="sticky top-0 z-30 bg-white/100 backdrop-blur-md border-b border-gray-200 px-4 h-[60px] flex items-center">
         <div className="flex items-center gap-3 w-full">
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition">
+          <button onClick={() => navigate(-1)} className="p-1.5 hover:bg-gray-100 rounded-full transition">
             <ChevronLeft size={20} />
           </button>
           <div className="font-bold text-lg truncate">{currentProfile.fullName}</div>
@@ -337,9 +318,9 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                 ) : (
                   <>
                     {userPosts.map((post) => (
-                      <div key={post._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(post)}>
+                      <div key={post._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => navigate(`/akis/${post._id}`)}>
                         <div className="flex items-center gap-3 mb-2">
-                          <div onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }} className="cursor-pointer hover:opacity-80 transition">
+                          <div onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }} className="cursor-pointer hover:opacity-80 transition">
                             {currentProfile.profilePicture ? (
                               <img
                                 src={ensureHttps(currentProfile.profilePicture)}
@@ -356,7 +337,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                             <div className="flex items-center gap-2">
                               <div
                                 className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
-                                onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }}
                               >
                                 {currentProfile.fullName}
                               </div>
@@ -381,7 +362,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                             className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedPost(post);
+                              navigate(`/akis/${post._id}`);
                             }}
                           >
                             <MessageSquare size={20} />
@@ -403,9 +384,9 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                 ) : (
                   <>
                     {userConfessions.map((confession) => (
-                      <div key={confession._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => setSelectedPost(confession)}>
+                      <div key={confession._id} className="p-5 hover:bg-gray-50/50 transition cursor-pointer" onClick={() => navigate(`/itiraf/${confession._id}`)}>
                         <div className="flex items-center gap-3 mb-2">
-                          <div onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }} className="cursor-pointer hover:opacity-80 transition">
+                          <div onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }} className="cursor-pointer hover:opacity-80 transition">
                             {currentProfile.profilePicture ? (
                               <img
                                 src={ensureHttps(currentProfile.profilePicture)}
@@ -422,7 +403,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                             <div className="flex items-center gap-2">
                               <div
                                 className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
-                                onClick={(e) => { e.stopPropagation(); if (onMentionClick) onMentionClick(currentProfile.username); }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/kullanici/${currentProfile.username}`); }}
                               >
                                 {currentProfile.fullName}
                               </div>
@@ -447,7 +428,7 @@ export default function PublicProfilePage({ username, onClose, onMentionClick, c
                             className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedPost(confession);
+                              navigate(`/itiraf/${confession._id}`);
                             }}
                           >
                             <MessageSquare size={20} />

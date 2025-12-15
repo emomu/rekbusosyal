@@ -5,7 +5,7 @@ const initialState = {
   token: localStorage.getItem('token') || null,
   userId: null,
   username: localStorage.getItem('username') || null,
-  userRole: 'user',
+  userRole: localStorage.getItem('userRole') || 'user',
   userInterests: JSON.parse(localStorage.getItem('userInterests') || '[]'),
   isAuthenticated: !!localStorage.getItem('token')
 };
@@ -52,6 +52,7 @@ const authSlice = createSlice({
 
     setUserRole: (state, action) => {
       state.userRole = action.payload;
+      localStorage.setItem('userRole', action.payload);
     },
 
     updateInterests: (state, action) => {
@@ -78,6 +79,7 @@ const authSlice = createSlice({
       localStorage.removeItem('token');
       localStorage.removeItem('username');
       localStorage.removeItem('userInterests');
+      localStorage.removeItem('userRole');
     }
   }
 });

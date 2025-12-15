@@ -3,6 +3,10 @@ import { createSlice } from '@reduxjs/toolkit';
 const initialState = {
   posts: [],
   confessions: [],
+  campusComments: [],
+  communityComments: [],
+  campusVotes: {},
+  communityVotes: {},
   loading: false,
   error: null,
   postsPagination: {
@@ -78,6 +82,54 @@ const postsSlice = createSlice({
 
     setConfessionsPagination: (state, action) => {
       state.confessionsPagination = action.payload;
+    },
+
+    setCampusComments: (state, action) => {
+      state.campusComments = action.payload;
+    },
+
+    addCampusComment: (state, action) => {
+      state.campusComments.unshift(action.payload);
+    },
+
+    updateCampusComment: (state, action) => {
+      const index = state.campusComments.findIndex(c => c._id === action.payload._id);
+      if (index !== -1) {
+        state.campusComments[index] = action.payload;
+      }
+    },
+
+    deleteCampusComment: (state, action) => {
+      state.campusComments = state.campusComments.filter(c => c._id !== action.payload);
+    },
+
+    setCommunityComments: (state, action) => {
+      state.communityComments = action.payload;
+    },
+
+    addCommunityComment: (state, action) => {
+      state.communityComments.unshift(action.payload);
+    },
+
+    updateCommunityComment: (state, action) => {
+      const index = state.communityComments.findIndex(c => c._id === action.payload._id);
+      if (index !== -1) {
+        state.communityComments[index] = action.payload;
+      }
+    },
+
+    deleteCommunityComment: (state, action) => {
+      state.communityComments = state.communityComments.filter(c => c._id !== action.payload);
+    },
+
+    updateCampusVote: (state, action) => {
+      const { campusId, counts } = action.payload;
+      state.campusVotes[campusId] = counts;
+    },
+
+    updateCommunityVote: (state, action) => {
+      const { communityId, counts } = action.payload;
+      state.communityVotes[communityId] = counts;
     }
   }
 });
@@ -94,7 +146,17 @@ export const {
   appendPosts,
   appendConfessions,
   setPostsPagination,
-  setConfessionsPagination
+  setConfessionsPagination,
+  setCampusComments,
+  addCampusComment,
+  updateCampusComment,
+  deleteCampusComment,
+  setCommunityComments,
+  addCommunityComment,
+  updateCommunityComment,
+  deleteCommunityComment,
+  updateCampusVote,
+  updateCommunityVote
 } = postsSlice.actions;
 
 export default postsSlice.reducer;

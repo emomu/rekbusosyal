@@ -15,14 +15,31 @@ build/
 client/dist/
 client/build/
 
+# Uploads (now using Cloudinary, but keep old uploads local)
+backend/uploads/
+uploads/
+
 # Logs
 *.log
 npm-debug.log*
 logs/
 
-# OS Files
+# OS Files (macOS metadata)
 .DS_Store
+**/.DS_Store
 Thumbs.db
+._*
+**/._*
+*.backup
+*.old
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
 
 # IDE
 .vscode/

@@ -16,6 +16,7 @@ const ResetPasswordPage = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [formError, setFormError] = useState("");
+  const [countdown, setCountdown] = useState(3);
 
   // Token URL'de yoksa direkt geçersiz moduna geç
   useEffect(() => {
@@ -23,6 +24,25 @@ const ResetPasswordPage = () => {
       setStatus('invalid_token');
     }
   }, [token]);
+
+  // Geçersiz token durumunda sayfa yenilenirse giriş sayfasına yönlendir
+  useEffect(() => {
+    if (status === 'invalid_token') {
+      // Geri sayım başlat
+      const countdownInterval = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            navigate('/giris', { replace: true });
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(countdownInterval);
+    }
+  }, [status, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,7 +72,7 @@ const ResetPasswordPage = () => {
       if (res.ok) {
         setStatus('success');
         success('Şifreniz başarıyla güncellendi! Giriş sayfasına yönlendiriliyorsunuz...');
-        setTimeout(() => navigate('/login'), 3000);
+        setTimeout(() => navigate('/giris'), 3000);
       } else {
         // --- GÜNCELLENEN KISIM BURASI ---
         
@@ -93,14 +113,17 @@ const ResetPasswordPage = () => {
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Geçersiz Bağlantı</h2>
-          <p className="text-gray-500 mb-8 px-4">
+          <p className="text-gray-500 mb-4 px-4">
             Bu şifre sıfırlama bağlantısının süresi dolmuş veya bağlantı daha önce kullanılmış. Lütfen yeni bir şifre sıfırlama isteği gönderin.
           </p>
-          <button 
-            onClick={() => navigate('/login')}
+          <p className="text-sm text-gray-400 mb-8">
+            {countdown} saniye içinde giriş sayfasına yönlendiriliyorsunuz...
+          </p>
+          <button
+            onClick={() => navigate('/giris')}
             className="w-full bg-blue-900 text-white font-bold py-3 rounded-lg hover:bg-blue-800 transition shadow-lg shadow-blue-900/20"
           >
-            Giriş Ekranına Dön
+            Hemen Giriş Ekranına Dön
           </button>
         </div>
       );

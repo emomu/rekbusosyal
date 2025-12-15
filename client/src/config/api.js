@@ -4,8 +4,8 @@
 
 export const API_URL = import.meta.env.VITE_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
-// Debug log (production'da da görmek için)
-if (typeof window !== 'undefined') {
+// Debug log (only in development)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   console.log('🔗 API_URL:', API_URL);
   console.log('🌍 ENV VITE_API_URL:', import.meta.env.VITE_API_URL);
   console.log('📍 window.location.origin:', window.location.origin);
