@@ -9,9 +9,8 @@ import { sanitizeUsername } from '../utils/security';
 import MobileHeader from '../components/MobileHeader';
 import NotificationsPage from '../components/NotificationsPage';
 import { ToastContainer } from '../components/Toast';
-import { useToast } from '../hooks/useToast';
 import CookieConsent from '../components/CookieConsent';
-import { setActiveTab, setSelectedImage } from '../store/slices/uiSlice';
+import { setActiveTab, setSelectedImage, removeToast } from '../store/slices/uiSlice';
 import { setUnreadCount } from '../store/slices/notificationsSlice';
 import loaderAnimation from '../assets/loader.json';
 
@@ -24,9 +23,8 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const navigation = useNavigation();
   const location = useLocation();
-  const toast = useToast();
   const { userId, token, userRole } = useSelector((state) => state.auth);
-  const { selectedImage } = useSelector((state) => state.ui);
+  const { selectedImage, toasts } = useSelector((state) => state.ui);
   const { unreadCount } = useSelector((state) => state.notifications);
 
   // Check if navigation is in loading state
@@ -171,9 +169,9 @@ export default function AppLayout() {
   }, [selectedImage, dispatch]);
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans flex justify-center">
+    <div className="h-screen bg-white text-gray-900 font-sans flex justify-center overflow-hidden">
       {/* LEFT SIDEBAR - Fixed on desktop, hidden on mobile */}
-      <aside className="w-64 hidden md:flex flex-col h-screen sticky top-0 border-r border-gray-200 p-6">
+      <aside className="w-64 hidden md:flex flex-col h-full border-r border-gray-200 p-6 flex-shrink-0">
         <h1 className="text-2xl font-bold tracking-tighter mb-8 text-blue-900">
           KBÜ<span className="text-red-600">Sosyal</span>.
         </h1>
@@ -454,7 +452,7 @@ export default function AppLayout() {
       )}
 
       {/* CENTER CONTENT AREA - Scrollable, changes with routes */}
-      <main className="flex-1 max-w-2xl w-full border-r border-gray-200 min-h-screen overflow-y-auto relative">
+      <main className="flex-1 max-w-2xl w-full border-r border-gray-200 h-full overflow-y-auto relative flex-shrink-0">
         {/* Global Navigation Loading Bar */}
         {isNavigating && (
           <div className="absolute top-0 left-0 right-0 z-50 h-1 bg-blue-100 overflow-hidden">
@@ -475,7 +473,7 @@ export default function AppLayout() {
       </main>
 
       {/* RIGHT SEARCH PANEL - Fixed on large screens only */}
-      <aside className="w-80 hidden lg:block p-6 sticky top-0 h-screen">
+      <aside className="w-80 hidden lg:block p-6 h-full overflow-y-auto flex-shrink-0">
         <div className="relative mb-6">
           <Search className="absolute left-3 top-3 text-gray-400" size={18} />
           <input
@@ -551,7 +549,7 @@ export default function AppLayout() {
       )}
 
       {/* TOAST NOTIFICATIONS */}
-      <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+      <ToastContainer toasts={toasts} removeToast={(id) => dispatch(removeToast(id))} />
 
       {/* COOKIE CONSENT */}
       <CookieConsent />

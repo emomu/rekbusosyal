@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLoaderData, useNavigate, useOutletContext } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, MessageSquare, Lock, Send, Heart } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Lock, Send, Heart, Trash2 } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import CampusRating from '../components/CampusRating';
@@ -12,6 +12,7 @@ import {
   setCampusComments,
   updateCampusComment,
   addCampusComment,
+  deleteCampusComment,
   updateCampusVote
 } from '../store/slices/postsSlice';
 import {
@@ -63,9 +64,12 @@ export default function CampusDetailPage() {
   const { commentInput, editingCommentId, editingContent } = useSelector((state) => state.ui);
 
   // Initialize comments from loader
-  useState(() => {
-    dispatch(setCampusComments(initialComments || []));
-  });
+  useEffect(() => {
+    if (initialComments) {
+      dispatch(setCampusComments(initialComments));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   // Check if user has voted
   const hasUserVoted = campusComments.some((c) => c.author?._id === userId);
@@ -119,7 +123,13 @@ export default function CampusDetailPage() {
   const handleSendComment = async () => {
     if (!commentInput.trim()) return;
     try {
-      const res = await fetch(`${API_URL}/api/campus/${campus._id}/comments`, {
+      const url = `${API_URL}/api/campus/${campus._id}/comments`;
+      console.log('🔍 URL:', url);
+      console.log('🔍 Campus ID:', campus._id);
+      console.log('🔍 API_URL:', API_URL);
+      console.log('🔍 Token var mı?', !!token);
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -127,6 +137,8 @@ export default function CampusDetailPage() {
         },
         body: JSON.stringify({ content: commentInput })
       });
+
+      console.log('📥 Response:', { status: res.status, ok: res.ok });
 
       if (res.status === 429) {
         const data = await res.json();
@@ -148,8 +160,14 @@ export default function CampusDetailPage() {
 
         dispatch(setCommentInput(''));
       } else {
-        const errorData = await res.json();
-        alert(errorData.error || 'Yorum yapılamadı');
+        // Check if response is JSON before parsing
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          alert(errorData.error || 'Yorum yapılamadı');
+        } else {
+          alert(`Yorum yapılamadı (${res.status})`);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -195,6 +213,26 @@ export default function CampusDetailPage() {
       } else {
         const errorData = await res.json();
         alert(errorData.error || 'Yorum düzenlenemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  // Handle delete comment
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Bu yorumu silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/campus/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        dispatch(deleteCampusComment(commentId));
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || 'Yorum silinemedi');
       }
     } catch (err) {
       console.error(err);
@@ -285,7 +323,7 @@ export default function CampusDetailPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className="font-bold text-sm text-gray-900">
-                              {comment.author?.fullName || comment.author?.username || 'Anonim'}
+                              {comment.author?.username || 'Anonim'}
                             </div>
                             {comment.author?.badges && comment.author.badges.length > 0 && (
                               <UserBadges badges={comment.author.badges} size="sm" />
@@ -350,14 +388,23 @@ export default function CampusDetailPage() {
                             <span className="text-xs font-medium">{comment.likes?.length || 0}</span>
                           </button>
                           {isOwnComment && !isEditing && (
-                            <button
-                              onClick={() =>
-                                dispatch(setEditingComment({ id: comment._id, content: comment.content }))
-                              }
-                              className="text-xs text-gray-500 hover:text-blue-600 font-medium"
-                            >
-                              Düzenle
-                            </button>
+                            <>
+                              <button
+                                onClick={() =>
+                                  dispatch(setEditingComment({ id: comment._id, content: comment.content }))
+                                }
+                                className="text-xs text-gray-500 hover:text-blue-600 font-medium"
+                              >
+                                Düzenle
+                              </button>
+                              <button
+                                onClick={() => handleDeleteComment(comment._id)}
+                                className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 font-medium"
+                              >
+                                <Trash2 size={14} />
+                                Sil
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>

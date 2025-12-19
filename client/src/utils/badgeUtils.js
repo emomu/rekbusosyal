@@ -41,7 +41,7 @@ export const BADGE_INFO = {
   },
   verified: {
     id: 'verified',
-    name: 'Mavi Tik',
+    name: 'Doğrulanmış',
     description: 'Doğrulanmış hesap',
     image: '/badges/verified.png',
     color: 'from-blue-400 to-blue-600'

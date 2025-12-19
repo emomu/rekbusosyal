@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useLoaderData, useOutletContext } from 'react-router-dom';
-import { User, MessageSquare, RefreshCw } from 'lucide-react';
+import { User, MessageSquare, RefreshCw, Image, Film, FileImage, Send, Loader2, Play, X } from 'lucide-react';
 import { setPosts, addPost, appendPosts, setPostsPagination } from '../store/slices/postsSlice';
-import { setNewPostContent } from '../store/slices/uiSlice';
-import { setSelectedImage } from '../store/slices/uiSlice';
+import { setNewPostContent, setLoadingPosts, setSelectedImage, addToast } from '../store/slices/uiSlice';
 import { incrementAdImpression, incrementAdClick } from '../store/slices/advertisementsSlice';
 import { addInterests } from '../store/slices/authSlice';
 import { FeedShimmer } from '../components/LoadingShimmer';
 import { usePullToRefresh } from '../hooks/usePullToRefresh';
-import { useToast } from '../hooks/useToast';
 import MobileHeader from '../components/MobileHeader';
 import LikeButton from '../components/LikeButton';
 import LoadMoreButton from '../components/LoadMoreButton';
 import UserBadges from '../components/UserBadges';
+import MediaUploadDialog from '../components/MediaUploadDialog';
+import MediaDisplay from '../components/MediaDisplay';
+import GiphyPicker from '../components/GiphyPicker';
+import Post from '../components/Post';
 import { API_URL } from '../config/api';
 
 // AdCard Component
@@ -91,7 +93,6 @@ function AdCard({ ad, onView, onClick, onImageClick }) {
 export default function FeedPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { setIsMobileMenuOpen, setShowNotifications, unreadCount } = useOutletContext();
   const loaderData = useLoaderData();
 
@@ -101,6 +102,12 @@ export default function FeedPage() {
   const { newPostContent, isLoadingPosts } = useSelector((state) => state.ui);
 
   const [currentUserInfo, setCurrentUserInfo] = useState(null);
+  const [selectedMedia, setSelectedMedia] = useState([]);
+  const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
+  const [mediaDialogType, setMediaDialogType] = useState(null); // 'image' | 'gif' | 'video'
+  const [giphyPickerOpen, setGiphyPickerOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Load initial data from loader into Redux
   useEffect(() => {
@@ -156,8 +163,6 @@ export default function FeedPage() {
       if (ad.startDate && new Date(ad.startDate) > now) return false;
       if (ad.endDate && new Date(ad.endDate) < now) return false;
       if (!ad.isActive) return false;
-
-      // Personalization: match ad tags with user interests
       if (!ad.tags || ad.tags.length === 0) return true;
       if (!userInterests || userInterests.length === 0) return true;
       return ad.tags.some(tag => userInterests.includes(tag));
@@ -206,10 +211,8 @@ export default function FeedPage() {
     }
   };
 
-  // Handle ad click with auto interest learning
   const handleAdClick = async (ad) => {
     trackAdClick(ad._id);
-
     if (ad.tags && ad.tags.length > 0) {
       const newInterests = [...new Set([...userInterests, ...ad.tags])];
       if (newInterests.length !== userInterests.length) {
@@ -228,43 +231,158 @@ export default function FeedPage() {
         }
       }
     }
-
     if (ad.targetUrl) {
       window.open(ad.targetUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
-  // Create new post
+  // Create new post with media support
   const handleCreatePost = async () => {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setUploadProgress(0);
+
     try {
-      const res = await fetch(`${API_URL}/api/posts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ content: newPostContent })
+      const formData = new FormData();
+      formData.append('content', newPostContent);
+
+      selectedMedia.forEach((media) => {
+        if (media.file) {
+          formData.append('media', media.file);
+        }
       });
 
-      if (res.status === 429) {
-        const data = await res.json();
-        toast.warning(`${data.error}. ${data.remainingSeconds} saniye sonra tekrar dene.`);
+      const giphyGifs = selectedMedia.filter(m => m.type === 'gif' && !m.file);
+      if (giphyGifs.length > 0) {
+        formData.append('giphyGifs', JSON.stringify(giphyGifs.map(g => ({
+          url: g.url,
+          type: 'gif'
+        }))));
+      }
+
+      // Use XMLHttpRequest for real-time upload progress tracking
+      const response = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        // Real-time upload progress (0-50% for network upload)
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            // Network upload takes 0-50% of progress
+            const percentComplete = Math.round((e.loaded / e.total) * 50);
+            setUploadProgress(percentComplete);
+          }
+        });
+
+        // Upload başladığında progress'i başlat
+        xhr.upload.addEventListener('loadstart', () => {
+          setUploadProgress(1);
+        });
+
+        // Upload tamamlandı, şimdi backend processing (Cloudinary upload) başlıyor
+        xhr.upload.addEventListener('loadend', () => {
+          setUploadProgress(50); // Network upload bitti, backend processing başladı
+
+          // Backend'de Cloudinary upload simülasyonu (50-90%)
+          let backendProgress = 50;
+          const backendInterval = setInterval(() => {
+            backendProgress += 5;
+            if (backendProgress >= 90) {
+              backendProgress = 90;
+              clearInterval(backendInterval);
+            }
+            setUploadProgress(backendProgress);
+          }, 200);
+
+          // Cleanup when response arrives
+          xhr.addEventListener('load', () => clearInterval(backendInterval));
+        });
+
+        xhr.addEventListener('load', () => {
+          setUploadProgress(100); // Tamamlandı
+
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve({
+              ok: true,
+              status: xhr.status,
+              json: async () => JSON.parse(xhr.responseText)
+            });
+          } else {
+            resolve({
+              ok: false,
+              status: xhr.status,
+              json: async () => JSON.parse(xhr.responseText)
+            });
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload aborted'));
+        });
+
+        xhr.open('POST', `${API_URL}/api/posts`);
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(formData);
+      });
+
+      if (response.status === 429) {
+        const data = await response.json();
+        dispatch(addToast({ message: `${data.error}. ${data.remainingSeconds} saniye sonra tekrar dene.`, type: 'warning' }));
         return;
       }
 
-      if (res.ok) {
-        const newPost = await res.json();
+      if (response.ok) {
+        const newPost = await response.json();
         dispatch(addPost(newPost));
         dispatch(setNewPostContent(''));
-        toast.success('Post paylaşıldı!');
+        setSelectedMedia([]);
+        dispatch(addToast({ message: 'Post başarıyla paylaşıldı!', type: 'success' }));
       } else {
-        toast.error('Post paylaşılamadı. Lütfen tekrar dene.');
+        const errorData = await response.json();
+        dispatch(addToast({ message: errorData.error || 'Post paylaşılamadı. Lütfen tekrar dene.', type: 'error' }));
       }
     } catch (err) {
       console.error(err);
-      toast.error('Bir hata oluştu.');
+      dispatch(addToast({ message: 'Bir hata oluştu. Lütfen tekrar dene.', type: 'error' }));
+    } finally {
+      setIsSubmitting(false);
+      // Progress bar'ı kısa bir süre daha göster, sonra gizle
+      setTimeout(() => {
+        setUploadProgress(0);
+      }, 500);
     }
   };
 
-  // Like post
+  const openMediaDialog = (type) => {
+    if (type === 'gif') {
+      setGiphyPickerOpen(true);
+    } else {
+      setMediaDialogType(type);
+      setMediaDialogOpen(true);
+    }
+  };
+
+  const handleMediaSelect = (newMedia) => {
+    setSelectedMedia([...selectedMedia, ...newMedia]);
+  };
+
+  const handleGiphySelect = (gifData) => {
+    setSelectedMedia([...selectedMedia, gifData]);
+  };
+
+  const handleRemoveMedia = (index) => {
+    const updated = selectedMedia.filter((_, i) => i !== index);
+    setSelectedMedia(updated);
+  };
+
+  const getMediaCountByType = (type) => {
+    return selectedMedia.filter(m => m.type === type).length;
+  };
+
   const handleLike = async (postId) => {
     try {
       const res = await fetch(`${API_URL}/api/posts/${postId}/like`, {
@@ -284,16 +402,16 @@ export default function FeedPage() {
     }
   };
 
-  // Load more posts
   const handleLoadMorePosts = async () => {
     if (!postsPagination.hasMore || isLoadingPosts) return;
+
+    dispatch(setLoadingPosts(true));
 
     try {
       const nextPage = postsPagination.currentPage + 1;
       const res = await fetch(`${API_URL}/api/posts?page=${nextPage}&limit=10`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-
       if (res.ok) {
         const data = await res.json();
         dispatch(appendPosts(data.posts || []));
@@ -305,15 +423,14 @@ export default function FeedPage() {
       }
     } catch (err) {
       console.error('Load more error:', err);
+    } finally {
+      dispatch(setLoadingPosts(false));
     }
   };
 
-  // Render content with clickable mentions
   const renderContentWithMentions = (text) => {
     if (!text) return null;
-
     const parts = text.split(/(@[\w.-]+)/g);
-
     return parts.map((part, index) => {
       if (part.startsWith('@')) {
         const username = part.slice(1);
@@ -361,38 +478,180 @@ export default function FeedPage() {
         Anasayfa
       </header>
 
-      {/* Create Post Area */}
-      <div className="p-4 border-b border-gray-100 flex gap-3">
-        {currentUserInfo?.profilePicture ? (
-          <img
-            src={currentUserInfo.profilePicture}
-            alt="Profil"
-            className="w-10 h-10 rounded-full object-cover border border-gray-200 shrink-0"
-          />
-        ) : (
-          <div className="w-10 h-10 bg-gray-200 rounded-full shrink-0 flex items-center justify-center">
-            <User size={20} className="text-gray-400" />
-          </div>
-        )}
+      {/* --- CREATE POST AREA START --- */}
+      <div className="group bg-white p-4 border-b border-gray-100 flex gap-4 transition-colors hover:bg-gray-50/30">
+        
+        {/* Avatar Area */}
+        <div className="shrink-0">
+          {currentUserInfo?.profilePicture ? (
+            <img
+              src={currentUserInfo.profilePicture}
+              alt="Profil"
+              className="w-11 h-11 rounded-full object-cover border border-gray-200 shadow-sm transition-transform hover:scale-105"
+            />
+          ) : (
+            <div className="w-11 h-11 bg-blue-50 rounded-full flex items-center justify-center border border-blue-100 text-blue-900">
+              <User size={20} strokeWidth={2.5} />
+            </div>
+          )}
+        </div>
+
+        {/* Input & Actions Area */}
         <div className="flex-1">
+          
+          {/* Text Input */}
           <textarea
-            className="w-full resize-none outline-none text-lg placeholder-gray-400 bg-transparent"
-            placeholder="Neler oluyor?"
+            className="w-full resize-none outline-none text-lg text-gray-900 placeholder-gray-400 bg-transparent min-h-[60px] py-1"
+            placeholder="Kampüste neler oluyor?"
             rows={2}
             value={newPostContent}
             onChange={(e) => dispatch(setNewPostContent(e.target.value))}
           />
-          <div className="flex justify-end mt-2">
-            <button
-              onClick={handleCreatePost}
-              disabled={!newPostContent.trim()}
-              className="bg-blue-900 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-blue-800 disabled:opacity-50"
-            >
-              Paylaş
-            </button>
+
+          {/* Selected Media Preview - UPDATED: FLEX + SQUARE THUMBNAILS (w-28 h-28) */}
+          {selectedMedia.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3 mb-2 animate-in fade-in slide-in-from-bottom-2">
+              {selectedMedia.map((media, index) => (
+                <div 
+                  key={index} 
+                  className="relative group rounded-xl overflow-hidden border border-gray-200 w-28 h-28 bg-gray-100 shadow-sm"
+                >
+                  {media.type === 'video' ? (
+                    <div className="relative w-full h-full bg-gray-900 flex items-center justify-center">
+                      <video src={media.preview} className="w-full h-full object-cover opacity-80" muted />
+                      {/* Play Icon Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border border-white/40 shadow-lg">
+                          <Play size={16} className="text-white ml-0.5" fill="currentColor" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <img 
+                      src={media.preview} 
+                      alt={media.name} 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                  )}
+
+                  {/* Remove Button - Top Right Floating */}
+                  <button
+                    onClick={() => handleRemoveMedia(index)}
+                    className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-sm transition-all duration-200 hover:scale-110 shadow-sm z-10"
+                    title="Kaldır"
+                  >
+                    <X size={12} strokeWidth={2.5} />
+                  </button>
+
+                  {/* Info Badges */}
+                  <div className="absolute bottom-1 left-1 flex gap-1 z-10">
+                    {media.type === 'gif' && (
+                      <div className="px-1.5 py-0.5 bg-purple-600/90 backdrop-blur-md text-white text-[9px] font-bold rounded-md shadow-sm">
+                        GIF
+                      </div>
+                    )}
+                     {media.type === 'video' && (
+                      <div className="px-1.5 py-0.5 bg-blue-600/90 backdrop-blur-md text-white text-[9px] font-bold rounded-md shadow-sm">
+                        VIDEO
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Actions Bar */}
+          <div className="flex items-center justify-end gap-3 mt-2">
+            
+            {/* Media Type Buttons Group */}
+            <div className="flex items-center gap-1">
+              {/* Image Button */}
+              <button
+                onClick={() => openMediaDialog('image')}
+                disabled={getMediaCountByType('image') >= 4}
+                className="relative p-2.5 rounded-xl text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 group disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Fotoğraf Ekle (Max 4)"
+              >
+                <Image size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
+                {getMediaCountByType('image') > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white ring-2 ring-white">
+                    {getMediaCountByType('image')}
+                  </span>
+                )}
+              </button>
+
+              {/* GIF Button */}
+              <button
+                onClick={() => openMediaDialog('gif')}
+                disabled={getMediaCountByType('gif') >= 1}
+                className="relative p-2.5 rounded-xl text-gray-500 hover:text-purple-600 hover:bg-purple-50 transition-all duration-200 group disabled:opacity-40 disabled:cursor-not-allowed"
+                title="GIF Ekle (Max 1)"
+              >
+                <FileImage size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
+                {getMediaCountByType('gif') > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-purple-600 text-[9px] font-bold text-white ring-2 ring-white">
+                    1
+                  </span>
+                )}
+              </button>
+
+              {/* Video Button */}
+              <button
+                onClick={() => openMediaDialog('video')}
+                disabled={getMediaCountByType('video') >= 1}
+                className="relative p-2.5 rounded-xl text-gray-500 hover:text-green-600 hover:bg-green-50 transition-all duration-200 group disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Video Ekle (Max 1)"
+              >
+                <Film size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
+                {getMediaCountByType('video') > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[9px] font-bold text-white ring-2 ring-white">
+                    1
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Share Button (Primary) */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleCreatePost}
+                disabled={!newPostContent.trim() || isSubmitting}
+                className="flex items-center gap-2 bg-blue-900 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/30 active:scale-95"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Paylaşılıyor</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Paylaş</span>
+                    <Send size={16} strokeWidth={2.5} />
+                  </>
+                )}
+              </button>
+
+              {/* Upload Progress Bar */}
+              {isSubmitting && uploadProgress > 0 && (
+                <div className="w-full">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-gray-600">Yükleniyor...</span>
+                    <span className="text-xs font-bold text-blue-900">{uploadProgress}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-blue-500 to-blue-900 transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+      {/* --- CREATE POST AREA END --- */}
 
       {/* Posts List */}
       <div className="divide-y divide-gray-100">
@@ -414,67 +673,13 @@ export default function FeedPage() {
               }
 
               return (
-                <div
+                <Post
                   key={item._id}
-                  className="p-5 hover:bg-gray-50/50 transition cursor-pointer"
-                  onClick={() => navigate(`/akis/${item._id}`)}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/kullanici/${item.author?.username}`);
-                      }}
-                    >
-                      {item.author?.profilePicture ? (
-                        <img
-                          src={item.author.profilePicture}
-                          className="w-9 h-9 bg-gray-200 rounded-full object-cover hover:opacity-80 transition"
-                          alt={item.author.username}
-                        />
-                      ) : (
-                        <div className="w-9 h-9 bg-gray-200 rounded-full flex items-center justify-center hover:opacity-80 transition">
-                          <User size={16} className="text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="font-bold text-sm text-gray-900 hover:underline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/kullanici/${item.author?.username}`);
-                          }}
-                        >
-                          {item.author?.fullName || 'Anonim'}
-                        </div>
-                        {item.author?.badges && item.author.badges.length > 0 && (
-                          <UserBadges badges={item.author.badges} size="sm" />
-                        )}
-                      </div>
-                      <div className="text-xs text-gray-400">
-                        @{item.author?.username} · {new Date(item.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-gray-800 mb-3 whitespace-pre-wrap">
-                    {renderContentWithMentions(item.content)}
-                  </div>
-
-                  <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                    <LikeButton
-                      isLiked={item.likes.includes(userId)}
-                      likeCount={item.likes.length}
-                      onClick={() => handleLike(item._id)}
-                    />
-                    <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition">
-                      <MessageSquare size={20} />
-                      <span className="text-sm font-medium">Yorum yap</span>
-                    </button>
-                  </div>
-                </div>
+                  post={item}
+                  onLike={handleLike}
+                  onDelete={(postId) => dispatch(setPosts(posts.filter(p => p._id !== postId)))}
+                  onUpdate={(updatedPost) => dispatch(setPosts(posts.map(p => p._id === updatedPost._id ? updatedPost : p)))}
+                />
               );
             })}
             <LoadMoreButton
@@ -485,6 +690,22 @@ export default function FeedPage() {
           </>
         )}
       </div>
+
+      {/* Media Upload Dialog */}
+      <MediaUploadDialog
+        isOpen={mediaDialogOpen}
+        onClose={() => setMediaDialogOpen(false)}
+        type={mediaDialogType}
+        onMediaSelect={handleMediaSelect}
+        currentMedia={selectedMedia}
+      />
+
+      {/* Giphy Picker */}
+      <GiphyPicker
+        isOpen={giphyPickerOpen}
+        onClose={() => setGiphyPickerOpen(false)}
+        onSelect={handleGiphySelect}
+      />
     </div>
   );
 }

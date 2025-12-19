@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLoaderData, useNavigate, useOutletContext } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, MessageSquare, Lock, Send, Heart } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Lock, Send, Heart, Trash2 } from 'lucide-react';
 import CampusRating from '../components/CampusRating';
 import UserBadges from '../components/UserBadges';
 import MobileHeader from '../components/MobileHeader';
@@ -10,6 +10,7 @@ import {
   setCommunityComments,
   updateCommunityComment,
   addCommunityComment,
+  deleteCommunityComment,
   updateCommunityVote
 } from '../store/slices/postsSlice';
 import {
@@ -60,9 +61,12 @@ export default function CommunityDetailPage() {
   const { communityCommentInput, editingCommentId, editingContent } = useSelector((state) => state.ui);
 
   // Initialize comments from loader
-  useState(() => {
-    dispatch(setCommunityComments(initialComments || []));
-  });
+  useEffect(() => {
+    if (initialComments) {
+      dispatch(setCommunityComments(initialComments));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   // Check if user has voted
   const hasUserVotedCommunity = communityComments.some((c) => c.author?._id === userId);
@@ -145,8 +149,14 @@ export default function CommunityDetailPage() {
 
         dispatch(setCommunityCommentInput(''));
       } else {
-        const errorData = await res.json();
-        alert(errorData.error || 'Yorum yapılamadı');
+        // Check if response is JSON before parsing
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          alert(errorData.error || 'Yorum yapılamadı');
+        } else {
+          alert(`Yorum yapılamadı (${res.status})`);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -190,8 +200,39 @@ export default function CommunityDetailPage() {
         dispatch(updateCommunityComment(updatedComment));
         dispatch(clearEditingComment());
       } else {
-        const errorData = await res.json();
-        alert(errorData.error || 'Yorum düzenlenemedi');
+        // Check if response is JSON before parsing
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          alert(errorData.error || 'Yorum düzenlenemedi');
+        } else {
+          alert(`Yorum düzenlenemedi (${res.status})`);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Bir hata oluştu');
+    }
+  };
+
+  // Handle delete comment
+  const handleDeleteCommunityComment = async (commentId) => {
+    if (!window.confirm('Bu yorumu silmek istediğinize emin misiniz?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/community/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        dispatch(deleteCommunityComment(commentId));
+      } else {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          alert(errorData.error || 'Yorum silinemedi');
+        } else {
+          alert(`Yorum silinemedi (${res.status})`);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -280,7 +321,7 @@ export default function CommunityDetailPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className="font-bold text-sm text-gray-900">
-                              {comment.author?.fullName || 'Anonim'}
+                              {comment.author?.username || 'Anonim'}
                             </div>
                             {comment.author?.badges && comment.author.badges.length > 0 && (
                               <UserBadges badges={comment.author.badges} size="sm" />
@@ -345,14 +386,23 @@ export default function CommunityDetailPage() {
                             <span className="text-xs font-medium">{comment.likes?.length || 0}</span>
                           </button>
                           {isOwnComment && !isEditing && (
-                            <button
-                              onClick={() =>
-                                dispatch(setEditingComment({ id: comment._id, content: comment.content }))
-                              }
-                              className="text-xs text-gray-500 hover:text-blue-600 font-medium"
-                            >
-                              Düzenle
-                            </button>
+                            <>
+                              <button
+                                onClick={() =>
+                                  dispatch(setEditingComment({ id: comment._id, content: comment.content }))
+                                }
+                                className="text-xs text-gray-500 hover:text-blue-600 font-medium"
+                              >
+                                Düzenle
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCommunityComment(comment._id)}
+                                className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 font-medium"
+                              >
+                                <Trash2 size={14} />
+                                Sil
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>

@@ -31,6 +31,12 @@ const CommentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  // Tek fotoğraf veya GIF yüklenebilir
+  media: {
+    url: { type: String },
+    type: { type: String, enum: ['image', 'gif'] },
+    publicId: { type: String } // Cloudinary public ID for deletion
+  },
   createdAt: {
     type: Date,
     default: Date.now

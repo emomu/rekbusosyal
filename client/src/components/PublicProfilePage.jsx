@@ -81,7 +81,11 @@ export default function PublicProfilePage() {
       if (res.ok) {
         if (page === 1) dispatch(setUserPosts(data.posts));
         else dispatch(appendUserPosts(data.posts));
-        dispatch(setPostsPagination(data.pagination));
+        dispatch(setPostsPagination({
+          currentPage: data.currentPage || page,
+          totalPages: data.totalPages || 1,
+          hasMore: data.hasMore || false
+        }));
       }
     } catch (err) {
       console.error('Postlar yüklenemedi:', err);
@@ -120,7 +124,11 @@ export default function PublicProfilePage() {
       if (res.ok) {
         if (page === 1) dispatch(setUserConfessions(data.posts));
         else dispatch(appendUserConfessions(data.posts));
-        dispatch(setConfessionsPagination(data.pagination));
+        dispatch(setConfessionsPagination({
+          currentPage: data.currentPage || page,
+          totalPages: data.totalPages || 1,
+          hasMore: data.hasMore || false
+        }));
       }
     } catch (err) {
       console.error('İtiraflar yüklenemedi:', err);

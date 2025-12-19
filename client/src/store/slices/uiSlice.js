@@ -15,7 +15,8 @@ const initialState = {
   isLoadingConfessions: false,
   isLoadingCampuses: false,
   isLoadingCommunities: false,
-  isLoadingComments: false
+  isLoadingComments: false,
+  toasts: []
 };
 
 const uiSlice = createSlice({
@@ -91,6 +92,20 @@ const uiSlice = createSlice({
 
     setLoadingComments: (state, action) => {
       state.isLoadingComments = action.payload;
+    },
+
+    addToast: (state, action) => {
+      const id = Date.now() + Math.random();
+      state.toasts.push({
+        id,
+        message: action.payload.message,
+        type: action.payload.type || 'info',
+        duration: action.payload.duration || 3000
+      });
+    },
+
+    removeToast: (state, action) => {
+      state.toasts = state.toasts.filter(toast => toast.id !== action.payload);
     }
   }
 });
@@ -111,7 +126,9 @@ export const {
   setLoadingConfessions,
   setLoadingCampuses,
   setLoadingCommunities,
-  setLoadingComments
+  setLoadingComments,
+  addToast,
+  removeToast
 } = uiSlice.actions;
 
 export default uiSlice.reducer;

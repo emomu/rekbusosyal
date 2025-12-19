@@ -38,19 +38,35 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
+// Media upload utilities
+const { uploadMediaToCloudinary, deleteMediaFromCloudinary } = require('./utils/mediaUpload');
+
 // Multer memory storage - we'll upload to Cloudinary manually
 const storage = multer.memoryStorage();
 
-// File filter - only images
+// File filter - images and videos
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
+  // Check MIME type (more reliable than extension)
+  const isImage = file.mimetype.startsWith('image/');
+  const isVideo = file.mimetype.startsWith('video/');
 
-  if (mimetype && extname) {
+  // Additional check for specific allowed MIME types
+  const allowedMimeTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'video/mp4',
+    'video/webm'
+  ];
+
+  const isAllowedMimeType = allowedMimeTypes.includes(file.mimetype);
+
+  if ((isImage || isVideo) && isAllowedMimeType) {
     return cb(null, true);
   } else {
-    cb(new Error('Sadece resim dosyaları yüklenebilir!'));
+    cb(new Error(`Desteklenmeyen dosya tipi: ${file.mimetype}. Sadece resim ve video dosyaları yüklenebilir!`));
   }
 };
 
@@ -58,7 +74,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 10 * 1024 * 1024 // 10MB limit
   },
   fileFilter: fileFilter
 });
@@ -84,7 +100,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // CORS ayarları
 app.use(cors({
-  origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
+  origin: [process.env.FRONTEND_URL, 'http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 
@@ -141,6 +157,12 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Apply maintenance mode middleware only to API routes (not static files)
 app.use('/api', maintenanceMode);
+
+// Debug logging middleware for API requests
+app.use('/api', (req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path}`);
+  next();
+});
 
 // SECURITY: Rate limiters for auth endpoints
 const authLimiter = rateLimit({
@@ -299,34 +321,73 @@ app.get('/api/posts', async (req, res) => {
       Post.countDocuments({ isAnonymous: false, category: 'Geyik' })
     ]);
 
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = skip + posts.length < totalCount;
+
     res.json({
       posts,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(totalCount / limit),
-        totalCount,
-        hasMore: skip + posts.length < totalCount
-      }
+      currentPage: page,
+      totalPages: totalPages,
+      totalCount,
+      hasMore: hasMore
     });
   } catch (err) {
     res.status(500).json(err);
   }
 });
 
-// Post Atma (Sadece giriş yapmış kullanıcılar) - 30 saniye cooldown
-app.post('/api/posts', auth, cooldown('post'), async (req, res) => {
+// Post Atma (Sadece giriş yapmış kullanıcılar) - 30 saniye cooldown - with media support
+app.post('/api/posts', auth, cooldown('post'), upload.array('media', 4), async (req, res) => {
   try {
+    const mediaFiles = [];
+
+    // Upload media files to Cloudinary if any
+    if (req.files && req.files.length > 0) {
+      // Check if Cloudinary is configured
+      if (!process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME === 'your_cloud_name') {
+        return res.status(400).json({ error: "Medya yükleme özelliği henüz yapılandırılmamış. Lütfen sadece metin içerik paylaşın." });
+      }
+
+      try {
+        for (const file of req.files) {
+          const fileType = file.mimetype.startsWith('image/') ? 'image' : 'video';
+          const uploadedMedia = await uploadMediaToCloudinary(file.buffer, fileType);
+          mediaFiles.push(uploadedMedia);
+        }
+      } catch (uploadError) {
+        console.error("Medya yükleme hatası:", uploadError);
+        return res.status(400).json({ error: "Medya dosyaları yüklenirken bir hata oluştu. Lütfen tekrar deneyin." });
+      }
+    }
+
+    // Add Giphy GIFs (no upload needed, just store URL)
+    if (req.body.giphyGifs) {
+      try {
+        const giphyGifs = JSON.parse(req.body.giphyGifs);
+        giphyGifs.forEach(gif => {
+          mediaFiles.push({
+            url: gif.url,
+            type: 'image', // Store as image type for database
+            publicId: null // No Cloudinary ID for Giphy GIFs
+          });
+        });
+      } catch (parseError) {
+        console.error("Giphy GIF parse error:", parseError);
+      }
+    }
+
     const newPost = new Post({
       content: req.body.content,
       author: req.userId, // middleware'den gelen kullanıcı ID'si
       isAnonymous: false, // Normal postlar anonim değildir
-      category: 'Geyik' // Varsayılan kategori
+      category: 'Geyik', // Varsayılan kategori
+      media: mediaFiles
     });
-    
+
     let savedPost = await newPost.save();
     // Kaydedilen postu yazar bilgisiyle birlikte geri döndür
     savedPost = await savedPost.populate('author', 'username profilePicture badges fullName');
-    
+
     res.status(201).json(savedPost);
   } catch (err) {
     console.error("Post oluşturma hatası:", err);
@@ -344,6 +405,7 @@ app.get('/api/confessions', async (req, res) => {
 
     const [confessions, totalCount] = await Promise.all([
       Post.find({ category: 'İtiraf' })
+        .select('+author')
         .populate('author', 'username profilePicture badges fullName')
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -351,38 +413,80 @@ app.get('/api/confessions', async (req, res) => {
       Post.countDocuments({ category: 'İtiraf' })
     ]);
 
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = skip + confessions.length < totalCount;
+
     res.json({
       posts: confessions,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(totalCount / limit),
-        totalCount,
-        hasMore: skip + confessions.length < totalCount
-      }
+      currentPage: page,
+      totalPages: totalPages,
+      totalCount,
+      hasMore: hasMore
     });
   } catch (err) {
     res.status(500).json(err);
   }
 });
 
-// İtiraf Gönderme (Sadece giriş yapmış kullanıcılar) - 60 saniye cooldown
-app.post('/api/confessions', auth, cooldown('confession'), async (req, res) => {
-  const { content, isAnonymous } = req.body;
+// İtiraf Gönderme (Sadece giriş yapmış kullanıcılar) - 60 saniye cooldown - with media support
+app.post('/api/confessions', auth, cooldown('confession'), upload.array('media', 4), async (req, res) => {
+  const { content } = req.body;
+  // FormData sends boolean as string, convert to boolean
+  const isAnonymous = req.body.isAnonymous === 'true' || req.body.isAnonymous === true;
+
   try {
+    const mediaFiles = [];
+
+    // Upload media files to Cloudinary if any
+    if (req.files && req.files.length > 0) {
+      // Check if Cloudinary is configured
+      if (!process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME === 'your_cloud_name') {
+        return res.status(400).json({ error: "Medya yükleme özelliği henüz yapılandırılmamış. Lütfen sadece metin içerik paylaşın." });
+      }
+
+      try {
+        for (const file of req.files) {
+          const fileType = file.mimetype.startsWith('image/') ? 'image' : 'video';
+          const uploadedMedia = await uploadMediaToCloudinary(file.buffer, fileType);
+          mediaFiles.push(uploadedMedia);
+        }
+      } catch (uploadError) {
+        console.error("Medya yükleme hatası:", uploadError);
+        return res.status(400).json({ error: "Medya dosyaları yüklenirken bir hata oluştu. Lütfen tekrar deneyin." });
+      }
+    }
+
+    // Add Giphy GIFs (no upload needed, just store URL)
+    if (req.body.giphyGifs) {
+      try {
+        const giphyGifs = JSON.parse(req.body.giphyGifs);
+        giphyGifs.forEach(gif => {
+          mediaFiles.push({
+            url: gif.url,
+            type: 'image', // Store as image type for database
+            publicId: null // No Cloudinary ID for Giphy GIFs
+          });
+        });
+      } catch (parseError) {
+        console.error("Giphy GIF parse error:", parseError);
+      }
+    }
+
     const newConfession = new Post({
       content,
       isAnonymous,
       category: 'İtiraf',
       author: isAnonymous ? null : req.userId,
+      media: mediaFiles
     });
 
     let savedConfession = await newConfession.save();
-    
+
     // Eğer anonim değilse, yazar bilgisiyle birlikte geri döndür
     if (!savedConfession.isAnonymous) {
       savedConfession = await savedConfession.populate('author', 'username profilePicture badges fullName');
     }
-    
+
     res.status(201).json(savedConfession);
   } catch (err) {
     console.error("İtiraf oluşturma hatası:", err);
@@ -597,67 +701,66 @@ app.get('/api/campus/:id/comments', async (req, res) => {
   }
 });
 
-// 2. YORUM YAPMA ENDPOINT'İ (TERMINATÖR MODU: Eskileri temizler) - 20 saniye cooldown
-// --- YORUM YAPMA (BİLDİRİMLİ) ---
-app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, res) => {
+// POST campus comment (Update existing or create new - only 1 comment per user)
+app.post('/api/campus/:id/comments', auth, cooldown('comment'), async (req, res) => {
   try {
     const { content } = req.body;
-    const postId = req.params.postId;
+    const campusId = req.params.id;
     const userId = req.userId;
 
-    if (!content || content.trim().length === 0) return res.status(400).json({ message: 'Boş olamaz' });
-    if (content.length > 500) return res.status(400).json({ message: 'Yorum çok uzun' });
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: 'Yorum boş olamaz' });
+    }
+    if (content.length > 500) {
+      return res.status(400).json({ error: 'Yorum çok uzun' });
+    }
 
-    // DÜZELTME: author field'ı select: false olduğu için +author ile dahil ediyoruz
-    const post = await Post.findById(postId).select('+author');
-    if (!post) return res.status(404).json({ message: 'Post bulunamadı' });
+    // Get user's vote for this campus
+    const user = await User.findById(userId);
+    const userVote = user.votedCampuses?.find(v => v.campusId.toString() === campusId);
 
-    const comment = new Comment({ content, author: userId, post: postId });
-    await comment.save();
-    await comment.populate('author', 'username profilePicture fullName badges');
+    if (!userVote) {
+      return res.status(403).json({ error: 'Yorum yapabilmek için önce oy vermelisiniz.' });
+    }
 
-    // 1. Post Sahibine Bildirim
-    // DÜZELTME: !post.isAnonymous kontrolü kaldırıldı.
-    console.log(`[YORUM] Post ID: ${postId}, Author: ${post.author}, Current User: ${userId}, isAnonymous: ${post.isAnonymous}`);
+    const campus = await Campus.findById(campusId);
+    if (!campus) {
+      return res.status(404).json({ error: 'Kampüs bulunamadı' });
+    }
 
-    if (post.author && userId.toString() !== post.author.toString()) {
-      const notification = await Notification.create({
-        recipient: post.author,
-        sender: userId,
-        type: 'comment',
-        post: postId,
-        comment: comment._id
-      });
-      console.log(`💬 Yorum Bildirimi OLUŞTURULDU -> Alıcı: ${post.author}, Bildirim ID: ${notification._id}`);
+    // Check if user already has a comment for this campus
+    let comment = await CampusComment.findOne({ campusId, author: userId });
+
+    if (comment) {
+      // Update existing comment
+      comment.content = content;
+      comment.voteType = userVote.voteType;
+      await comment.save();
     } else {
-      console.log(`⚠️ Yorum Bildirimi OLUŞTURULAMADI - Sebep: ${!post.author ? 'Post author yok' : 'Kendi postuna yorum yaptın'}`);
+      // Create new comment
+      comment = new CampusComment({
+        content,
+        author: userId,
+        campusId: campusId,
+        voteType: userVote.voteType
+      });
+      await comment.save();
     }
 
-    // 2. Mention Bildirimleri
-    const mentions = extractMentions(content);
-    console.log(`[MENTION] Bulunan mention'lar:`, mentions);
-    if (mentions.length > 0) {
-      const mentionedUsers = await User.find({ username: { $in: mentions }, _id: { $ne: userId } }).select('_id');
-      console.log(`[MENTION] Mention edilen kullanıcılar:`, mentionedUsers.map(u => u._id));
-      const mentionNotifs = mentionedUsers.map(user => ({
-        recipient: user._id,
-        sender: userId,
-        type: 'mention',
-        post: postId,
-        comment: comment._id
-      }));
-      if (mentionNotifs.length > 0) {
-        await Notification.insertMany(mentionNotifs);
-        console.log(`📢 ${mentionNotifs.length} Mention Bildirimi OLUŞTURULDU`);
-      }
-    }
-
+    await comment.populate('author', 'username profilePicture badges');
     res.status(201).json(comment);
   } catch (err) {
-    console.error('Yorum hatası:', err);
-    res.status(500).json({ message: 'Yorum yapılamadı' });
+    console.error('Campus yorum hatası:', err);
+    res.status(500).json({ error: 'Yorum yapılamadı' });
   }
 });
+
+// 2. YORUM YAPMA ENDPOINT'İ (TERMINATÖR MODU: Eskileri temizler) - 20 saniye cooldown - with media support
+// --- YORUM YAPMA (BİLDİRİMLİ) ---
+// DEPRECATED: Old endpoint replaced by new one at line 3186
+// app.post('/api/posts/:postId/comments', auth, cooldown('comment'), upload.array('media', 4), async (req, res) => {
+//   ... old code removed ...
+// });
 
 // Kampüs yorumunu beğenme
 app.post('/api/campus/comments/:id/like', auth, async (req, res) => {
@@ -710,6 +813,67 @@ app.put('/api/campus/comments/:id', auth, async (req, res) => {
     res.json(updatedComment);
   } catch (err) {
     console.error("Yorum düzenleme hatası:", err);
+    res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });
+  }
+});
+
+// Delete campus comment
+// --- KAMPÜS YORUMU DÜZENLEME (PUT) ---
+app.put('/api/campus/comments/:id', auth, async (req, res) => {
+  try {
+    const { content } = req.body;
+    const commentId = req.params.id;
+    const userId = req.userId;
+
+    // Validasyonlar
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: 'İçerik boş olamaz' });
+    }
+    if (content.length > 500) {
+      return res.status(400).json({ error: 'Yorum çok uzun' });
+    }
+
+    // Yorumu bul
+    const comment = await CampusComment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    // Yetki kontrolü (sadece sahibi düzenleyebilir)
+    if (comment.author.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Bu yorumu düzenleyemezsiniz' });
+    }
+
+    // Güncelle
+    comment.content = content;
+    await comment.save();
+
+    // Yazar bilgisini ekle
+    await comment.populate('author', 'username profilePicture fullName badges');
+
+    res.json(comment);
+  } catch (err) {
+    console.error('Kampüs yorumu düzenleme hatası:', err);
+    res.status(500).json({ error: 'Yorum güncellenemedi' });
+  }
+});
+
+app.delete('/api/campus/comments/:id', auth, async (req, res) => {
+  try {
+    const comment = await CampusComment.findById(req.params.id);
+    if (!comment) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    // Check if user is the author
+    if (comment.author.toString() !== req.userId) {
+      return res.status(403).json({ error: 'Bu yorumu silme yetkiniz yok' });
+    }
+
+    await CampusComment.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Yorum silindi' });
+  } catch (err) {
+    console.error("Yorum silme hatası:", err);
     res.status(500).json({ error: "İşlem sırasında bir hata oluştu." });
   }
 });
@@ -1550,14 +1714,15 @@ app.get('/api/users/:userId/posts', async (req, res) => {
       Post.countDocuments({ author: userId, isAnonymous: false, category: 'Geyik' })
     ]);
 
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = skip + posts.length < totalCount;
+
     res.json({
       posts,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(totalCount / limit),
-        totalCount,
-        hasMore: skip + posts.length < totalCount
-      }
+      currentPage: page,
+      totalPages: totalPages,
+      totalCount,
+      hasMore: hasMore
     });
   } catch (err) {
     res.status(500).json({ error: "Sunucu hatası" });
@@ -1584,14 +1749,15 @@ app.get('/api/users/:userId/confessions', async (req, res) => {
       Post.countDocuments({ author: userId, isAnonymous: false, category: 'İtiraf' })
     ]);
 
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasMore = skip + confessions.length < totalCount;
+
     res.json({
       posts: confessions,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(totalCount / limit),
-        totalCount,
-        hasMore: skip + confessions.length < totalCount
-      }
+      currentPage: page,
+      totalPages: totalPages,
+      totalCount,
+      hasMore: hasMore
     });
   } catch (err) {
     res.status(500).json({ error: "Sunucu hatası" });
@@ -2238,6 +2404,99 @@ app.get('/api/admin/posts', adminAuth, async (req, res) => {
 });
 
 // Post sil
+// --- KULLANICI POST DÜZENLEME (PUT) ---
+app.put('/api/posts/:id', auth, async (req, res) => {
+  try {
+    const { content } = req.body;
+    const postId = req.params.id;
+    const userId = req.userId;
+
+    // Validasyonlar
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: 'İçerik boş olamaz' });
+    }
+    if (content.length > 1000) {
+      return res.status(400).json({ error: 'Post çok uzun (max 1000 karakter)' });
+    }
+
+    // Post'u bul ve author'u populate et (author select:false olduğu için +author gerekli)
+    const post = await Post.findById(postId).select('+author').populate('author', 'username profilePicture fullName badges');
+    if (!post) {
+      return res.status(404).json({ error: 'Post bulunamadı' });
+    }
+
+    // Yetki kontrolü (sadece sahibi düzenleyebilir)
+    if (!post.author || post.author._id.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Bu postu düzenleyemezsiniz' });
+    }
+
+    // Güncelle
+    post.content = content;
+    await post.save();
+
+    res.json(post);
+  } catch (err) {
+    console.error('Post düzenleme hatası:', err);
+    res.status(500).json({ error: 'Post güncellenemedi' });
+  }
+});
+
+// --- KULLANICI POST SİLME (DELETE) ---
+app.delete('/api/posts/:id', auth, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.userId;
+
+    // Post'u bul - author field'ını ObjectId olarak al (select:false olduğu için +author gerekli)
+    const post = await Post.findById(postId).select('+author').lean();
+    if (!post) {
+      return res.status(404).json({ error: 'Post bulunamadı' });
+    }
+
+    // Yetki kontrolü (sadece sahibi veya admin silebilir)
+    if (!post.author) {
+      return res.status(403).json({ error: 'Post yazarı bulunamadı' });
+    }
+    if (post.author.toString() !== userId.toString() && req.userRole !== 'admin') {
+      return res.status(403).json({ error: 'Bu postu silme yetkiniz yok' });
+    }
+
+    // Media varsa Cloudinary'den sil
+    if (post.media && post.media.length > 0) {
+      for (const media of post.media) {
+        if (media.publicId) {
+          try {
+            await cloudinary.uploader.destroy(media.publicId);
+          } catch (cloudErr) {
+            console.error('Cloudinary silme hatası:', cloudErr);
+          }
+        }
+      }
+    }
+
+    // Legacy imageUrl desteği
+    if (post.imageUrl) {
+      const publicId = post.imageUrl.split('/').pop().split('.')[0];
+      try {
+        await cloudinary.uploader.destroy(`posts/${publicId}`);
+      } catch (cloudErr) {
+        console.error('Cloudinary silme hatası:', cloudErr);
+      }
+    }
+
+    // Post'u sil
+    await Post.findByIdAndDelete(postId);
+
+    // İlgili yorumları da sil
+    await Comment.deleteMany({ post: postId });
+
+    res.json({ message: 'Post silindi' });
+  } catch (err) {
+    console.error('Post silme hatası:', err);
+    res.status(500).json({ error: 'Post silinemedi' });
+  }
+});
+
 app.delete('/api/admin/posts/:id', adminAuth, async (req, res) => {
   try {
     await Post.findByIdAndDelete(req.params.id);
@@ -2611,6 +2870,28 @@ app.put('/api/community/comments/:id', auth, async (req, res) => {
     res.status(500).json({ error: 'Yorum düzenlenemedi' });
   }
 });
+
+// Topluluk yorumunu silme
+app.delete('/api/community/comments/:id', auth, async (req, res) => {
+  try {
+    const comment = await CommunityComment.findById(req.params.id);
+    if (!comment) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    // Check if user is the author or admin
+    if (comment.author.toString() !== req.userId && req.userRole !== 'admin') {
+      return res.status(403).json({ error: 'Bu yorumu silme yetkiniz yok' });
+    }
+
+    await CommunityComment.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Yorum silindi' });
+  } catch (err) {
+    console.error('Topluluk yorumu silme hatası:', err);
+    res.status(500).json({ error: 'Yorum silinemedi' });
+  }
+});
+
 // --- DOĞRULAMA MAİLİNİ TEKRAR GÖNDER ---
 // Cooldown middleware'ini buraya da ekledim ki spam yapılmasın (60 saniye)
 app.post('/api/resend-verification', async (req, res) => {
@@ -2826,6 +3107,8 @@ app.get('/api/posts/:postId/comments', async (req, res) => {
     })
       .populate('author', 'username profilePicture fullName badges')
       .sort({ createdAt: -1 });
+
+    console.log('Yorumlar gönderiliyor:', comments.map(c => ({ id: c._id, media: c.media })));
     res.json(comments);
   } catch (err) {
     console.error('Yorumları getirme hatası:', err);
@@ -2833,8 +3116,8 @@ app.get('/api/posts/:postId/comments', async (req, res) => {
   }
 });
 
-// 2. Yorum Yap (POST)
-app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, res) => {
+// 2. Yorum Yap (POST) - with media support (1 image or gif)
+app.post('/api/posts/:postId/comments', auth, cooldown('comment'), upload.single('media'), async (req, res) => {
   try {
     const { content } = req.body;
     const postId = req.params.postId;
@@ -2847,14 +3130,41 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), async (req, r
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: 'Gönderi bulunamadı' });
 
+    // Media upload (optional, max 1 image or gif)
+    let mediaData = null;
+
+    // Check for Giphy GIF (URL-based)
+    if (req.body.giphyGifs) {
+      try {
+        const giphyGifs = JSON.parse(req.body.giphyGifs);
+        if (giphyGifs.length > 0) {
+          mediaData = {
+            url: giphyGifs[0].url,
+            type: 'gif'
+          };
+        }
+      } catch (err) {
+        console.error('Giphy GIF parse hatası:', err);
+      }
+    }
+    // Check for file upload
+    else if (req.file) {
+      const fileType = req.file.mimetype === 'image/gif' ? 'gif' : 'image';
+      const uploadedMedia = await uploadMediaToCloudinary(req.file.buffer, fileType);
+      mediaData = uploadedMedia;
+    }
+
     // Yorumu Kaydet
+    console.log('💾 Kaydedilecek media:', mediaData);
     const comment = new Comment({
       content,
       author: userId,
-      post: postId
+      post: postId,
+      media: mediaData
     });
     await comment.save();
-    
+    console.log('✅ Kaydedilen yorum:', { id: comment._id, media: comment.media });
+
     // Frontend için yazar bilgisini ekle
     await comment.populate('author', 'username profilePicture fullName badges');
 
@@ -3053,8 +3363,8 @@ app.get('/api/comments/:commentId/replies', async (req, res) => {
   }
 });
 
-// Post a reply to a comment
-app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), async (req, res) => {
+// Post a reply to a comment - with media support (1 image or gif)
+app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), upload.single('media'), async (req, res) => {
   try {
     const { content } = req.body;
     const parentCommentId = req.params.commentId;
@@ -3074,12 +3384,37 @@ app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), async (r
       return res.status(404).json({ message: 'Yorum bulunamadı' });
     }
 
+    // Media upload (optional, max 1 image or gif)
+    let mediaData = null;
+
+    // Check for Giphy GIF (URL-based)
+    if (req.body.giphyGifs) {
+      try {
+        const giphyGifs = JSON.parse(req.body.giphyGifs);
+        if (giphyGifs.length > 0) {
+          mediaData = {
+            url: giphyGifs[0].url,
+            type: 'gif'
+          };
+        }
+      } catch (err) {
+        console.error('Giphy GIF parse hatası:', err);
+      }
+    }
+    // Check for file upload
+    else if (req.file) {
+      const fileType = req.file.mimetype === 'image/gif' ? 'gif' : 'image';
+      const uploadedMedia = await uploadMediaToCloudinary(req.file.buffer, fileType);
+      mediaData = uploadedMedia;
+    }
+
     // Reply'i kaydet
     const reply = new Comment({
       content,
       author: userId,
       post: parentComment.post,
-      parentComment: parentCommentId
+      parentComment: parentCommentId,
+      media: mediaData
     });
     await reply.save();
 
@@ -3129,6 +3464,89 @@ app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), async (r
   } catch (err) {
     console.error('Reply oluşturma hatası:', err);
     res.status(500).json({ message: 'Cevap oluşturulamadı' });
+  }
+});
+
+// --- REPLY DÜZENLEME (PUT) ---
+app.put('/api/replies/:replyId', auth, async (req, res) => {
+  try {
+    const { replyId } = req.params;
+    const { content } = req.body;
+    const userId = req.userId;
+
+    // Validasyonlar
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: 'İçerik boş olamaz' });
+    }
+    if (content.length > 500) {
+      return res.status(400).json({ error: 'Yorum çok uzun' });
+    }
+
+    // Reply'i bul (parentComment field'ı olmalı)
+    const reply = await Comment.findOne({ _id: replyId, parentComment: { $ne: null } });
+    if (!reply) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    // Yetki kontrolü (sadece sahibi düzenleyebilir)
+    if (reply.author.toString() !== userId.toString()) {
+      return res.status(403).json({ error: 'Bu yorumu düzenleyemezsiniz' });
+    }
+
+    // Güncelle
+    reply.content = content;
+    await reply.save();
+
+    // Yazar bilgisini ekle
+    await reply.populate('author', 'username profilePicture fullName badges');
+
+    res.json(reply);
+  } catch (err) {
+    console.error('Reply düzenleme hatası:', err);
+    res.status(500).json({ error: 'Yorum güncellenemedi' });
+  }
+});
+
+// --- REPLY SİLME (DELETE) ---
+app.delete('/api/replies/:replyId', auth, async (req, res) => {
+  try {
+    const { replyId } = req.params;
+    const userId = req.userId;
+
+    // Reply'i bul (parentComment field'ı olmalı)
+    const reply = await Comment.findOne({ _id: replyId, parentComment: { $ne: null } });
+    if (!reply) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    // Yetki kontrolü (sadece sahibi veya admin silebilir)
+    if (reply.author.toString() !== userId.toString() && req.userRole !== 'admin') {
+      return res.status(403).json({ error: 'Bu yorumu silemezsiniz' });
+    }
+
+    // Parent comment'in reply count'unu azalt
+    if (reply.parentComment) {
+      await Comment.findByIdAndUpdate(reply.parentComment, {
+        $inc: { replyCount: -1 }
+      });
+    }
+
+    // Media varsa Cloudinary'den sil
+    if (reply.media?.publicId) {
+      try {
+        await cloudinary.uploader.destroy(reply.media.publicId);
+      } catch (cloudErr) {
+        console.error('Cloudinary silme hatası:', cloudErr);
+      }
+    }
+
+    // Reply'i sil
+    await Comment.findByIdAndDelete(replyId);
+
+    res.json({ message: 'Yorum silindi' });
+  } catch (err) {
+    console.error('Reply silme hatası:', err);
+    res.status(500).json({ error: 'Yorum silinemedi' });
   }
 });
 
@@ -3279,6 +3697,11 @@ cron.schedule('0 12,20 * * *', async () => {
   } catch (err) {
     console.error('❌ Öneri sistemi hatası:', err);
   }
+});
+
+// 404 handler - must be after all routes
+app.use((req, res) => {
+  res.status(404).json({ error: 'Endpoint bulunamadı' });
 });
 
 const PORT = process.env.PORT || 5001; // .env'den çekiliyor veya 5001

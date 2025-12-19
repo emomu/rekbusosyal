@@ -122,6 +122,11 @@ const router = createBrowserRouter([
         loader: postLoader
       },
       {
+        path: 'post/:postId',
+        element: <PostDetailPage />,
+        loader: postLoader
+      },
+      {
         path: 'yorum/:commentId',
         element: <CommentDetailPage />,
         loader: commentLoader

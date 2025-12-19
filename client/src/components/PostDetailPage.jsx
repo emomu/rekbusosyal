@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLoaderData, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, BarChart2, Heart } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
+import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Edit2, Share2, BarChart2, Heart, Film, ImagePlus, FileImage } from 'lucide-react';
 import { API_URL } from '../config/api';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
 import { ensureHttps } from '../utils/imageUtils';
 import UserBadges from './UserBadges';
+import { setSelectedImage } from '../store/slices/uiSlice';
+import { CommentsShimmer } from './LoadingShimmer';
+import MediaUploadDialog from './MediaUploadDialog';
+import GiphyPicker from './GiphyPicker';
+import MediaDisplay from './MediaDisplay';
 
 // --- LIKE BUTONU BİLEŞENİ (Dokunulmadı, aynen korundu) ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -128,6 +133,7 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
 
 export default function PostDetailPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const toast = useToast();
   const post = useLoaderData();
   const { userId: currentUserId, token } = useSelector((state) => state.auth);
@@ -143,12 +149,39 @@ export default function PostDetailPage() {
   const [isLiked, setIsLiked] = useState(post?.likes?.includes(currentUserId) || false);
   const [likeCount, setLikeCount] = useState(post?.likes?.length || 0);
 
+  // Media upload states
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadType, setUploadType] = useState(null);
+  const [giphyPickerOpen, setGiphyPickerOpen] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+
+  // Edit comment states
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingContent, setEditingContent] = useState('');
+
+  // Edit post states
+  const [isEditingPost, setIsEditingPost] = useState(false);
+  const [editingPostContent, setEditingPostContent] = useState('');
+  const [postMenuOpen, setPostMenuOpen] = useState(false);
+
   const commentInputRef = useRef(null);
 
   useEffect(() => {
     fetchComments();
     window.scrollTo(0, 0);
   }, []);
+
+  // Close menus when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setPostMenuOpen(false);
+      setMenuOpen(null);
+    };
+    if (postMenuOpen || menuOpen) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [postMenuOpen, menuOpen]);
 
   // Fetch current user profile picture
   useEffect(() => {
@@ -238,6 +271,7 @@ export default function PostDetailPage() {
       const res = await fetch(`${API_URL}/api/posts/${post._id}/comments`);
       const data = await res.json();
       if (res.ok) {
+        console.log('Yorumlar:', data);
         setComments(data);
       }
     } catch (err) {
@@ -247,19 +281,55 @@ export default function PostDetailPage() {
     }
   };
 
+  // Media handlers
+  const handleMediaSelect = (files) => {
+    if (files && files.length > 0) {
+      setSelectedMedia(files[0]); // Only first file since we allow max 1
+    }
+    setUploadDialogOpen(false);
+  };
+
+  const handleGiphySelect = (gifData) => {
+    setSelectedMedia({
+      url: gifData.url,
+      preview: gifData.preview,
+      type: 'gif',
+      name: gifData.name,
+      file: null // Giphy GIF'leri için file yok, URL kullanılacak
+    });
+    setGiphyPickerOpen(false);
+  };
+
   const handleSubmitComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
     try {
       setSubmitting(true);
+
+      const formData = new FormData();
+      formData.append('content', newComment);
+
+      // Add media if selected
+      if (selectedMedia) {
+        if (selectedMedia.file) {
+          // Normal file upload (image/video)
+          formData.append('media', selectedMedia.file);
+        } else if (selectedMedia.type === 'gif' && selectedMedia.url) {
+          // Giphy GIF - send URL as JSON
+          formData.append('giphyGifs', JSON.stringify([{
+            url: selectedMedia.url,
+            type: 'gif'
+          }]));
+        }
+      }
+
       const res = await fetch(`${API_URL}/api/posts/${post._id}/comments`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ content: newComment })
+        body: formData
       });
 
       const data = await res.json();
@@ -272,6 +342,7 @@ export default function PostDetailPage() {
       if (res.ok) {
         setComments([data, ...comments]);
         setNewComment('');
+        setSelectedMedia(null);
         toast.success('Yorum gönderildi!');
       } else {
         toast.error(data.message || 'Yorum gönderilemedi');
@@ -299,6 +370,44 @@ export default function PostDetailPage() {
     }
   };
 
+  const handleEditComment = (comment) => {
+    setEditingCommentId(comment._id);
+    setEditingContent(comment.content);
+    setMenuOpen(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCommentId(null);
+    setEditingContent('');
+  };
+
+  const handleSaveEdit = async (commentId) => {
+    if (!editingContent.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/api/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: editingContent })
+      });
+
+      if (res.ok) {
+        const updatedComment = await res.json();
+        setComments(comments.map(c => c._id === commentId ? updatedComment : c));
+        setEditingCommentId(null);
+        setEditingContent('');
+        toast.success('Yorum güncellendi');
+      } else {
+        toast.error('Yorum güncellenemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Bir hata oluştu');
+    }
+  };
+
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm('Bu yorumu silmek istediğinize emin misiniz?')) return;
     try {
@@ -311,6 +420,66 @@ export default function PostDetailPage() {
         toast.success('Yorum silindi');
       } else {
         toast.error('Yorum silinemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Bir hata oluştu');
+    }
+  };
+
+  // Post edit/delete handlers
+  const handleEditPost = () => {
+    setIsEditingPost(true);
+    setEditingPostContent(post.content);
+    setPostMenuOpen(false);
+  };
+
+  const handleCancelEditPost = () => {
+    setIsEditingPost(false);
+    setEditingPostContent('');
+  };
+
+  const handleSavePost = async () => {
+    if (!editingPostContent.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/api/posts/${post._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: editingPostContent })
+      });
+
+      if (res.ok) {
+        const updatedPost = await res.json();
+        post.content = updatedPost.content;
+        setIsEditingPost(false);
+        setEditingPostContent('');
+        toast.success('Post güncellendi');
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.error || 'Post güncellenemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Bir hata oluştu');
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!window.confirm('Bu postu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/posts/${post._id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Post silindi');
+        setTimeout(() => navigate('/'), 1000);
+      } else {
+        const errorData = await res.json();
+        toast.error(errorData.error || 'Post silinemedi');
       }
     } catch (err) {
       console.error(err);
@@ -423,20 +592,120 @@ export default function PostDetailPage() {
               <span className="text-gray-500 text-sm">@{post.author?.username} · {timeAgo(post.createdAt)} önce</span>
             </div>
           </div>
-          <button className="text-gray-400 hover:text-blue-500 transition">
-            <MoreHorizontal size={20} />
-          </button>
+          {post.author?._id === currentUserId && (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPostMenuOpen(!postMenuOpen);
+                }}
+                className="text-gray-400 hover:text-blue-500 transition p-1"
+              >
+                <MoreHorizontal size={20} />
+              </button>
+              {postMenuOpen && (
+                <div className="absolute right-0 top-8 bg-white shadow-lg border border-gray-100 rounded-lg py-1 z-10 w-32">
+                  <button
+                    onClick={handleEditPost}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <Edit2 size={14} /> Düzenle
+                  </button>
+                  <button
+                    onClick={handleDeletePost}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} /> Sil
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Gönderi Metni */}
-        <div className="text-gray-900 text-xl leading-normal whitespace-pre-wrap mb-4 font-normal">
-          {renderWithMentions(post.content)}
-        </div>
+        {/* Gönderi Metni - Editable or Display */}
+        {isEditingPost ? (
+          <div className="mb-4 space-y-2">
+            <textarea
+              value={editingPostContent}
+              onChange={(e) => setEditingPostContent(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+              rows={4}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleSavePost}
+                className="px-4 py-2 bg-blue-500 text-white rounded-full text-sm font-medium hover:bg-blue-600"
+              >
+                Kaydet
+              </button>
+              <button
+                onClick={handleCancelEditPost}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-300"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-gray-900 text-xl leading-normal whitespace-pre-wrap mb-4 font-normal">
+            {renderWithMentions(post.content)}
+          </div>
+        )}
 
-        {/* Resim Varsa */}
-        {post.imageUrl && (
+        {/* Media Gallery */}
+        {post.media && post.media.length > 0 && (
+          <div className={`mb-4 rounded-2xl overflow-hidden ${
+            post.media.length === 1 ? '' :
+            post.media.length === 2 ? 'grid grid-cols-2 gap-1' :
+            post.media.length === 3 ? 'grid grid-cols-2 gap-1' :
+            'grid grid-cols-2 gap-1'
+          }`}>
+            {post.media.map((media, idx) => (
+              <div
+                key={idx}
+                className={`relative ${
+                  post.media.length === 3 && idx === 0 ? 'col-span-2' : ''
+                } ${
+                  post.media.length === 1 ? 'border border-gray-100' : ''
+                }`}
+              >
+                {media.type === 'video' ? (
+                  <div className="relative bg-black">
+                    <video
+                      src={media.url}
+                      controls
+                      className="w-full h-full object-contain max-h-[500px]"
+                      playsInline
+                    />
+                  </div>
+                ) : (
+                  <img
+                    src={media.url}
+                    alt={`Media ${idx + 1}`}
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-95 transition"
+                    onClick={() => dispatch(setSelectedImage(media.url))}
+                    style={{
+                      aspectRatio: post.media.length === 1 ? 'auto' : '1/1',
+                      maxHeight: post.media.length === 1 ? '500px' : 'auto'
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Legacy single image support */}
+        {!post.media && post.imageUrl && (
           <div className="mb-4 rounded-2xl overflow-hidden border border-gray-100">
-            <img src={post.imageUrl} alt="Post content" className="w-full h-auto" />
+            <img
+              src={post.imageUrl}
+              alt="Post content"
+              className="w-full h-auto cursor-pointer hover:opacity-95 transition"
+              onClick={() => dispatch(setSelectedImage(post.imageUrl))}
+            />
           </div>
         )}
 
@@ -480,43 +749,87 @@ export default function PostDetailPage() {
       </div>
 
       {/* 3. YORUM YAZMA ALANI */}
-      <div className="px-4 py-2 border-b border-gray-100">
-        <form onSubmit={handleSubmitComment} className="flex gap-3 items-center">
-          {currentUserProfilePic ? (
-            <img
-              src={currentUserProfilePic}
-              alt="Profil"
-              className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
-            />
-          ) : (
-            <div className="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
-              <User size={18} className="text-gray-400" />
+      <div className="px-4 py-3 border-b border-gray-100">
+        <form onSubmit={handleSubmitComment} className="space-y-2">
+          <div className="flex gap-3 items-start">
+            {currentUserProfilePic ? (
+              <img
+                src={currentUserProfilePic}
+                alt="Profil"
+                className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
+                <User size={18} className="text-gray-400" />
+              </div>
+            )}
+            <div className="flex-1">
+              <input
+                ref={commentInputRef}
+                type="text"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Yanıtını gönder"
+                className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
+              />
+
+              {/* Selected media preview */}
+              {selectedMedia && (
+                <div className="mt-2 relative inline-block">
+                  <img
+                    src={selectedMedia.preview}
+                    alt="Preview"
+                    className="max-w-[120px] max-h-[120px] rounded-lg object-cover border border-gray-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMedia(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-          <div className="flex-1">
-            <input
-              ref={commentInputRef}
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Yanıtını gönder"
-              className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
-            />
           </div>
-          <button
-            type="submit"
-            disabled={!newComment.trim() || submitting}
-            className="px-4 py-1.5 bg-blue-500 text-white rounded-full font-bold text-sm hover:bg-blue-600 disabled:opacity-50 transition"
-          >
-            Yanıtla
-          </button>
+
+          {/* Media buttons and submit */}
+          <div className="flex items-center justify-end gap-2 pl-11">
+            <button
+              type="button"
+              onClick={() => {
+                setUploadType('image');
+                setUploadDialogOpen(true);
+              }}
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+              title="Fotoğraf ekle"
+            >
+              <ImagePlus size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setGiphyPickerOpen(true)}
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+              title="GIF ekle"
+            >
+              <FileImage size={20} />
+            </button>
+
+            <button
+              type="submit"
+              disabled={!newComment.trim() || submitting}
+              className="px-4 py-1.5 bg-blue-500 text-white rounded-full font-bold text-sm hover:bg-blue-600 disabled:opacity-50 transition"
+            >
+              {submitting ? 'Gönderiliyor...' : 'Yanıtla'}
+            </button>
+          </div>
         </form>
       </div>
 
       {/* 4. YORUMLAR LİSTESİ */}
       <div className="pb-20">
         {loading ? (
-          <div className="py-8 flex justify-center"><div className="w-6 h-6 border-2 border-blue-500 rounded-full animate-spin border-t-transparent"></div></div>
+          <CommentsShimmer count={3} />
         ) : comments.length === 0 ? (
           <div className="text-center py-10 text-gray-500 text-sm">
             İlk yanıtı sen ver!
@@ -575,6 +888,7 @@ export default function PostDetailPage() {
                         </button>
                         {menuOpen === comment._id && (
                           <div className="absolute right-0 top-6 bg-white shadow-lg border border-gray-100 rounded-lg py-1 z-10 w-32">
+                            <button onClick={(e) => { e.stopPropagation(); handleEditComment(comment); }} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><Edit2 size={14} /> Düzenle</button>
                             <button onClick={(e) => { e.stopPropagation(); handleDeleteComment(comment._id); }} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14} /> Sil</button>
                           </div>
                         )}
@@ -582,9 +896,46 @@ export default function PostDetailPage() {
                     )}
                   </div>
 
-                  <div className="text-gray-900 mt-1 whitespace-pre-wrap text-base">
-                    {renderWithMentions(comment.content)}
-                  </div>
+                  {/* Comment Content - Editable or Display */}
+                  {editingCommentId === comment._id ? (
+                    <div className="mt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+                      <textarea
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows={3}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleSaveEdit(comment._id); }}
+                          className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm font-medium hover:bg-blue-600"
+                        >
+                          Kaydet
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancelEdit(); }}
+                          className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-300"
+                        >
+                          İptal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-900 mt-1 whitespace-pre-wrap text-base">
+                      {renderWithMentions(comment.content)}
+                    </div>
+                  )}
+
+                  {/* Comment Media */}
+                  {comment.media && comment.media.url && (
+                    <div className="mt-3">
+                      <MediaDisplay
+                        media={[comment.media]}
+                        onImageClick={() => dispatch(setSelectedImage(ensureHttps(comment.media.url)))}
+                      />
+                    </div>
+                  )}
 
                   {/* Yorum Altı Butonlar */}
                   <div className="flex items-center gap-6 mt-3 max-w-md">
@@ -611,6 +962,20 @@ export default function PostDetailPage() {
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+
+      {/* Media Upload Dialogs */}
+      <MediaUploadDialog
+        isOpen={uploadDialogOpen}
+        onClose={() => setUploadDialogOpen(false)}
+        type={uploadType}
+        onMediaSelect={handleMediaSelect}
+      />
+
+      <GiphyPicker
+        isOpen={giphyPickerOpen}
+        onClose={() => setGiphyPickerOpen(false)}
+        onSelect={handleGiphySelect}
+      />
     </div>
   );
 }

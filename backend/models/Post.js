@@ -8,6 +8,11 @@ const PostSchema = new mongoose.Schema({
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Kimler beğendi
   viewCount: { type: Number, default: 0 },
   score: { type: Number, default: 0 }, // Algoritma için hesaplanmış skor
+  media: [{
+    url: { type: String, required: true },
+    type: { type: String, enum: ['image', 'video'], required: true },
+    publicId: { type: String } // Cloudinary public ID for deletion
+  }],
   createdAt: { type: Date, default: Date.now }
 });
 

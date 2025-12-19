@@ -1,12 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLoaderData } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Share2, Heart } from 'lucide-react';
+import { ChevronLeft, MessageSquare, User, MoreHorizontal, Trash2, Edit2, Share2, Heart, ImagePlus, FileImage } from 'lucide-react';
 import { API_URL } from '../config/api';
 import { useToast } from '../hooks/useToast';
 import { ToastContainer } from './Toast';
 import { ensureHttps } from '../utils/imageUtils';
 import UserBadges from './UserBadges';
+import { CommentsShimmer } from './LoadingShimmer';
+import MediaUploadDialog from './MediaUploadDialog';
+import GiphyPicker from './GiphyPicker';
+import MediaDisplay from './MediaDisplay';
+import { useDispatch } from 'react-redux';
+import { setSelectedImage } from '../store/slices/uiSlice';
 
 // --- LIKE BUTONU BİLEŞENİ ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -128,6 +134,7 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
 
 export default function CommentDetailPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const toast = useToast();
   const initialComment = useLoaderData();
   const { userId: currentUserId, token } = useSelector((state) => state.auth);
@@ -143,6 +150,21 @@ export default function CommentDetailPage() {
   // Yerel State - Ana yorum için
   const [isLiked, setIsLiked] = useState(comment?.likes?.includes(currentUserId) || false);
   const [likeCount, setLikeCount] = useState(comment?.likes?.length || 0);
+
+  // Media upload states
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadType, setUploadType] = useState(null);
+  const [giphyPickerOpen, setGiphyPickerOpen] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+
+  // Edit states for replies
+  const [editingReplyId, setEditingReplyId] = useState(null);
+  const [editingContent, setEditingContent] = useState('');
+
+  // Edit states for main comment
+  const [isEditingMainComment, setIsEditingMainComment] = useState(false);
+  const [editingMainContent, setEditingMainContent] = useState('');
+  const [mainCommentMenuOpen, setMainCommentMenuOpen] = useState(false);
 
   const replyInputRef = useRef(null);
 
@@ -227,19 +249,55 @@ export default function CommentDetailPage() {
     }
   };
 
+  // Media handlers
+  const handleMediaSelect = (files) => {
+    if (files && files.length > 0) {
+      setSelectedMedia(files[0]); // Only first file since we allow max 1
+    }
+    setUploadDialogOpen(false);
+  };
+
+  const handleGiphySelect = (gifData) => {
+    setSelectedMedia({
+      url: gifData.url,
+      preview: gifData.preview,
+      type: 'gif',
+      name: gifData.name,
+      file: null // Giphy GIF'leri için file yok, URL kullanılacak
+    });
+    setGiphyPickerOpen(false);
+  };
+
   const handleSubmitReply = async (e) => {
     e.preventDefault();
     if (!newReply.trim()) return;
 
     try {
       setSubmitting(true);
+
+      const formData = new FormData();
+      formData.append('content', newReply);
+
+      // Add media if selected
+      if (selectedMedia) {
+        if (selectedMedia.file) {
+          // Normal file upload (image/video)
+          formData.append('media', selectedMedia.file);
+        } else if (selectedMedia.type === 'gif' && selectedMedia.url) {
+          // Giphy GIF - send URL as JSON
+          formData.append('giphyGifs', JSON.stringify([{
+            url: selectedMedia.url,
+            type: 'gif'
+          }]));
+        }
+      }
+
       const res = await fetch(`${API_URL}/api/comments/${comment._id}/replies`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ content: newReply })
+        body: formData
       });
 
       const data = await res.json();
@@ -252,6 +310,7 @@ export default function CommentDetailPage() {
       if (res.ok) {
         setReplies([data, ...replies]);
         setNewReply('');
+        setSelectedMedia(null);
         // Update reply count locally
         setComment({ ...comment, replyCount: (comment.replyCount || 0) + 1 });
         toast.success('Cevap gönderildi!');
@@ -289,7 +348,7 @@ export default function CommentDetailPage() {
   const handleDeleteReply = async (replyId) => {
     if (!window.confirm('Bu cevabı silmek istediğinize emin misiniz?')) return;
     try {
-      const res = await fetch(`${API_URL}/api/comments/${replyId}`, {
+      const res = await fetch(`${API_URL}/api/replies/${replyId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -300,6 +359,102 @@ export default function CommentDetailPage() {
         toast.success('Cevap silindi');
       } else {
         toast.error('Cevap silinemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Bir hata oluştu');
+    }
+  };
+
+  const handleEditReply = (reply) => {
+    setEditingReplyId(reply._id);
+    setEditingContent(reply.content);
+    setMenuOpen(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingReplyId(null);
+    setEditingContent('');
+  };
+
+  const handleSaveEdit = async (replyId) => {
+    if (!editingContent.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/api/replies/${replyId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: editingContent })
+      });
+
+      if (res.ok) {
+        const updatedReply = await res.json();
+        setReplies(replies.map(r => r._id === replyId ? updatedReply : r));
+        setEditingReplyId(null);
+        setEditingContent('');
+        toast.success('Cevap güncellendi');
+      } else {
+        toast.error('Cevap güncellenemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Bir hata oluştu');
+    }
+  };
+
+  // Main comment edit/delete handlers
+  const handleEditMainComment = () => {
+    setIsEditingMainComment(true);
+    setEditingMainContent(comment.content);
+    setMainCommentMenuOpen(false);
+  };
+
+  const handleCancelEditMainComment = () => {
+    setIsEditingMainComment(false);
+    setEditingMainContent('');
+  };
+
+  const handleSaveMainComment = async () => {
+    if (!editingMainContent.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/api/comments/${comment._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: editingMainContent })
+      });
+
+      if (res.ok) {
+        const updatedComment = await res.json();
+        setComment(updatedComment);
+        setIsEditingMainComment(false);
+        setEditingMainContent('');
+        toast.success('Yorum güncellendi');
+      } else {
+        toast.error('Yorum güncellenemedi');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Bir hata oluştu');
+    }
+  };
+
+  const handleDeleteMainComment = async () => {
+    if (!window.confirm('Bu yorumu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/comments/${comment._id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Yorum silindi');
+        setTimeout(() => navigate(-1), 1000);
+      } else {
+        toast.error('Yorum silinemedi');
       }
     } catch (err) {
       console.error(err);
@@ -435,15 +590,77 @@ export default function CommentDetailPage() {
               <span className="text-gray-500 text-sm">@{comment.author?.username} · {timeAgo(comment.createdAt)} önce</span>
             </div>
           </div>
-          <button className="text-gray-400 hover:text-blue-500 transition">
-            <MoreHorizontal size={20} />
-          </button>
+          {comment.author?._id === currentUserId && (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMainCommentMenuOpen(!mainCommentMenuOpen);
+                }}
+                className="text-gray-400 hover:text-blue-500 transition p-1"
+              >
+                <MoreHorizontal size={20} />
+              </button>
+              {mainCommentMenuOpen && (
+                <div className="absolute right-0 top-8 bg-white shadow-lg border border-gray-100 rounded-lg py-1 z-10 w-32">
+                  <button
+                    onClick={handleEditMainComment}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <Edit2 size={14} /> Düzenle
+                  </button>
+                  <button
+                    onClick={handleDeleteMainComment}
+                    className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} /> Sil
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Yorum Metni */}
-        <div className="text-gray-900 text-xl leading-normal whitespace-pre-wrap mb-4 font-normal">
-          {renderWithMentions(comment.content)}
-        </div>
+        {/* Yorum Metni - Editable or Display */}
+        {isEditingMainComment ? (
+          <div className="mb-4 space-y-2">
+            <textarea
+              value={editingMainContent}
+              onChange={(e) => setEditingMainContent(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
+              rows={4}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveMainComment}
+                className="px-4 py-2 bg-blue-500 text-white rounded-full text-sm font-medium hover:bg-blue-600"
+              >
+                Kaydet
+              </button>
+              <button
+                onClick={handleCancelEditMainComment}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-300"
+              >
+                İptal
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-gray-900 text-xl leading-normal whitespace-pre-wrap mb-4 font-normal">
+            {renderWithMentions(comment.content)}
+          </div>
+        )}
+
+        {/* Comment Media */}
+        {comment.media && comment.media.url && (
+          <div className="mb-4">
+            <MediaDisplay
+              media={[comment.media]}
+              onImageClick={() => dispatch(setSelectedImage(ensureHttps(comment.media.url)))}
+            />
+          </div>
+        )}
 
         {/* Tarih */}
         <div className="border-b border-gray-100 pb-3 mb-3">
@@ -482,42 +699,86 @@ export default function CommentDetailPage() {
 
       {/* 3. CEVAP YAZMA ALANI */}
       <div className="px-4 py-2 border-b border-gray-100">
-        <form onSubmit={handleSubmitReply} className="flex gap-3 items-center">
-          {currentUserProfilePic ? (
-            <img
-              src={currentUserProfilePic}
-              alt="Profil"
-              className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
-            />
-          ) : (
-            <div className="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
-              <User size={18} className="text-gray-400" />
+        <form onSubmit={handleSubmitReply} className="space-y-2">
+          <div className="flex gap-3 items-start">
+            {currentUserProfilePic ? (
+              <img
+                src={currentUserProfilePic}
+                alt="Profil"
+                className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-100"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
+                <User size={18} className="text-gray-400" />
+              </div>
+            )}
+            <div className="flex-1">
+              <input
+                ref={replyInputRef}
+                type="text"
+                value={newReply}
+                onChange={(e) => setNewReply(e.target.value)}
+                placeholder="Cevabını gönder"
+                className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
+              />
+
+              {/* Selected media preview */}
+              {selectedMedia && (
+                <div className="mt-2 relative inline-block">
+                  <img
+                    src={selectedMedia.preview}
+                    alt="Preview"
+                    className="max-w-[120px] max-h-[120px] rounded-lg object-cover border border-gray-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMedia(null)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-          <div className="flex-1">
-            <input
-              ref={replyInputRef}
-              type="text"
-              value={newReply}
-              onChange={(e) => setNewReply(e.target.value)}
-              placeholder="Cevabını gönder"
-              className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
-            />
           </div>
-          <button
-            type="submit"
-            disabled={!newReply.trim() || submitting}
-            className="px-4 py-1.5 bg-blue-500 text-white rounded-full font-bold text-sm hover:bg-blue-600 disabled:opacity-50 transition"
-          >
-            Cevapla
-          </button>
+
+          {/* Media buttons and submit */}
+          <div className="flex items-center justify-end gap-2 pl-11">
+            <button
+              type="button"
+              onClick={() => {
+                setUploadType('image');
+                setUploadDialogOpen(true);
+              }}
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+              title="Fotoğraf ekle"
+            >
+              <ImagePlus size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setGiphyPickerOpen(true)}
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+              title="GIF ekle"
+            >
+              <FileImage size={20} />
+            </button>
+
+            <button
+              type="submit"
+              disabled={!newReply.trim() || submitting}
+              className="px-4 py-1.5 bg-blue-500 text-white rounded-full font-bold text-sm hover:bg-blue-600 disabled:opacity-50 transition"
+            >
+              {submitting ? 'Gönderiliyor...' : 'Cevapla'}
+            </button>
+          </div>
         </form>
       </div>
 
       {/* 4. CEVAPLAR LİSTESİ */}
       <div className="pb-20">
         {loading ? (
-          <div className="py-8 flex justify-center"><div className="w-6 h-6 border-2 border-blue-500 rounded-full animate-spin border-t-transparent"></div></div>
+          <CommentsShimmer count={3} />
         ) : replies.length === 0 ? (
           <div className="text-center py-10 text-gray-500 text-sm">
             İlk cevabı sen ver!
@@ -572,6 +833,7 @@ export default function CommentDetailPage() {
                         </button>
                         {menuOpen === reply._id && (
                           <div className="absolute right-0 top-6 bg-white shadow-lg border border-gray-100 rounded-lg py-1 z-10 w-32">
+                            <button onClick={() => handleEditReply(reply)} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><Edit2 size={14} /> Düzenle</button>
                             <button onClick={() => handleDeleteReply(reply._id)} className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"><Trash2 size={14} /> Sil</button>
                           </div>
                         )}
@@ -579,9 +841,46 @@ export default function CommentDetailPage() {
                     )}
                   </div>
 
-                  <div className="text-gray-900 mt-1 whitespace-pre-wrap text-base">
-                    {renderWithMentions(reply.content)}
-                  </div>
+                  {/* Reply Content - Editable or Display */}
+                  {editingReplyId === reply._id ? (
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows={3}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSaveEdit(reply._id)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm font-medium hover:bg-blue-600"
+                        >
+                          Kaydet
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-medium hover:bg-gray-300"
+                        >
+                          İptal
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-900 mt-1 whitespace-pre-wrap text-base">
+                      {renderWithMentions(reply.content)}
+                    </div>
+                  )}
+
+                  {/* Reply Media */}
+                  {reply.media && reply.media.url && (
+                    <div className="mt-3">
+                      <MediaDisplay
+                        media={[reply.media]}
+                        onImageClick={() => dispatch(setSelectedImage(ensureHttps(reply.media.url)))}
+                      />
+                    </div>
+                  )}
 
                   {/* Cevap Altı Butonlar */}
                   <div className="flex items-center gap-6 mt-3 max-w-md">
@@ -602,6 +901,20 @@ export default function CommentDetailPage() {
 
       {/* Toast Notifications */}
       <ToastContainer toasts={toast.toasts} removeToast={toast.removeToast} />
+
+      {/* Media Upload Dialogs */}
+      <MediaUploadDialog
+        isOpen={uploadDialogOpen}
+        onClose={() => setUploadDialogOpen(false)}
+        type={uploadType}
+        onMediaSelect={handleMediaSelect}
+      />
+
+      <GiphyPicker
+        isOpen={giphyPickerOpen}
+        onClose={() => setGiphyPickerOpen(false)}
+        onSelect={handleGiphySelect}
+      />
     </div>
   );
 }

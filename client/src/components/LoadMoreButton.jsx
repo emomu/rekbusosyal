@@ -1,19 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import Lottie from 'lottie-react';
-import loaderAnimation from '../assets/loader.json';
+import React, { useEffect, useRef } from 'react';
+import { PostShimmer } from './LoadingShimmer';
 
 const LoadMoreButton = ({ onLoadMore, isLoading, hasMore }) => {
   const loaderRef = useRef(null);
-  const [hasTriggered, setHasTriggered] = useState(false);
+  const loadedRef = useRef(false);
 
   // Intersection Observer ile otomatik yükleme
   useEffect(() => {
-    if (!hasMore || isLoading || hasTriggered) return;
+    if (!hasMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isLoading && !hasTriggered) {
-          setHasTriggered(true);
+        if (entries[0].isIntersecting && !isLoading && hasMore && !loadedRef.current) {
+          loadedRef.current = true;
           onLoadMore();
         }
       },
@@ -29,14 +28,14 @@ const LoadMoreButton = ({ onLoadMore, isLoading, hasMore }) => {
         observer.unobserve(loaderRef.current);
       }
     };
-  }, [hasMore, isLoading, onLoadMore, hasTriggered]);
+  }, [hasMore, isLoading, onLoadMore]);
 
-  // Loading bitince trigger'ı resetle
+  // Loading bitince yeni yüklemeye hazır ol
   useEffect(() => {
-    if (!isLoading && hasTriggered) {
-      setHasTriggered(false);
+    if (!isLoading) {
+      loadedRef.current = false;
     }
-  }, [isLoading, hasTriggered]);
+  }, [isLoading]);
 
   if (!hasMore) {
     return (
@@ -47,10 +46,11 @@ const LoadMoreButton = ({ onLoadMore, isLoading, hasMore }) => {
   }
 
   return (
-    <div ref={loaderRef} className="py-8 flex justify-center">
+    <div ref={loaderRef}>
       {isLoading && (
-        <div className="w-16 h-16">
-          <Lottie animationData={loaderAnimation} loop={true} />
+        <div className="divide-y divide-gray-100">
+          <PostShimmer />
+          <PostShimmer />
         </div>
       )}
     </div>
