@@ -16,6 +16,8 @@ const GiphyPicker = ({ isOpen, onClose, onSelect }) => {
   const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'your_giphy_api_key_here';
   const GIPHY_API_BASE = 'https://api.giphy.com/v1/gifs';
 
+  console.log('Giphy API Key:', GIPHY_API_KEY);
+
   // Load trending on mount
   useEffect(() => {
     if (isOpen) {

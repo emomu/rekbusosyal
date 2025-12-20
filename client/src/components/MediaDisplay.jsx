@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, X, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { Play, X, ChevronLeft, ChevronRight, Share2, Loader2 } from 'lucide-react';
 
 // --- ALT BİLEŞEN: TEKİL MEDYA ÖĞESİ (Video/Resim) ---
 const MediaItem = ({ item, onClick, isLarge }) => {
   const isVideo = item.type === 'video';
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   return (
-    <div 
-      className="relative w-full h-full bg-black cursor-pointer overflow-hidden group isolate"
+    <div
+      className="relative w-full h-full bg-gray-900 cursor-pointer overflow-hidden group isolate"
       onClick={onClick}
     >
       {isVideo ? (
@@ -16,14 +17,22 @@ const MediaItem = ({ item, onClick, isLarge }) => {
           <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
              {/* Thumbnail varsa onu göster, yoksa videonun 1. saniyesini al */}
              {item.preview || item.thumbnail ? (
-                 <img 
-                  src={item.preview || item.thumbnail} 
-                  className="w-full h-full object-cover opacity-90"
-                  alt="cover"
-                 />
+                 <>
+                   {!imageLoaded && (
+                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+                       <Loader2 className="animate-spin text-blue-500" size={isLarge ? 40 : 24} />
+                     </div>
+                   )}
+                   <img
+                    src={item.preview || item.thumbnail}
+                    className="w-full h-full object-cover opacity-90"
+                    alt="cover"
+                    onLoad={() => setImageLoaded(true)}
+                   />
+                 </>
              ) : (
                 <video
-                  src={`${item.url}#t=1.0`} 
+                  src={`${item.url}#t=1.0`}
                   className="w-full h-full object-cover"
                   preload="metadata"
                   muted
@@ -53,11 +62,17 @@ const MediaItem = ({ item, onClick, isLarge }) => {
       ) : (
         // RESİM GÖRÜNÜMÜ
         <div className="absolute inset-0 z-0">
+          {!imageLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+              <Loader2 className="animate-spin text-blue-500" size={isLarge ? 40 : 24} />
+            </div>
+          )}
           <img
             src={item.preview || item.url}
             alt="Media"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
+            onLoad={() => setImageLoaded(true)}
           />
           {item.type === 'gif' && (
             <div className="absolute bottom-2 left-2 z-10 px-2 py-1 bg-black/50 backdrop-blur-sm rounded text-[10px] font-bold text-white">
@@ -73,9 +88,11 @@ const MediaItem = ({ item, onClick, isLarge }) => {
 // --- ANA BİLEŞEN ---
 const MediaDisplay = ({ media = [] }) => {
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+  const [fullImageLoaded, setFullImageLoaded] = useState(false);
 
   // Lightbox Navigasyon
   const navigate = useCallback((direction) => {
+    setFullImageLoaded(false);
     setLightboxIndex((prev) => {
       if (prev === -1) return prev;
       const newIndex = prev + direction;
@@ -210,10 +227,15 @@ const MediaDisplay = ({ media = [] }) => {
           )}
 
           {/* Full Screen Content */}
-          <div 
-            className="w-full h-full flex items-center justify-center p-0 md:p-8" 
+          <div
+            className="w-full h-full flex items-center justify-center p-0 md:p-8 relative"
             onClick={(e) => e.stopPropagation()}
           >
+            {!fullImageLoaded && currentMedia.type !== 'video' && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="animate-spin text-blue-500" size={48} />
+              </div>
+            )}
             {currentMedia.type === 'video' ? (
               <video
                 src={currentMedia.url}
@@ -226,6 +248,7 @@ const MediaDisplay = ({ media = [] }) => {
                 src={currentMedia.url}
                 alt="Full View"
                 className="max-w-full max-h-full object-contain shadow-2xl"
+                onLoad={() => setFullImageLoaded(true)}
               />
             )}
           </div>
