@@ -6,13 +6,20 @@ import Lottie from 'lottie-react';
 import { logout } from '../store/slices/authSlice';
 import { API_URL } from '../config/api';
 import { sanitizeUsername } from '../utils/security';
+import { api } from '../utils/apiClient';
 import MobileHeader from '../components/MobileHeader';
 import NotificationsPage from '../components/NotificationsPage';
+import NotificationPermissionPrompt from '../components/NotificationPermissionPrompt';
 import { ToastContainer } from '../components/Toast';
 import CookieConsent from '../components/CookieConsent';
 import { setActiveTab, setSelectedImage, removeToast } from '../store/slices/uiSlice';
 import { setUnreadCount } from '../store/slices/notificationsSlice';
 import loaderAnimation from '../assets/loader.json';
+import {
+  shouldShowPermissionPrompt,
+  showNotificationForAppNotification,
+  canShowNotification,
+} from '../utils/browserNotifications';
 
 /**
  * AppLayout - Main application layout with fixed sidebar, mobile menu, and search panel
@@ -42,6 +49,10 @@ export default function AppLayout() {
   // Current user info for sidebar and mobile menu
   const [currentUser, setCurrentUser] = useState(null);
   const [currentUserInfo, setCurrentUserInfo] = useState(null);
+  // Browser notification permission prompt
+  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  // Previous unread count for detecting new notifications
+  const previousUnreadCountRef = useRef(0);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -67,9 +78,7 @@ export default function AppLayout() {
   // Fetch current user info for sidebar and mobile menu
   useEffect(() => {
     if (userId && token) {
-      fetch(`${API_URL}/api/profile`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      api.get('/api/profile')
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data) {
@@ -77,20 +86,65 @@ export default function AppLayout() {
             setCurrentUserInfo(data);
           }
         })
-        .catch(err => console.error('Error fetching user info:', err));
+        .catch(err => {
+          // apiClient will handle token expiration automatically
+          console.error('Error fetching user info:', err);
+        });
     }
   }, [userId, token]);
 
-  // Fetch unread notifications count
+  // Show notification permission prompt after a delay
   useEffect(() => {
-    if (token) {
-      fetch(`${API_URL}/api/notifications/unread-count`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => dispatch(setUnreadCount(data.count)))
-        .catch(() => dispatch(setUnreadCount(0)));
-    }
+    // Wait 10 seconds after mount, then check if we should show prompt
+    const timer = setTimeout(() => {
+      if (shouldShowPermissionPrompt()) {
+        setShowPermissionPrompt(true);
+      }
+    }, 10000); // 10 seconds delay
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Poll for new notifications and show browser notifications
+  useEffect(() => {
+    if (!token) return;
+
+    // Initial fetch
+    const fetchNotifications = async () => {
+      try {
+        const res = await api.get('/api/notifications/unread-count');
+        const data = await res.json();
+        const newCount = data.count || 0;
+
+        // Check if there are new notifications
+        const previousCount = previousUnreadCountRef.current;
+        if (newCount > previousCount && newCount > 0 && canShowNotification()) {
+          // New notification detected! Fetch latest notification to show browser notification
+          const notifRes = await api.get('/api/notifications?page=1&limit=1');
+          const notifData = await notifRes.json();
+
+          if (notifData.notifications && notifData.notifications.length > 0) {
+            const latestNotification = notifData.notifications[0];
+            // Show browser notification
+            showNotificationForAppNotification(latestNotification);
+          }
+        }
+
+        // Update Redux state and ref
+        dispatch(setUnreadCount(newCount));
+        previousUnreadCountRef.current = newCount;
+      } catch (err) {
+        console.error('Error polling notifications:', err);
+      }
+    };
+
+    // Fetch immediately
+    fetchNotifications();
+
+    // Poll every 30 seconds
+    const pollInterval = setInterval(fetchNotifications, 30000);
+
+    return () => clearInterval(pollInterval);
   }, [token, dispatch]);
 
   // Handle logout
@@ -522,7 +576,35 @@ export default function AppLayout() {
 
       {/* NOTIFICATIONS OVERLAY */}
       {showNotifications && (
-        <NotificationsPage onClose={() => setShowNotifications(false)} />
+        <NotificationsPage
+          onClose={() => setShowNotifications(false)}
+          onNavigateToProfile={(username) => {
+            navigate(`/profil/${username}`);
+            setShowNotifications(false);
+          }}
+          onNavigateToPost={(postId) => {
+            navigate(`/gonderi/${postId}`);
+            setShowNotifications(false);
+          }}
+          onNavigateToComment={(commentId) => {
+            navigate(`/yorum/${commentId}`);
+            setShowNotifications(false);
+          }}
+          onNavigateToVersionNotes={() => {
+            navigate('/surum-notlari');
+            setShowNotifications(false);
+          }}
+        />
+      )}
+
+      {/* NOTIFICATION PERMISSION PROMPT */}
+      {showPermissionPrompt && (
+        <NotificationPermissionPrompt
+          onClose={() => setShowPermissionPrompt(false)}
+          onAccept={() => {
+            console.log('✅ Browser notifications enabled!');
+          }}
+        />
       )}
 
       {/* IMAGE LIGHTBOX MODAL */}

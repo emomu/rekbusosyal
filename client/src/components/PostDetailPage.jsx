@@ -938,20 +938,22 @@ export default function PostDetailPage() {
                   )}
 
                   {/* Yorum Altı Butonlar */}
-                  <div className="flex items-center gap-6 mt-3 max-w-md">
-                    <button className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-sm group">
-                      <MessageSquare size={16} className="group-hover:stroke-blue-500" />
-                      {comment.replyCount > 0 && (
-                        <span className="group-hover:text-blue-500">{comment.replyCount}</span>
-                      )}
+                  <div className="flex items-center gap-6 mt-3">
+                    <button className="flex items-center gap-1 text-gray-500 hover:text-blue-500 transition text-sm">
+                      <MessageSquare size={18} />
+                      <span>{comment.replyCount || 0}</span>
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleLikeComment(comment._id); }}
-                      className={`flex items-center gap-1 text-sm group ${comment.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
-                    >
-                      <Heart size={16} className={`group-hover:stroke-red-500 ${comment.likes?.includes(currentUserId) ? 'fill-current' : ''}`} />
-                      {comment.likes?.length > 0 && <span>{comment.likes.length}</span>}
-                    </button>
+
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <LikeButton
+                        isLiked={comment.likes?.includes(currentUserId)}
+                        likeCount={comment.likes?.length || 0}
+                        onClick={(e) => {
+                          e?.stopPropagation();
+                          handleLikeComment(comment._id);
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

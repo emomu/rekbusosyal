@@ -323,15 +323,24 @@ app.get('/api/posts', async (req, res) => {
         .populate('author', 'username profilePicture badges fullName')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(), // Convert to plain JS objects for modification
       Post.countDocuments({ isAnonymous: false, category: 'Geyik' })
     ]);
+
+    // Add comment count to each post
+    const postsWithCommentCount = await Promise.all(
+      posts.map(async (post) => {
+        const commentCount = await Comment.countDocuments({ post: post._id });
+        return { ...post, commentCount };
+      })
+    );
 
     const totalPages = Math.ceil(totalCount / limit);
     const hasMore = skip + posts.length < totalCount;
 
     res.json({
-      posts,
+      posts: postsWithCommentCount,
       currentPage: page,
       totalPages: totalPages,
       totalCount,
@@ -415,15 +424,24 @@ app.get('/api/confessions', async (req, res) => {
         .populate('author', 'username profilePicture badges fullName')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean(),
       Post.countDocuments({ category: 'İtiraf' })
     ]);
+
+    // Add comment count to each confession
+    const confessionsWithCommentCount = await Promise.all(
+      confessions.map(async (confession) => {
+        const commentCount = await Comment.countDocuments({ post: confession._id });
+        return { ...confession, commentCount };
+      })
+    );
 
     const totalPages = Math.ceil(totalCount / limit);
     const hasMore = skip + confessions.length < totalCount;
 
     res.json({
-      posts: confessions,
+      posts: confessionsWithCommentCount,
       currentPage: page,
       totalPages: totalPages,
       totalCount,
@@ -576,13 +594,18 @@ app.get('/api/posts/:id', auth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
       .select('+author') // author field'ı dahil et
-      .populate('author', 'username profilePicture badges fullName');
+      .populate('author', 'username profilePicture badges fullName')
+      .lean();
 
     if (!post) {
       return res.status(404).json({ error: 'Post bulunamadı' });
     }
 
-    res.json(post);
+    // Add comment count
+    const commentCount = await Comment.countDocuments({ post: post._id });
+    const postWithCommentCount = { ...post, commentCount };
+
+    res.json(postWithCommentCount);
   } catch (err) {
     console.error('Post getirme hatası:', err);
     res.status(500).json({ error: 'Post yüklenemedi' });
@@ -1373,7 +1396,7 @@ app.post('/api/login', authLimiter, async (req, res) => {
     // -----------------------------------
 
     // Giriş bileti (Token) oluştur
-    // SECURITY: Token expires in 7 days for better security
+    // SECURITY: Token expires in 365 days (long-term like Instagram)
     const token = jwt.sign(
       {
         id: user._id,
@@ -1382,7 +1405,7 @@ app.post('/api/login', authLimiter, async (req, res) => {
       },
       JWT_SECRET,
       {
-        expiresIn: '7d', // 7 gün sonra otomatik expire
+        expiresIn: '365d', // 365 gün sonra otomatik expire
         algorithm: 'HS256' // Algoritma belirt (algorithm confusion attack prevention)
       }
     );
@@ -1395,6 +1418,63 @@ app.post('/api/login', authLimiter, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json(err);
+  }
+});
+
+// Logout endpoint - Token'ı invalidate etmek için
+// Not: JWT stateless olduğu için gerçek logout client-side'da token'ı silmekle olur
+// Bu endpoint opsiyonel, gelecekte token blacklist eklenebilir
+app.post('/api/logout', auth, async (req, res) => {
+  try {
+    // Client-side token'ı silecek, burada log tutabiliriz
+    res.json({
+      success: true,
+      message: "Başarıyla çıkış yapıldı"
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Çıkış yapılırken hata oluştu" });
+  }
+});
+
+// Token refresh endpoint - Token'ı yenilemek için
+app.post('/api/refresh-token', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Kullanıcıyı bul
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    // Kullanıcı banlı mı kontrol et
+    if (user.isBanned) {
+      return res.status(403).json({
+        error: `Hesabınız yasaklandı. Neden: ${user.banReason || 'Belirtilmemiş'}`
+      });
+    }
+
+    // Yeni token oluştur
+    const newToken = jwt.sign(
+      {
+        id: user._id,
+        username: user.username,
+        role: user.role || 'user'
+      },
+      JWT_SECRET,
+      {
+        expiresIn: '365d',
+        algorithm: 'HS256'
+      }
+    );
+
+    res.json({
+      success: true,
+      token: newToken,
+      message: "Token yenilendi"
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Token yenilenirken hata oluştu" });
   }
 });
 
@@ -1552,7 +1632,7 @@ app.put('/api/profile/username', async (req, res) => {
     await user.save();
 
     // Yeni token oluştur
-    // SECURITY: Token expires in 7 days
+    // SECURITY: Token expires in 365 days (long-term like Instagram)
     const newToken = jwt.sign(
       {
         id: user._id,
@@ -1561,7 +1641,7 @@ app.put('/api/profile/username', async (req, res) => {
       },
       JWT_SECRET,
       {
-        expiresIn: '7d',
+        expiresIn: '365d',
         algorithm: 'HS256'
       }
     );

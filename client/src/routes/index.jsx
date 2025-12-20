@@ -127,12 +127,22 @@ const router = createBrowserRouter([
         loader: postLoader
       },
       {
+        path: 'gonderi/:postId',
+        element: <PostDetailPage />,
+        loader: postLoader
+      },
+      {
         path: 'yorum/:commentId',
         element: <CommentDetailPage />,
         loader: commentLoader
       },
       {
         path: 'kullanici/:username',
+        element: <PublicProfilePage />,
+        loader: profileLoader
+      },
+      {
+        path: 'profil/:username',
         element: <PublicProfilePage />,
         loader: profileLoader
       },

@@ -261,12 +261,12 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (onLike) onLike(post._id);
+                    navigate(`${postUrlPrefix}/${post._id}`);
                   }}
-                  className="flex items-center gap-1 text-gray-500 hover:text-blue-500 text-sm"
+                  className="flex items-center gap-1 text-gray-500 hover:text-blue-500 transition text-sm"
                 >
                   <MessageSquare size={18} />
-                  {post.commentCount > 0 && <span>{post.commentCount}</span>}
+                  <span>{post.commentCount || 0}</span>
                 </button>
 
                 <div onClick={(e) => e.stopPropagation()}>

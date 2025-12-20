@@ -883,14 +883,12 @@ export default function CommentDetailPage() {
                   )}
 
                   {/* Cevap Altı Butonlar */}
-                  <div className="flex items-center gap-6 mt-3 max-w-md">
-                    <button
+                  <div className="flex items-center gap-6 mt-3">
+                    <LikeButton
+                      isLiked={reply.likes?.includes(currentUserId)}
+                      likeCount={reply.likes?.length || 0}
                       onClick={() => handleLikeComment(reply._id)}
-                      className={`flex items-center gap-1 text-sm group ${reply.likes?.includes(currentUserId) ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`}
-                    >
-                      <Heart size={16} className={`group-hover:stroke-red-500 ${reply.likes?.includes(currentUserId) ? 'fill-current' : ''}`} />
-                      {reply.likes?.length > 0 && <span>{reply.likes.length}</span>}
-                    </button>
+                    />
                   </div>
                 </div>
               </div>
