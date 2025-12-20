@@ -12,6 +12,7 @@ import { API_URL } from '../config/api';
 import { ensureHttps } from '../utils/imageUtils';
 import UserBadges from './UserBadges';
 import { useProfileNavigate } from '../hooks/useSmartNavigate';
+import MediaDisplay from './MediaDisplay';
 
 export default function PublicProfilePage() {
   const navigate = useNavigate();
@@ -367,23 +368,29 @@ export default function PublicProfilePage() {
                         <div className="text-gray-800 mb-3 whitespace-pre-wrap">
                           {renderWithMentions(post.content)}
                         </div>
+                        {/* Media Display */}
+                        {post.media && post.media.length > 0 && (
+                          <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+                            <MediaDisplay media={post.media} />
+                          </div>
+                        )}
                         {/* Post Beğeni ve Yorum Butonları */}
                         <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                          <LikeButton
-                            isLiked={post.likes?.includes(currentUserId)}
-                            likeCount={post.likes?.length || 0}
-                            onClick={() => handleLike(post._id, 'post')}
-                          />
                           <button
-                            className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition"
+                            className="flex items-center gap-1 text-gray-500 hover:text-blue-500 transition text-sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/akis/${post._id}`);
                             }}
                           >
-                            <MessageSquare size={20} />
-                            <span className="text-sm font-medium">Yorum yap</span>
+                            <MessageSquare size={18} />
+                            <span>{post.commentCount || 0}</span>
                           </button>
+                          <LikeButton
+                            isLiked={post.likes?.includes(currentUserId)}
+                            likeCount={post.likes?.length || 0}
+                            onClick={() => handleLike(post._id, 'post')}
+                          />
                         </div>
                       </div>
                     ))}
@@ -433,23 +440,29 @@ export default function PublicProfilePage() {
                         <div className="text-gray-800 mb-3 whitespace-pre-wrap">
                           {renderWithMentions(confession.content)}
                         </div>
+                        {/* Media Display */}
+                        {confession.media && confession.media.length > 0 && (
+                          <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+                            <MediaDisplay media={confession.media} />
+                          </div>
+                        )}
                         {/* İtiraf Beğeni ve Yorum Butonları */}
                         <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
-                          <LikeButton
-                            isLiked={confession.likes?.includes(currentUserId)}
-                            likeCount={confession.likes?.length || 0}
-                            onClick={() => handleLike(confession._id, 'confession')}
-                          />
                           <button
-                            className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition"
+                            className="flex items-center gap-1 text-gray-500 hover:text-blue-500 transition text-sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigate(`/itiraf/${confession._id}`);
                             }}
                           >
-                            <MessageSquare size={20} />
-                            <span className="text-sm font-medium">Yorum yap</span>
+                            <MessageSquare size={18} />
+                            <span>{confession.commentCount || 0}</span>
                           </button>
+                          <LikeButton
+                            isLiked={confession.likes?.includes(currentUserId)}
+                            likeCount={confession.likes?.length || 0}
+                            onClick={() => handleLike(confession._id, 'confession')}
+                          />
                         </div>
                       </div>
                     ))}
