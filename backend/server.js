@@ -109,9 +109,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://static.cloudflareinsights.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", "https://api.giphy.com", "https://res.cloudinary.com", "wss:", "ws:", process.env.FRONTEND_URL || "http://localhost:5173"],
+      mediaSrc: ["'self'", "https:", "blob:"],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      workerSrc: ["'self'", "blob:"],
     },
   },
   crossOriginEmbedderPolicy: false, // Allow external images (Cloudinary)
