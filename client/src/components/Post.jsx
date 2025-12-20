@@ -162,22 +162,28 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 overflow-hidden">
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (post.author?.username) {
-                      navigate(`/kullanici/${post.author.username}`);
-                    }
-                  }}
-                  className="font-bold text-gray-900 truncate hover:underline"
-                >
-                  {post.author?.fullName || post.author?.username || 'Anonim'}
-                </span>
-                {post.author?.badges && post.author.badges.length > 0 && (
-                  <UserBadges badges={post.author.badges} size="sm" />
-                )}
-                <span className="text-gray-500 text-sm">· {timeAgo(post.createdAt)}</span>
+              <div className="flex flex-col overflow-hidden">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (post.author?.username) {
+                        navigate(`/kullanici/${post.author.username}`);
+                      }
+                    }}
+                    className="font-bold text-gray-900 truncate hover:underline"
+                  >
+                    {post.author?.fullName || post.author?.username || 'Anonim'}
+                  </span>
+                  {post.author?.badges && post.author.badges.length > 0 && (
+                    <UserBadges badges={post.author.badges} size="sm" />
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-gray-500 text-sm">
+                  <span>@{post.author?.username || 'anonim'}</span>
+                  <span>·</span>
+                  <span>{timeAgo(post.createdAt)}</span>
+                </div>
               </div>
 
               {isOwnPost && showMoreHorizontal && (

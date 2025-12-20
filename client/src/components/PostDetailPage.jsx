@@ -862,22 +862,28 @@ export default function PostDetailPage() {
                 {/* İçerik */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (comment.author?.username) {
-                            navigate(`/kullanici/${comment.author.username}`);
-                          }
-                        }}
-                        className="font-bold text-gray-900 truncate hover:underline cursor-pointer"
-                      >
-                        {comment.author?.fullName || comment.author?.username || 'Kullanıcı'}
-                      </span>
-                      {comment.author?.badges && comment.author.badges.length > 0 && (
-                        <UserBadges badges={comment.author.badges} size="sm" />
-                      )}
-                      <span className="text-gray-500 text-sm">· {timeAgo(comment.createdAt)}</span>
+                    <div className="flex flex-col overflow-hidden">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (comment.author?.username) {
+                              navigate(`/kullanici/${comment.author.username}`);
+                            }
+                          }}
+                          className="font-bold text-gray-900 truncate hover:underline cursor-pointer"
+                        >
+                          {comment.author?.fullName || comment.author?.username || 'Kullanıcı'}
+                        </span>
+                        {comment.author?.badges && comment.author.badges.length > 0 && (
+                          <UserBadges badges={comment.author.badges} size="sm" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-500 text-sm">
+                        <span>@{comment.author?.username || 'kullanıcı'}</span>
+                        <span>·</span>
+                        <span>{timeAgo(comment.createdAt)}</span>
+                      </div>
                     </div>
 
                     {/* Yorum Menüsü */}

@@ -807,22 +807,28 @@ export default function CommentDetailPage() {
                 {/* İçerik */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (reply.author?.username) {
-                            navigate(`/kullanici/${reply.author.username}`);
-                          }
-                        }}
-                        className="font-bold text-gray-900 truncate hover:underline cursor-pointer"
-                      >
-                        {reply.author?.fullName || reply.author?.username || 'Kullanıcı'}
-                      </span>
-                      {reply.author?.badges && reply.author.badges.length > 0 && (
-                        <UserBadges badges={reply.author.badges} size="sm" />
-                      )}
-                      <span className="text-gray-500 text-sm">· {timeAgo(reply.createdAt)}</span>
+                    <div className="flex flex-col overflow-hidden">
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (reply.author?.username) {
+                              navigate(`/kullanici/${reply.author.username}`);
+                            }
+                          }}
+                          className="font-bold text-gray-900 truncate hover:underline cursor-pointer"
+                        >
+                          {reply.author?.fullName || reply.author?.username || 'Kullanıcı'}
+                        </span>
+                        {reply.author?.badges && reply.author.badges.length > 0 && (
+                          <UserBadges badges={reply.author.badges} size="sm" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-500 text-sm">
+                        <span>@{reply.author?.username || 'kullanıcı'}</span>
+                        <span>·</span>
+                        <span>{timeAgo(reply.createdAt)}</span>
+                      </div>
                     </div>
 
                     {/* Cevap Menüsü */}
