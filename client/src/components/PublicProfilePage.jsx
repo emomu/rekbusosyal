@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLoaderData, useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, Calendar, Lock, User, MessageSquare, Music, ExternalLink } from 'lucide-react';
+import { ChevronLeft, Calendar, Lock, User, MessageSquare } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import FollowButton from './FollowButton';
@@ -13,6 +13,7 @@ import { ensureHttps } from '../utils/imageUtils';
 import UserBadges from './UserBadges';
 import { useProfileNavigate } from '../hooks/useSmartNavigate';
 import MediaDisplay from './MediaDisplay';
+import SpotifyTrackDisplay from './SpotifyTrackDisplay';
 
 export default function PublicProfilePage() {
   const navigate = useNavigate();
@@ -296,11 +297,15 @@ export default function PublicProfilePage() {
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-2 gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-bold text-base text-gray-900 truncate">{currentProfile.fullName}</h2>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 max-w-full">
+                  <h2 className="font-bold text-base text-gray-900 truncate shrink min-w-0">
+                    {currentProfile.fullName}
+                  </h2>
                   {currentProfile.badges && currentProfile.badges.length > 0 && (
-                    <UserBadges badges={currentProfile.badges} size="sm" />
+                    <div className="shrink-0">
+                      <UserBadges badges={currentProfile.badges} size="sm" />
+                    </div>
                   )}
                 </div>
                 <p className="text-gray-500 text-sm truncate">@{currentProfile.username}</p>
@@ -321,38 +326,11 @@ export default function PublicProfilePage() {
 
             {/* Spotify Şu An Dinleniyor - Gizli hesaplarda sadece takipçilere göster */}
             {!loadingSpotify && spotifyData && (!currentProfile.isPrivate || isFollowing || isOwnProfile) && (
-              <a
-                href={spotifyData.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mb-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg flex items-center gap-3 hover:from-green-100 hover:to-emerald-100 transition group"
-              >
-                <div className="relative">
-                  {spotifyData.albumArt ? (
-                    <img
-                      src={spotifyData.albumArt}
-                      alt={spotifyData.album}
-                      className="w-12 h-12 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 bg-green-200 rounded flex items-center justify-center">
-                      <Music size={24} className="text-green-600" />
-                    </div>
-                  )}
-                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1">
-                    <Music size={10} className="text-white" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <Music size={12} className="text-green-600" />
-                    <span className="text-xs text-green-600 font-medium">Şu an dinliyor</span>
-                  </div>
-                  <div className="font-semibold text-sm text-gray-900 truncate">{spotifyData.name}</div>
-                  <div className="text-xs text-gray-600 truncate">{spotifyData.artist}</div>
-                </div>
-                <ExternalLink size={16} className="text-green-600 group-hover:translate-x-0.5 transition-transform shrink-0" />
-              </a>
+              <SpotifyTrackDisplay 
+                track={spotifyData} 
+                compact={true} 
+                initialProgress={spotifyData.progress}
+              />
             )}
 
             <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
@@ -420,16 +398,18 @@ export default function PublicProfilePage() {
                               </div>
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 max-w-full">
                               <div
-                                className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
+                                className="font-bold text-sm text-gray-900 hover:underline cursor-pointer truncate shrink min-w-0"
                                 onClick={(e) => handleProfileClick(e, currentProfile.username)}
                               >
                                 {currentProfile.fullName}
                               </div>
                               {currentProfile.badges && currentProfile.badges.length > 0 && (
-                                <UserBadges badges={currentProfile.badges} size="sm" />
+                                <div className="shrink-0">
+                                  <UserBadges badges={currentProfile.badges} size="sm" />
+                                </div>
                               )}
                             </div>
                             <div className="text-xs text-gray-400">@{currentProfile.username} · {new Date(post.createdAt).toLocaleDateString('tr-TR')}</div>
@@ -492,16 +472,18 @@ export default function PublicProfilePage() {
                               </div>
                             )}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 max-w-full">
                               <div
-                                className="font-bold text-sm text-gray-900 hover:underline cursor-pointer"
+                                className="font-bold text-sm text-gray-900 hover:underline cursor-pointer truncate shrink min-w-0"
                                 onClick={(e) => handleProfileClick(e, currentProfile.username)}
                               >
                                 {currentProfile.fullName}
                               </div>
                               {currentProfile.badges && currentProfile.badges.length > 0 && (
-                                <UserBadges badges={currentProfile.badges} size="sm" />
+                                <div className="shrink-0">
+                                  <UserBadges badges={currentProfile.badges} size="sm" />
+                                </div>
                               )}
                             </div>
                             <div className="text-xs text-gray-400">@{currentProfile.username} · {new Date(confession.createdAt).toLocaleDateString('tr-TR')}</div>

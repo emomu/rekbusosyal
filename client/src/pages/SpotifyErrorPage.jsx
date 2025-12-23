@@ -40,7 +40,7 @@ export default function SpotifyErrorPage() {
             Bağlantı Kurulmadı
           </h2>
           <p className="text-xl font-light opacity-90 leading-relaxed border-l-4 border-green-500 pl-4">
-            Spotify entegrasyonu için gerekli ayarları tamamlaman gerekiyor.
+            Spotify entegrasyonu için gerekli bağlantı sağlanamadı.
           </p>
         </div>
       </div>
@@ -63,61 +63,9 @@ export default function SpotifyErrorPage() {
             </p>
           </div>
 
-          {/* Hata Açıklaması */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-amber-800 leading-relaxed">
-              <strong className="font-bold">Ne oldu?</strong> Spotify Developer Dashboard'da Redirect URI ayarı eksik veya yanlış yapılandırılmış.
-            </p>
-          </div>
+       
 
-          {/* Çözüm Adımları */}
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 mb-6">
-            <p className="font-bold text-gray-900 text-sm mb-3 uppercase tracking-wider">Nasıl Düzeltilir:</p>
-
-            <ol className="space-y-3 text-sm text-gray-700">
-              <li className="flex gap-2">
-                <span className="font-bold text-green-600 shrink-0">1.</span>
-                <span><a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline font-medium">Spotify Developer Dashboard</a>'a git</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-green-600 shrink-0">2.</span>
-                <span>Uygulamanı seç ve <strong>Settings</strong>'e tıkla</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-green-600 shrink-0">3.</span>
-                <span><strong>Redirect URIs</strong> bölümünde <strong>Edit</strong> butonuna tıkla</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-green-600 shrink-0">4.</span>
-                <div className="flex-1">
-                  <span className="block mb-2">Aşağıdaki URI'yi ekle:</span>
-                  <div className="bg-white border border-gray-300 rounded-lg p-3 font-mono text-xs text-gray-800 flex items-center justify-between gap-2 group">
-                    <code className="flex-1 break-all">{redirectUri}</code>
-                    <button
-                      onClick={handleCopy}
-                      className="shrink-0 p-1.5 hover:bg-gray-100 rounded transition"
-                      title="Kopyala"
-                    >
-                      {copied ? (
-                        <CheckCircle size={16} className="text-green-600" />
-                      ) : (
-                        <Copy size={16} className="text-gray-400 group-hover:text-gray-600" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-green-600 shrink-0">5.</span>
-                <span><strong>Save</strong> butonuna tıkla</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-bold text-green-600 shrink-0">6.</span>
-                <span>Ayarlar sayfasına dön ve tekrar dene</span>
-              </li>
-            </ol>
-          </div>
-
+         
           {/* Aksiyon Butonları */}
           <div className="space-y-4">
 
@@ -149,12 +97,7 @@ export default function SpotifyErrorPage() {
             </button>
           </div>
 
-          {/* Yardım Linki */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-            <p className="text-xs text-blue-700">
-              <strong>Hala sorun mu yaşıyorsun?</strong> <a href="https://github.com/anthropics/claude-code/issues" className="underline hover:text-blue-800" target="_blank" rel="noopener noreferrer">SPOTIFY_SETUP.md</a> dosyasına göz at.
-            </p>
-          </div>
+         
 
           {/* Footer */}
           <div className="mt-8 text-center">

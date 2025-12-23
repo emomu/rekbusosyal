@@ -451,11 +451,15 @@ export default function ProfilePage({ onMenuClick }) {
                 </button>
               </div>
 
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-xl font-bold text-gray-900">{profile.fullName}</h3>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 max-w-full">
+                  <h3 className="text-xl font-bold text-gray-900 truncate shrink min-w-0">
+                    {profile.fullName}
+                  </h3>
                   {profile.badges && profile.badges.length > 0 && (
-                    <UserBadges badges={profile.badges} size="sm" />
+                    <div className="shrink-0">
+                      <UserBadges badges={profile.badges} size="sm" />
+                    </div>
                   )}
                 </div>
                 <p className="text-gray-500 text-sm mt-1">@{profile.username}</p>

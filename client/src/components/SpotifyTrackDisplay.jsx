@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Music, Play, Pause, ExternalLink } from 'lucide-react';
 
-export default function SpotifyTrackDisplay({ track, compact = false }) {
+export default function SpotifyTrackDisplay({ track, compact = false, initialProgress = null }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -12,10 +12,20 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
       audioRef.current.src = track.previewUrl;
     }
 
+    // Eğer initialProgress varsa ve şarkı oynatılmıyorsa, süreyi oraya set et
+    if (initialProgress !== null && !isPlaying) {
+      setCurrentTime(initialProgress / 1000);
+    }
+    
+    // Duration'ı track'ten al (API ms cinsinden veriyor)
+    if (track?.duration) {
+      setDuration(track.duration / 1000);
+    }
+
     return () => {
       audioRef.current?.pause();
     };
-  }, [track]);
+  }, [track, initialProgress]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -35,7 +45,7 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
   };
 
   const handleLoadedMetadata = () => {
-    if (audioRef.current) {
+    if (audioRef.current && !track.duration) { // Eğer track objesinde duration yoksa audio'dan al
       setDuration(audioRef.current.duration);
     }
   };
@@ -46,6 +56,9 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
   };
 
   const handleSeek = (e) => {
+    // Sadece preview varsa seek yapılabilir
+    if (!track.previewUrl) return;
+    
     const progressBar = e.currentTarget;
     const clickX = e.nativeEvent.offsetX;
     const width = progressBar.offsetWidth;
@@ -58,6 +71,7 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
   };
 
   const formatTime = (seconds) => {
+    if (!seconds && seconds !== 0) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -67,10 +81,10 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
 
   if (!track) return null;
 
-  // Compact mode (post kartlarında)
+  // Compact mode (post kartlarında ve profil status)
   if (compact) {
     return (
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 mb-3">
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 mb-3 w-full">
         <audio
           ref={audioRef}
           onTimeUpdate={handleTimeUpdate}
@@ -108,20 +122,20 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
           </div>
 
           {/* Track Info */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-center gap-1 mb-1">
               <Music size={12} className="text-green-600 shrink-0" />
-              <span className="font-semibold text-sm text-gray-900 truncate">
+              <span className="font-semibold text-sm text-gray-900 truncate block w-full">
                 {track.name}
               </span>
             </div>
-            <div className="text-xs text-gray-600 truncate">{track.artist}</div>
+            <div className="text-xs text-gray-600 truncate block w-full">{track.artist}</div>
 
             {/* Progress Bar */}
-            {track.previewUrl ? (
+            {(track.previewUrl || initialProgress !== null) ? (
               <div className="mt-2">
                 <div
-                  className="h-1 bg-green-200 rounded-full cursor-pointer overflow-hidden"
+                  className={`h-1 bg-green-200 rounded-full overflow-hidden ${track.previewUrl ? 'cursor-pointer' : ''}`}
                   onClick={handleSeek}
                 >
                   <div
@@ -130,10 +144,10 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
                   />
                 </div>
                 <div className="flex justify-between items-center mt-1">
-                  <span className="text-xs text-gray-500">
+                  <span className="text-[10px] text-gray-500 font-mono">
                     {formatTime(currentTime)}
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-[10px] text-gray-500 font-mono">
                     {formatTime(duration || 30)}
                   </span>
                 </div>
@@ -147,7 +161,7 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
 
           {/* Spotify Link */}
           <a
-            href={track.spotifyUrl}
+            href={track.spotifyUrl || track.url}
             target="_blank"
             rel="noopener noreferrer"
             className="shrink-0 p-2 hover:bg-green-100 rounded-lg transition"
@@ -162,7 +176,7 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
 
   // Full mode
   return (
-    <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 border border-green-200 rounded-xl p-4 mb-4">
+    <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-green-50 border border-green-200 rounded-xl p-4 mb-4 w-full">
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
@@ -200,24 +214,24 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
         </div>
 
         {/* Track Info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 mb-1">
             <Music size={16} className="text-green-600 shrink-0" />
             <span className="text-xs font-medium text-green-600 uppercase tracking-wide">
               Spotify
             </span>
           </div>
-          <h3 className="font-bold text-lg text-gray-900 mb-1 truncate">
+          <h3 className="font-bold text-lg text-gray-900 mb-1 truncate block w-full">
             {track.name}
           </h3>
-          <p className="text-sm text-gray-600 mb-1 truncate">{track.artist}</p>
-          <p className="text-xs text-gray-500 truncate">{track.album}</p>
+          <p className="text-sm text-gray-600 mb-1 truncate block w-full">{track.artist}</p>
+          <p className="text-xs text-gray-500 truncate block w-full">{track.album}</p>
 
           {/* Progress Bar */}
-          {track.previewUrl && (
+          {(track.previewUrl || initialProgress !== null) ? (
             <div className="mt-3">
               <div
-                className="h-2 bg-green-200 rounded-full cursor-pointer overflow-hidden"
+                className={`h-2 bg-green-200 rounded-full overflow-hidden ${track.previewUrl ? 'cursor-pointer' : ''}`}
                 onClick={handleSeek}
               >
                 <div
@@ -226,17 +240,15 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
                 />
               </div>
               <div className="flex justify-between items-center mt-2">
-                <span className="text-sm text-gray-600 font-medium">
+                <span className="text-sm text-gray-600 font-medium font-mono">
                   {formatTime(currentTime)}
                 </span>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 font-mono">
                   {formatTime(duration || 30)}
                 </span>
               </div>
             </div>
-          )}
-
-          {!track.previewUrl && (
+          ) : (
             <div className="mt-3 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg inline-block">
               Preview mevcut değil
             </div>
@@ -245,7 +257,7 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
 
         {/* Spotify Link */}
         <a
-          href={track.spotifyUrl}
+          href={track.spotifyUrl || track.url}
           target="_blank"
           rel="noopener noreferrer"
           className="shrink-0 p-3 bg-green-600 hover:bg-green-700 text-white rounded-xl transition shadow-md hover:shadow-lg"
