@@ -152,11 +152,15 @@ export default function PublicProfilePage() {
 
   // Spotify şu an dinlenen şarkıyı çek
   useEffect(() => {
-    const fetchSpotifyData = async () => {
+    const fetchSpotifyData = async (isInitial = false) => {
       if (!username) return;
 
       try {
-        setLoadingSpotify(true);
+        // Sadece ilk yüklemede loading göster
+        if (isInitial) {
+            setLoadingSpotify(true);
+        }
+        
         const res = await fetch(`${API_URL}/api/spotify/currently-playing/${username}`);
         const data = await res.json();
 
@@ -169,14 +173,16 @@ export default function PublicProfilePage() {
         console.error('Spotify veri çekme hatası:', err);
         setSpotifyData(null);
       } finally {
-        setLoadingSpotify(false);
+        if (isInitial) {
+            setLoadingSpotify(false);
+        }
       }
     };
 
-    fetchSpotifyData();
+    fetchSpotifyData(true);
 
     // Her 30 saniyede bir güncelle
-    const interval = setInterval(fetchSpotifyData, 30000);
+    const interval = setInterval(() => fetchSpotifyData(false), 30000);
 
     return () => clearInterval(interval);
   }, [username]);
@@ -326,11 +332,16 @@ export default function PublicProfilePage() {
 
             {/* Spotify Şu An Dinleniyor - Gizli hesaplarda sadece takipçilere göster */}
             {!loadingSpotify && spotifyData && (!currentProfile.isPrivate || isFollowing || isOwnProfile) && (
-              <SpotifyTrackDisplay 
-                track={spotifyData} 
-                compact={true} 
-                initialProgress={spotifyData.progress}
-              />
+              <div className="mt-2 mb-3">
+                <div className="text-xs text-gray-500 font-medium mb-1.5 ml-1">
+                    Şu an dinliyor
+                </div>
+                <SpotifyTrackDisplay 
+                    track={spotifyData} 
+                    compact={true} 
+                    initialProgress={spotifyData.progress}
+                />
+              </div>
             )}
 
             <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
@@ -418,6 +429,14 @@ export default function PublicProfilePage() {
                         <div className="text-gray-800 mb-3 whitespace-pre-wrap">
                           {renderWithMentions(post.content)}
                         </div>
+                        
+                        {/* Spotify Track */}
+                        {post.spotifyTrack && (
+                          <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+                            <SpotifyTrackDisplay track={post.spotifyTrack} compact={true} />
+                          </div>
+                        )}
+
                         {/* Media Display */}
                         {post.media && post.media.length > 0 && (
                           <div className="mb-3" onClick={(e) => e.stopPropagation()}>

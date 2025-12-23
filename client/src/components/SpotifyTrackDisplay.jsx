@@ -27,6 +27,23 @@ export default function SpotifyTrackDisplay({ track, compact = false, initialPro
     };
   }, [track, initialProgress]);
 
+  // Simulate progress for currently playing track (when not playing preview locally)
+  useEffect(() => {
+    let interval;
+    if (initialProgress !== null && !isPlaying && duration > 0) {
+      interval = setInterval(() => {
+        setCurrentTime((prev) => {
+          if (prev >= duration) {
+            clearInterval(interval);
+            return duration;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [initialProgress, isPlaying, duration]);
+
   const togglePlay = () => {
     if (!audioRef.current) return;
 
