@@ -319,8 +319,8 @@ export default function PublicProfilePage() {
             </div>
             {currentProfile.bio && <p className="text-gray-700 text-sm mb-2 leading-relaxed whitespace-pre-wrap">{currentProfile.bio}</p>}
 
-            {/* Spotify Şu An Dinleniyor */}
-            {!loadingSpotify && spotifyData && (
+            {/* Spotify Şu An Dinleniyor - Gizli hesaplarda sadece takipçilere göster */}
+            {!loadingSpotify && spotifyData && (!currentProfile.isPrivate || isFollowing || isOwnProfile) && (
               <a
                 href={spotifyData.url}
                 target="_blank"

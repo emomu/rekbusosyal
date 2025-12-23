@@ -37,6 +37,16 @@ const CommentSchema = new mongoose.Schema({
     type: { type: String, enum: ['image', 'gif'] },
     publicId: { type: String } // Cloudinary public ID for deletion
   },
+  spotifyTrack: {
+    id: { type: String }, // Spotify track ID
+    name: { type: String }, // Şarkı adı
+    artist: { type: String }, // Sanatçı
+    album: { type: String }, // Albüm
+    albumArt: { type: String }, // Albüm kapağı URL
+    previewUrl: { type: String }, // 30 saniyelik preview URL
+    spotifyUrl: { type: String }, // Spotify'da açma linki
+    duration: { type: Number } // Şarkı süresi (ms)
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useLoaderData, useOutletContext } from 'react-router-dom';
-import { User, MessageSquare, RefreshCw, Image, Film, FileImage, Ghost, Send, X, Play, Loader2, MoreHorizontal, Edit2, Trash2 } from 'lucide-react';
+import { User, MessageSquare, RefreshCw, Image, Film, FileImage, Ghost, Send, X, Play, Loader2, MoreHorizontal, Edit2, Trash2, Music } from 'lucide-react';
 import { setConfessions, addConfession, appendConfessions, setConfessionsPagination } from '../store/slices/postsSlice';
 import { setNewConfessionContent, setIsAnonymous, setSelectedImage, setLoadingConfessions, addToast } from '../store/slices/uiSlice';
 import { incrementAdImpression, incrementAdClick } from '../store/slices/advertisementsSlice';
@@ -15,6 +15,8 @@ import UserBadges from '../components/UserBadges';
 import MediaUploadDialog from '../components/MediaUploadDialog';
 import MediaDisplay from '../components/MediaDisplay';
 import GiphyPicker from '../components/GiphyPicker';
+import SpotifyTrackPicker from '../components/SpotifyTrackPicker';
+import SpotifyTrackDisplay from '../components/SpotifyTrackDisplay';
 import { API_URL } from '../config/api';
 
 // AdCard Component
@@ -92,6 +94,8 @@ export default function ConfessionsPage() {
   const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
   const [mediaDialogType, setMediaDialogType] = useState(null);
   const [giphyPickerOpen, setGiphyPickerOpen] = useState(false);
+  const [spotifyPickerOpen, setSpotifyPickerOpen] = useState(false);
+  const [selectedSpotifyTrack, setSelectedSpotifyTrack] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [currentUserInfo, setCurrentUserInfo] = useState(null);
@@ -277,6 +281,10 @@ export default function ConfessionsPage() {
         }))));
       }
 
+      if (selectedSpotifyTrack) {
+        formData.append('spotifyTrack', JSON.stringify(selectedSpotifyTrack));
+      }
+
       // Use XMLHttpRequest for real-time upload progress tracking
       const response = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -357,6 +365,7 @@ export default function ConfessionsPage() {
         dispatch(addConfession(newConfession));
         dispatch(setNewConfessionContent(''));
         setSelectedMedia([]);
+        setSelectedSpotifyTrack(null);
         dispatch(addToast({ message: 'İtiraf başarıyla paylaşıldı!', type: 'success' }));
       } else {
         const errorData = await response.json();
@@ -568,6 +577,22 @@ export default function ConfessionsPage() {
             rows={2}
           />
 
+          {/* --- SPOTIFY TRACK PREVIEW --- */}
+          {selectedSpotifyTrack && (
+            <div className="mt-3 mb-2 animate-in fade-in slide-in-from-bottom-2">
+              <div className="relative">
+                <SpotifyTrackDisplay track={selectedSpotifyTrack} compact={true} />
+                <button
+                  onClick={() => setSelectedSpotifyTrack(null)}
+                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full backdrop-blur-sm transition-all duration-200 hover:scale-110 shadow-sm z-10"
+                  title="Kaldır"
+                >
+                  <X size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* --- MEDIA PREVIEW (SQUARE THUMBNAIL) --- */}
           {selectedMedia.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-3 mb-2 animate-in fade-in slide-in-from-bottom-2">
@@ -657,6 +682,18 @@ export default function ConfessionsPage() {
                 <Film size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
                 {getMediaCountByType('video') > 0 && (
                   <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white ring-2 ring-white">1</span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setSpotifyPickerOpen(true)}
+                disabled={selectedSpotifyTrack !== null}
+                className="relative p-2.5 rounded-xl text-gray-500 hover:text-green-600 hover:bg-green-50 transition-all duration-200 group disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Spotify Şarkısı Ekle"
+              >
+                <Music size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
+                {selectedSpotifyTrack && (
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[9px] font-bold text-white ring-2 ring-white">1</span>
                 )}
               </button>
             </div>
@@ -869,6 +906,13 @@ export default function ConfessionsPage() {
                     </div>
                   )}
 
+                  {/* Spotify Track Display */}
+                  {item.spotifyTrack && (
+                    <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+                      <SpotifyTrackDisplay track={item.spotifyTrack} compact={true} />
+                    </div>
+                  )}
+
                   {/* Media Display */}
                   {item.media && item.media.length > 0 && (
                     <MediaDisplay media={item.media} />
@@ -912,6 +956,15 @@ export default function ConfessionsPage() {
         isOpen={giphyPickerOpen}
         onClose={() => setGiphyPickerOpen(false)}
         onSelect={handleGiphySelect}
+      />
+
+      <SpotifyTrackPicker
+        isOpen={spotifyPickerOpen}
+        onClose={() => setSpotifyPickerOpen(false)}
+        onSelect={(track) => {
+          setSelectedSpotifyTrack(track);
+          setSpotifyPickerOpen(false);
+        }}
       />
     </div>
   );

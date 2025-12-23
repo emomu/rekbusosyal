@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, useLoaderData, useOutletContext } from 'react-router-dom';
-import { User, MessageSquare, RefreshCw, Image, Film, FileImage, Send, Loader2, Play, X } from 'lucide-react';
+import { User, MessageSquare, RefreshCw, Image, Film, FileImage, Send, Loader2, Play, X, Music } from 'lucide-react';
 import { setPosts, addPost, appendPosts, setPostsPagination } from '../store/slices/postsSlice';
 import { setNewPostContent, setLoadingPosts, setSelectedImage, addToast } from '../store/slices/uiSlice';
 import { incrementAdImpression, incrementAdClick } from '../store/slices/advertisementsSlice';
@@ -16,6 +16,8 @@ import MediaUploadDialog from '../components/MediaUploadDialog';
 import MediaDisplay from '../components/MediaDisplay';
 import GiphyPicker from '../components/GiphyPicker';
 import Post from '../components/Post';
+import SpotifyTrackPicker from '../components/SpotifyTrackPicker';
+import SpotifyTrackDisplay from '../components/SpotifyTrackDisplay';
 import { API_URL } from '../config/api';
 
 // AdCard Component
@@ -108,6 +110,8 @@ export default function FeedPage() {
   const [giphyPickerOpen, setGiphyPickerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [spotifyPickerOpen, setSpotifyPickerOpen] = useState(false);
+  const [selectedSpotifyTrack, setSelectedSpotifyTrack] = useState(null);
 
   // Load initial data from loader into Redux
   useEffect(() => {
@@ -261,6 +265,11 @@ export default function FeedPage() {
         }))));
       }
 
+      // Spotify track ekle
+      if (selectedSpotifyTrack) {
+        formData.append('spotifyTrack', JSON.stringify(selectedSpotifyTrack));
+      }
+
       // Use XMLHttpRequest for real-time upload progress tracking
       const response = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -340,6 +349,7 @@ export default function FeedPage() {
         dispatch(addPost(newPost));
         dispatch(setNewPostContent(''));
         setSelectedMedia([]);
+        setSelectedSpotifyTrack(null);
         dispatch(addToast({ message: 'Post başarıyla paylaşıldı!', type: 'success' }));
       } else {
         const errorData = await response.json();
@@ -561,6 +571,19 @@ export default function FeedPage() {
             </div>
           )}
 
+          {/* Spotify Track Preview */}
+          {selectedSpotifyTrack && (
+            <div className="mt-3">
+              <SpotifyTrackDisplay track={selectedSpotifyTrack} compact={true} />
+              <button
+                onClick={() => setSelectedSpotifyTrack(null)}
+                className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+              >
+                <X size={14} /> Şarkıyı Kaldır
+              </button>
+            </div>
+          )}
+
           {/* Actions Bar */}
           <div className="flex items-center justify-end gap-3 mt-2">
             
@@ -605,6 +628,21 @@ export default function FeedPage() {
               >
                 <Film size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
                 {getMediaCountByType('video') > 0 && (
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[9px] font-bold text-white ring-2 ring-white">
+                    1
+                  </span>
+                )}
+              </button>
+
+              {/* Spotify Button */}
+              <button
+                onClick={() => setSpotifyPickerOpen(true)}
+                disabled={selectedSpotifyTrack !== null}
+                className="relative p-2.5 rounded-xl text-gray-500 hover:text-green-600 hover:bg-green-50 transition-all duration-200 group disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Spotify Şarkısı Ekle"
+              >
+                <Music size={20} strokeWidth={2} className="group-hover:scale-110 transition-transform" />
+                {selectedSpotifyTrack && (
                   <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[9px] font-bold text-white ring-2 ring-white">
                     1
                   </span>
@@ -705,6 +743,13 @@ export default function FeedPage() {
         isOpen={giphyPickerOpen}
         onClose={() => setGiphyPickerOpen(false)}
         onSelect={handleGiphySelect}
+      />
+
+      {/* Spotify Track Picker */}
+      <SpotifyTrackPicker
+        isOpen={spotifyPickerOpen}
+        onClose={() => setSpotifyPickerOpen(false)}
+        onSelect={(track) => setSelectedSpotifyTrack(track)}
       />
     </div>
   );

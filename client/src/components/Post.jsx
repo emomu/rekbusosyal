@@ -5,6 +5,7 @@ import { User, MessageSquare, MoreHorizontal, Edit2, Trash2, Loader2 } from 'luc
 import LikeButton from './LikeButton';
 import UserBadges from './UserBadges';
 import MediaDisplay from './MediaDisplay';
+import SpotifyTrackDisplay from './SpotifyTrackDisplay';
 import { setSelectedImage, addToast } from '../store/slices/uiSlice';
 import { API_URL } from '../config/api';
 import { ensureHttps } from '../utils/imageUtils';
@@ -251,6 +252,13 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
             ) : (
               <div className="text-gray-900 mt-1 whitespace-pre-wrap text-base break-words">
                 {renderWithMentions(post.content)}
+              </div>
+            )}
+
+            {/* Spotify Track */}
+            {!isEditing && post.spotifyTrack && (
+              <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                <SpotifyTrackDisplay track={post.spotifyTrack} compact={true} />
               </div>
             )}
 

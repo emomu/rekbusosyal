@@ -393,12 +393,23 @@ app.post('/api/posts', auth, cooldown('post'), upload.array('media', 4), async (
       }
     }
 
+    // Parse Spotify track if provided
+    let spotifyTrack = null;
+    if (req.body.spotifyTrack) {
+      try {
+        spotifyTrack = JSON.parse(req.body.spotifyTrack);
+      } catch (parseError) {
+        console.error("Spotify track parse error:", parseError);
+      }
+    }
+
     const newPost = new Post({
       content: req.body.content,
       author: req.userId, // middleware'den gelen kullanıcı ID'si
       isAnonymous: false, // Normal postlar anonim değildir
       category: 'Geyik', // Varsayılan kategori
-      media: mediaFiles
+      media: mediaFiles,
+      spotifyTrack: spotifyTrack
     });
 
     let savedPost = await newPost.save();
@@ -498,12 +509,23 @@ app.post('/api/confessions', auth, cooldown('confession'), upload.array('media',
       }
     }
 
+    // Parse Spotify track if provided
+    let spotifyTrack = null;
+    if (req.body.spotifyTrack) {
+      try {
+        spotifyTrack = JSON.parse(req.body.spotifyTrack);
+      } catch (parseError) {
+        console.error("Spotify track parse error:", parseError);
+      }
+    }
+
     const newConfession = new Post({
       content,
       isAnonymous,
       category: 'İtiraf',
       author: isAnonymous ? null : req.userId,
-      media: mediaFiles
+      media: mediaFiles,
+      spotifyTrack: spotifyTrack
     });
 
     let savedConfession = await newConfession.save();

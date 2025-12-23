@@ -23,6 +23,62 @@ router.get('/auth', authMiddleware, (req, res) => {
   res.json({ authUrl });
 });
 
+// Şarkı arama endpoint'i (Client Credentials kullanarak - kullanıcı bağımsız)
+router.get('/search', authMiddleware, async (req, res) => {
+  const { q } = req.query;
+
+  if (!q || q.trim().length === 0) {
+    return res.status(400).json({ error: 'Arama terimi gerekli' });
+  }
+
+  try {
+    // Client Credentials token al (kullanıcı bağımsız)
+    const tokenResponse = await axios.post(
+      'https://accounts.spotify.com/api/token',
+      new URLSearchParams({
+        grant_type: 'client_credentials',
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
+        }
+      }
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+
+    // Şarkı ara
+    const searchResponse = await axios.get('https://api.spotify.com/v1/search', {
+      params: {
+        q: q,
+        type: 'track',
+        limit: 10,
+        market: 'TR'
+      },
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    const tracks = searchResponse.data.tracks.items.map(track => ({
+      id: track.id,
+      name: track.name,
+      artist: track.artists.map(a => a.name).join(', '),
+      album: track.album.name,
+      albumArt: track.album.images[0]?.url,
+      previewUrl: track.preview_url,
+      spotifyUrl: track.external_urls.spotify,
+      duration: track.duration_ms
+    }));
+
+    res.json({ tracks });
+  } catch (error) {
+    console.error('Spotify search error:', error.response?.data || error.message);
+    res.status(500).json({ error: 'Arama sırasında bir hata oluştu' });
+  }
+});
+
 // Spotify callback
 router.get('/callback', async (req, res) => {
   const { code, state, error } = req.query;
