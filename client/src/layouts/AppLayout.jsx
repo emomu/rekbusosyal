@@ -109,6 +109,8 @@ export default function AppLayout() {
   useEffect(() => {
     if (!token) return;
 
+    let isFirstFetch = true;
+
     // Initial fetch
     const fetchNotifications = async () => {
       try {
@@ -116,23 +118,31 @@ export default function AppLayout() {
         const data = await res.json();
         const newCount = data.count || 0;
 
-        // Check if there are new notifications
-        const previousCount = previousUnreadCountRef.current;
-        if (newCount > previousCount && newCount > 0 && canShowNotification()) {
-          // New notification detected! Fetch latest notification to show browser notification
-          const notifRes = await api.get('/api/notifications?page=1&limit=1');
-          const notifData = await notifRes.json();
+        // İlk fetch'te sadece ref'i güncelle, bildirim gösterme
+        if (isFirstFetch) {
+          previousUnreadCountRef.current = newCount;
+          isFirstFetch = false;
+        } else {
+          // Sonraki fetch'lerde: yeni bildirim varsa göster
+          const previousCount = previousUnreadCountRef.current;
+          if (newCount > previousCount && newCount > 0 && canShowNotification()) {
+            // New notification detected! Fetch latest notification to show browser notification
+            const notifRes = await api.get('/api/notifications?page=1&limit=1');
+            const notifData = await notifRes.json();
 
-          if (notifData.notifications && notifData.notifications.length > 0) {
-            const latestNotification = notifData.notifications[0];
-            // Show browser notification
-            showNotificationForAppNotification(latestNotification);
+            if (notifData.notifications && notifData.notifications.length > 0) {
+              const latestNotification = notifData.notifications[0];
+              // Show browser notification only if it's unread
+              if (!latestNotification.isRead) {
+                showNotificationForAppNotification(latestNotification);
+              }
+            }
           }
+          previousUnreadCountRef.current = newCount;
         }
 
-        // Update Redux state and ref
+        // Her zaman Redux state'i güncelle
         dispatch(setUnreadCount(newCount));
-        previousUnreadCountRef.current = newCount;
       } catch (err) {
         console.error('Error polling notifications:', err);
       }
@@ -141,8 +151,8 @@ export default function AppLayout() {
     // Fetch immediately
     fetchNotifications();
 
-    // Poll every 30 seconds
-    const pollInterval = setInterval(fetchNotifications, 30000);
+    // Poll every 10 seconds (daha responsive)
+    const pollInterval = setInterval(fetchNotifications, 10000);
 
     return () => clearInterval(pollInterval);
   }, [token, dispatch]);

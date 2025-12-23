@@ -14,6 +14,7 @@ import UserBadges from './UserBadges';
 import { useProfileNavigate } from '../hooks/useSmartNavigate';
 import MediaDisplay from './MediaDisplay';
 import SpotifyTrackDisplay from './SpotifyTrackDisplay';
+import FollowersModal from './FollowersModal';
 
 export default function PublicProfilePage() {
   const navigate = useNavigate();
@@ -34,6 +35,9 @@ export default function PublicProfilePage() {
   const [selectedPost, setSelectedPost] = useState(null);
   const [spotifyData, setSpotifyData] = useState(null);
   const [loadingSpotify, setLoadingSpotify] = useState(true);
+  const [listeningAlong, setListeningAlong] = useState([]);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [followersModalType, setFollowersModalType] = useState('followers');
 
   const isOwnProfile = currentUsername === username;
 
@@ -160,14 +164,26 @@ export default function PublicProfilePage() {
         if (isInitial) {
             setLoadingSpotify(true);
         }
-        
+
         const res = await fetch(`${API_URL}/api/spotify/currently-playing/${username}`);
         const data = await res.json();
 
         if (data.isPlaying) {
-          setSpotifyData(data.track);
+          // Sadece şarkı değiştiyse veya ilk yüklemede state'i güncelle
+          setSpotifyData(prev => {
+            // Eğer önceki şarkı yoksa veya farklı bir şarkıya geçildiyse güncelle
+            if (!prev || prev.name !== data.track.name || prev.artist !== data.track.artist) {
+              return data.track;
+            }
+            // Aynı şarkı çalıyorsa sadece progress'i güncelle
+            return { ...prev, progress: data.track.progress };
+          });
+
+          // Listening along bilgisini güncelle
+          setListeningAlong(data.listeningAlong || []);
         } else {
           setSpotifyData(null);
+          setListeningAlong([]);
         }
       } catch (err) {
         console.error('Spotify veri çekme hatası:', err);
@@ -181,8 +197,8 @@ export default function PublicProfilePage() {
 
     fetchSpotifyData(true);
 
-    // Her 30 saniyede bir güncelle
-    const interval = setInterval(() => fetchSpotifyData(false), 30000);
+    // Her 5 saniyede bir güncelle (daha responsive)
+    const interval = setInterval(() => fetchSpotifyData(false), 5000);
 
     return () => clearInterval(interval);
   }, [username]);
@@ -333,13 +349,11 @@ export default function PublicProfilePage() {
             {/* Spotify Şu An Dinleniyor - Gizli hesaplarda sadece takipçilere göster */}
             {!loadingSpotify && spotifyData && (!currentProfile.isPrivate || isFollowing || isOwnProfile) && (
               <div className="mt-2 mb-3">
-                <div className="text-xs text-gray-500 font-medium mb-1.5 ml-1">
-                    Şu an dinliyor
-                </div>
-                <SpotifyTrackDisplay 
-                    track={spotifyData} 
-                    compact={true} 
+                <SpotifyTrackDisplay
+                    track={spotifyData}
+                    compact={true}
                     initialProgress={spotifyData.progress}
+                    listeningAlong={listeningAlong}
                 />
               </div>
             )}
@@ -354,8 +368,26 @@ export default function PublicProfilePage() {
               )}
             </div>
             <div className="flex gap-3 text-sm">
-              <div><span className="font-bold text-gray-900">{currentProfile.following?.length || 0}</span><span className="text-gray-500 ml-1">Takip</span></div>
-              <div><span className="font-bold text-gray-900">{currentProfile.followers?.length || 0}</span><span className="text-gray-500 ml-1">Takipçi</span></div>
+              <div
+                onClick={() => {
+                  setFollowersModalType('following');
+                  setShowFollowersModal(true);
+                }}
+                className="cursor-pointer hover:underline"
+              >
+                <span className="font-bold text-gray-900">{currentProfile.following?.length || 0}</span>
+                <span className="text-gray-500 ml-1">Takip</span>
+              </div>
+              <div
+                onClick={() => {
+                  setFollowersModalType('followers');
+                  setShowFollowersModal(true);
+                }}
+                className="cursor-pointer hover:underline"
+              >
+                <span className="font-bold text-gray-900">{currentProfile.followers?.length || 0}</span>
+                <span className="text-gray-500 ml-1">Takipçi</span>
+              </div>
             </div>
           </div>
         </div>
@@ -545,6 +577,14 @@ export default function PublicProfilePage() {
           </div>
         </>
       )}
+
+      {/* Followers/Following Modal */}
+      <FollowersModal
+        isOpen={showFollowersModal}
+        onClose={() => setShowFollowersModal(false)}
+        username={currentProfile?.username}
+        type={followersModalType}
+      />
     </div>
   );
 }

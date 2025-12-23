@@ -636,6 +636,24 @@ app.get('/api/posts/:id', auth, async (req, res) => {
   }
 });
 
+// Post'u beğenen kullanıcıları getir
+app.get('/api/posts/:id/likes', auth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+      .populate('likes', 'username fullName profilePicture badges')
+      .lean();
+
+    if (!post) {
+      return res.status(404).json({ error: 'Post bulunamadı' });
+    }
+
+    res.json({ users: post.likes || [] });
+  } catch (err) {
+    console.error('Like kullanıcıları getirme hatası:', err);
+    res.status(500).json({ error: 'Kullanıcılar yüklenemedi' });
+  }
+});
+
 // 2. KAMPÜSLER VE OYLAMA
 app.get('/api/campus', async (req, res) => {
   try {
@@ -1802,6 +1820,69 @@ app.get('/api/users/:username', async (req, res) => {
   }
 });
 
+// Kullanıcının takipçilerini getir (gizlilik kontrolü ile)
+app.get('/api/users/:username/followers', auth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username })
+      .populate('followers', 'username fullName profilePicture badges')
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+    }
+
+    const currentUserId = req.userId;
+    const isOwnProfile = user._id.toString() === currentUserId;
+
+    // Gizli hesap kontrolü
+    if (user.isPrivate && !isOwnProfile) {
+      // Takipçi mi kontrol et
+      const isFollowing = user.followers.some(f => f._id.toString() === currentUserId);
+
+      if (!isFollowing) {
+        return res.status(403).json({ error: 'Bu hesap gizli' });
+      }
+    }
+
+    res.json({ followers: user.followers || [] });
+  } catch (err) {
+    console.error('Takipçi listesi getirme hatası:', err);
+    res.status(500).json({ error: 'Takipçiler yüklenemedi' });
+  }
+});
+
+// Kullanıcının takip ettiklerini getir (gizlilik kontrolü ile)
+app.get('/api/users/:username/following', auth, async (req, res) => {
+  try {
+    const user = await User.findOne({ username: req.params.username })
+      .populate('following', 'username fullName profilePicture badges')
+      .populate('followers', '_id')
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+    }
+
+    const currentUserId = req.userId;
+    const isOwnProfile = user._id.toString() === currentUserId;
+
+    // Gizli hesap kontrolü
+    if (user.isPrivate && !isOwnProfile) {
+      // Takipçi mi kontrol et
+      const isFollowing = user.followers.some(f => f._id.toString() === currentUserId);
+
+      if (!isFollowing) {
+        return res.status(403).json({ error: 'Bu hesap gizli' });
+      }
+    }
+
+    res.json({ following: user.following || [] });
+  } catch (err) {
+    console.error('Takip listesi getirme hatası:', err);
+    res.status(500).json({ error: 'Takip edilenler yüklenemedi' });
+  }
+});
+
 // Kullanıcının postlarını getir
 app.get('/api/users/:userId/posts', async (req, res) => {
   try {
@@ -2253,6 +2334,43 @@ app.put('/api/admin/users/:id/badges', adminAuth, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Rozetler güncellenemedi: " + err.message });
+  }
+});
+
+// Beta özellikleri toggle (Admin)
+app.put('/api/admin/users/:id/beta', adminAuth, async (req, res) => {
+  try {
+    const { feature, enabled } = req.body; // feature: 'spotifyIntegration', enabled: true/false
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    // Geçerli beta özellikleri
+    const validFeatures = ['spotifyIntegration'];
+    if (!validFeatures.includes(feature)) {
+      return res.status(400).json({ error: "Geçersiz beta özelliği" });
+    }
+
+    // Beta özellikleri objesini başlat (yoksa)
+    if (!user.betaFeatures) {
+      user.betaFeatures = {};
+    }
+
+    user.betaFeatures[feature] = enabled;
+    await user.save();
+
+    res.json({
+      message: `Beta özellik ${enabled ? 'aktifleştirildi' : 'devre dışı bırakıldı'}`,
+      user: {
+        _id: user._id,
+        username: user.username,
+        betaFeatures: user.betaFeatures
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Beta özellik güncellenemedi: " + err.message });
   }
 });
 
@@ -3470,6 +3588,24 @@ app.get('/api/comments/:commentId/replies', async (req, res) => {
   } catch (err) {
     console.error('Cevapları getirme hatası:', err);
     res.status(500).json({ message: 'Cevaplar yüklenemedi' });
+  }
+});
+
+// Yorumu beğenen kullanıcıları getir
+app.get('/api/comments/:commentId/likes', auth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.commentId)
+      .populate('likes', 'username fullName profilePicture badges')
+      .lean();
+
+    if (!comment) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    res.json({ users: comment.likes || [] });
+  } catch (err) {
+    console.error('Like kullanıcıları getirme hatası:', err);
+    res.status(500).json({ error: 'Kullanıcılar yüklenemedi' });
   }
 });
 

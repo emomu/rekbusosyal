@@ -1,45 +1,59 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Music, Play, Pause, ExternalLink } from 'lucide-react';
 
-export default function SpotifyTrackDisplay({ track, compact = false, initialProgress = null }) {
+export default function SpotifyTrackDisplay({ track, compact = false, initialProgress = null, listeningAlong = [] }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef(null);
+  const startTimeRef = useRef(null);
+  const trackIdRef = useRef(null);
 
+  // Track değiştiğinde veya ilk yükleme
   useEffect(() => {
     if (track?.previewUrl && audioRef.current) {
       audioRef.current.src = track.previewUrl;
     }
 
-    // Eğer initialProgress varsa ve şarkı oynatılmıyorsa, süreyi oraya set et
-    if (initialProgress !== null && !isPlaying) {
-      setCurrentTime(initialProgress / 1000);
-    }
-    
     // Duration'ı track'ten al (API ms cinsinden veriyor)
     if (track?.duration) {
       setDuration(track.duration / 1000);
     }
 
+    // Şarkı değiştiyse zamanı resetle
+    const trackId = track?.name + track?.artist;
+    if (trackId !== trackIdRef.current) {
+      trackIdRef.current = trackId;
+      if (initialProgress !== null) {
+        setCurrentTime(initialProgress / 1000);
+        startTimeRef.current = Date.now() - initialProgress;
+      }
+    }
+
     return () => {
       audioRef.current?.pause();
     };
-  }, [track, initialProgress]);
+  }, [track]);
 
-  // Simulate progress for currently playing track (when not playing preview locally)
+  // initialProgress değiştiğinde sadece referans zamanını güncelle
+  useEffect(() => {
+    if (initialProgress !== null && !isPlaying) {
+      startTimeRef.current = Date.now() - initialProgress;
+    }
+  }, [initialProgress, isPlaying]);
+
+  // Her saniye progress'i güncelle (Discord gibi smooth)
   useEffect(() => {
     let interval;
-    if (initialProgress !== null && !isPlaying && duration > 0) {
+    if (initialProgress !== null && !isPlaying && duration > 0 && startTimeRef.current) {
       interval = setInterval(() => {
-        setCurrentTime((prev) => {
-          if (prev >= duration) {
-            clearInterval(interval);
-            return duration;
-          }
-          return prev + 1;
-        });
-      }, 1000);
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
+        if (elapsed >= duration) {
+          setCurrentTime(duration);
+        } else {
+          setCurrentTime(elapsed);
+        }
+      }, 100); // 100ms'de bir güncelle (daha smooth)
     }
     return () => clearInterval(interval);
   }, [initialProgress, isPlaying, duration]);
@@ -101,13 +115,43 @@ export default function SpotifyTrackDisplay({ track, compact = false, initialPro
   // Compact mode (post kartlarında ve profil status)
   if (compact) {
     return (
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 mb-3 w-full">
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-3 w-full">
         <audio
           ref={audioRef}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={handleLoadedMetadata}
           onEnded={handleEnded}
         />
+
+        {/* Başlık - Sadece initialProgress varsa göster (profilde çalan şarkı) */}
+        {initialProgress !== null && (
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Music size={12} className="text-green-600" />
+              <span className="text-xs text-green-700 font-semibold">Şu an dinliyor</span>
+            </div>
+
+            {/* Listening Along - Discord gibi */}
+            {listeningAlong && listeningAlong.length > 0 && (
+              <div className="flex items-center gap-1">
+                <div className="flex -space-x-2">
+                  {listeningAlong.slice(0, 3).map((user, idx) => (
+                    <img
+                      key={idx}
+                      src={user.profilePicture || '/default-avatar.png'}
+                      alt={user.fullName}
+                      className="w-5 h-5 rounded-full border-2 border-green-50 object-cover"
+                      title={user.fullName}
+                    />
+                  ))}
+                </div>
+                <span className="text-[10px] text-green-600 font-medium">
+                  +{listeningAlong.length} dinliyor
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-3">
           {/* Album Art & Play Button */}

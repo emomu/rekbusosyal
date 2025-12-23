@@ -6,6 +6,7 @@ import LikeButton from './LikeButton';
 import UserBadges from './UserBadges';
 import MediaDisplay from './MediaDisplay';
 import SpotifyTrackDisplay from './SpotifyTrackDisplay';
+import LikeUsersModal from './LikeUsersModal';
 import { setSelectedImage, addToast } from '../store/slices/uiSlice';
 import { API_URL } from '../config/api';
 import { ensureHttps } from '../utils/imageUtils';
@@ -19,6 +20,7 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
   const [isEditing, setIsEditing] = useState(false);
   const [editingContent, setEditingContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showLikeModal, setShowLikeModal] = useState(false);
 
   const isOwnPost = post.author?._id === currentUserId;
 
@@ -291,6 +293,12 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
                       e?.stopPropagation();
                       if (onLike) onLike(post._id);
                     }}
+                    onCountClick={(e) => {
+                      e?.stopPropagation();
+                      if (post.likes?.length > 0) {
+                        setShowLikeModal(true);
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -298,6 +306,14 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
           </div>
         </div>
       </div>
+
+      {/* Like Users Modal */}
+      <LikeUsersModal
+        isOpen={showLikeModal}
+        onClose={() => setShowLikeModal(false)}
+        itemId={post._id}
+        type="post"
+      />
     </div>
   );
 }

@@ -41,6 +41,11 @@ const UserSchema = new mongoose.Schema({
     enum: ['founder', 'developer', 'bug_hunter', 'admin', 'moderator', 'supporter', 'verified']
   }],
 
+  // Beta Features
+  betaFeatures: {
+    spotifyIntegration: { type: Boolean, default: false } // Admin tarafından aktifleştirilebilir
+  },
+
   // Spotify Integration
   spotify: {
     spotifyId: { type: String },

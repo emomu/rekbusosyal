@@ -1,11 +1,12 @@
 import { Heart } from 'lucide-react';
 import { useState } from 'react';
 
-const LikeButton = ({ isLiked, likeCount, onClick }) => {
+const LikeButton = ({ isLiked, likeCount, onClick, onCountClick }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [particles, setParticles] = useState([]);
 
   const handleClick = (e) => {
+    e.stopPropagation();
     if (!isLiked) {
       setIsAnimating(true);
 
@@ -23,7 +24,14 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
       }, 600);
     }
 
-    onClick();
+    onClick(e);
+  };
+
+  const handleCountClick = (e) => {
+    e.stopPropagation();
+    if (onCountClick && likeCount > 0) {
+      onCountClick(e);
+    }
   };
 
   return (
@@ -89,11 +97,14 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
         )}
       </div>
 
-      {/* Like sayısı */}
+      {/* Like sayısı - Tıklanabilir */}
       <span
+        onClick={handleCountClick}
         className={`text-xs font-medium transition-all duration-300 ${
           isLiked ? 'text-red-500' : 'text-gray-400 group-hover:text-red-400'
-        } ${isAnimating ? 'animate-like-count-pop' : ''}`}
+        } ${isAnimating ? 'animate-like-count-pop' : ''} ${
+          likeCount > 0 && onCountClick ? 'cursor-pointer hover:underline' : ''
+        }`}
       >
         {likeCount}
       </span>

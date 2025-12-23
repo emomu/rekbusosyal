@@ -9,6 +9,25 @@ const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 
+// In-memory store for currently listening users
+// Format: { trackId: [{ userId, username, fullName, profilePicture, startedAt }] }
+const listeningUsers = new Map();
+
+// Clean up old listening sessions every minute
+setInterval(() => {
+  const now = Date.now();
+  const TIMEOUT = 60000; // 1 minute timeout
+
+  for (const [trackId, users] of listeningUsers.entries()) {
+    const activeUsers = users.filter(u => (now - u.startedAt) < TIMEOUT);
+    if (activeUsers.length === 0) {
+      listeningUsers.delete(trackId);
+    } else {
+      listeningUsers.set(trackId, activeUsers);
+    }
+  }
+}, 60000);
+
 // Spotify embed sayfasından preview URL çekme fonksiyonu
 async function fetchPreviewUrlFromEmbed(trackId) {
   try {
@@ -63,19 +82,34 @@ function findNodeValue(obj, targetKey) {
   return null;
 }
 
-// Spotify'a yönlendir
-router.get('/auth', authMiddleware, (req, res) => {
-  const scope = 'user-read-currently-playing user-read-playback-state';
-  const state = req.userId; // User ID'yi state olarak kullanıyoruz
+// Spotify'a yönlendir (sadece beta kullanıcılar)
+router.get('/auth', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
 
-  const authUrl = `https://accounts.spotify.com/authorize?` +
-    `client_id=${SPOTIFY_CLIENT_ID}` +
-    `&response_type=code` +
-    `&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}` +
-    `&scope=${encodeURIComponent(scope)}` +
-    `&state=${state}`;
+    // Beta özelliği aktif değilse reddet
+    if (!user?.betaFeatures?.spotifyIntegration) {
+      return res.status(403).json({
+        error: 'Spotify entegrasyonu beta özelliğidir. Erişim için yetkiniz bulunmamaktadır.'
+      });
+    }
 
-  res.json({ authUrl });
+    const scope = 'user-read-currently-playing user-read-playback-state';
+    const state = req.userId; // User ID'yi state olarak kullanıyoruz
+
+    const authUrl = `https://accounts.spotify.com/authorize?` +
+      `client_id=${SPOTIFY_CLIENT_ID}` +
+      `&response_type=code` +
+      `&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}` +
+      `&scope=${encodeURIComponent(scope)}` +
+      `&state=${state}` +
+      `&show_dialog=true`; // Her seferinde hesap seçimi istenir
+
+    res.json({ authUrl });
+  } catch (error) {
+    console.error('Spotify auth error:', error);
+    res.status(500).json({ error: 'Bir hata oluştu' });
+  }
 });
 
 // Şarkı arama endpoint'i (Client Credentials kullanarak - kullanıcı bağımsız)
@@ -206,9 +240,18 @@ router.get('/callback', async (req, res) => {
   }
 });
 
-// Spotify bağlantısını kaldır
+// Spotify bağlantısını kaldır (sadece beta kullanıcılar)
 router.post('/disconnect', authMiddleware, async (req, res) => {
   try {
+    const user = await User.findById(req.userId);
+
+    // Beta özelliği aktif değilse reddet
+    if (!user?.betaFeatures?.spotifyIntegration) {
+      return res.status(403).json({
+        error: 'Spotify entegrasyonu beta özelliğidir.'
+      });
+    }
+
     await User.findByIdAndUpdate(req.userId, {
       spotify: {
         spotifyId: null,
@@ -299,10 +342,39 @@ router.get('/currently-playing/:username', async (req, res) => {
     }
 
     const track = data.item;
+    const trackId = track.id;
+
+    // Kullanıcıyı dinleme listesine ekle
+    const userInfo = {
+      userId: user._id.toString(),
+      username: user.username,
+      fullName: user.fullName,
+      profilePicture: user.profilePicture,
+      startedAt: Date.now()
+    };
+
+    // Bu şarkıyı dinleyenleri al veya yeni liste oluştur
+    const currentListeners = listeningUsers.get(trackId) || [];
+
+    // Bu kullanıcıyı listeden çıkar (varsa) ve yeniden ekle (güncelle)
+    const filteredListeners = currentListeners.filter(l => l.userId !== userInfo.userId);
+    filteredListeners.push(userInfo);
+
+    listeningUsers.set(trackId, filteredListeners);
+
+    // Aynı şarkıyı dinleyenleri döndür (kendisi hariç)
+    const otherListeners = filteredListeners
+      .filter(l => l.userId !== userInfo.userId)
+      .map(l => ({
+        username: l.username,
+        fullName: l.fullName,
+        profilePicture: l.profilePicture
+      }));
 
     res.json({
       isPlaying: true,
       track: {
+        id: trackId,
         name: track.name,
         artist: track.artists.map(a => a.name).join(', '),
         album: track.album.name,
@@ -310,7 +382,8 @@ router.get('/currently-playing/:username', async (req, res) => {
         url: track.external_urls.spotify,
         duration: track.duration_ms,
         progress: data.progress_ms
-      }
+      },
+      listeningAlong: otherListeners
     });
   } catch (error) {
     console.error('Currently playing error:', error.message);

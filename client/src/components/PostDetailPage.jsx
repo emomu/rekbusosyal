@@ -13,9 +13,10 @@ import MediaUploadDialog from './MediaUploadDialog';
 import GiphyPicker from './GiphyPicker';
 import MediaDisplay from './MediaDisplay';
 import SpotifyTrackDisplay from './SpotifyTrackDisplay';
+import LikeUsersModal from './LikeUsersModal';
 
-// --- LIKE BUTONU BİLEŞENİ (Dokunulmadı, aynen korundu) ---
-const LikeButton = ({ isLiked, likeCount, onClick }) => {
+// --- LIKE BUTONU BİLEŞENİ ---
+const LikeButton = ({ isLiked, likeCount, onClick, onCountClick }) => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [particles, setParticles] = useState([]);
 
@@ -37,6 +38,13 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
     }
 
     onClick();
+  };
+
+  const handleCountClick = (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (onCountClick && likeCount > 0) {
+      onCountClick(e);
+    }
   };
 
   return (
@@ -89,8 +97,11 @@ const LikeButton = ({ isLiked, likeCount, onClick }) => {
       </div>
 
       <span
+        onClick={handleCountClick}
         className={`text-sm font-medium transition-all duration-300 ${isLiked ? 'text-red-500' : 'text-gray-500 group-hover:text-red-500'
-          } ${isAnimating ? 'animate-like-count-pop' : ''}`}
+          } ${isAnimating ? 'animate-like-count-pop' : ''} ${
+          likeCount > 0 && onCountClick ? 'cursor-pointer hover:underline' : ''
+        }`}
       >
         {likeCount > 0 ? likeCount : ''}
       </span>
@@ -149,6 +160,11 @@ export default function PostDetailPage() {
   // Yerel State
   const [isLiked, setIsLiked] = useState(post?.likes?.includes(currentUserId) || false);
   const [likeCount, setLikeCount] = useState(post?.likes?.length || 0);
+
+  // Like modal states
+  const [showPostLikeModal, setShowPostLikeModal] = useState(false);
+  const [showCommentLikeModal, setShowCommentLikeModal] = useState(false);
+  const [selectedCommentId, setSelectedCommentId] = useState(null);
 
   // Media upload states
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -741,6 +757,12 @@ export default function PostDetailPage() {
             isLiked={isLiked}
             likeCount={likeCount}
             onClick={handleLikeToggle}
+            onCountClick={(e) => {
+              e?.stopPropagation();
+              if (likeCount > 0) {
+                setShowPostLikeModal(true);
+              }
+            }}
           />
 
           <button className="text-gray-500 hover:text-green-500 hover:bg-green-50 p-2 rounded-full transition group">
@@ -966,6 +988,13 @@ export default function PostDetailPage() {
                           e?.stopPropagation();
                           handleLikeComment(comment._id);
                         }}
+                        onCountClick={(e) => {
+                          e?.stopPropagation();
+                          if (comment.likes?.length > 0) {
+                            setSelectedCommentId(comment._id);
+                            setShowCommentLikeModal(true);
+                          }
+                        }}
                       />
                     </div>
                   </div>
@@ -991,6 +1020,21 @@ export default function PostDetailPage() {
         isOpen={giphyPickerOpen}
         onClose={() => setGiphyPickerOpen(false)}
         onSelect={handleGiphySelect}
+      />
+
+      {/* Like Modals */}
+      <LikeUsersModal
+        isOpen={showPostLikeModal}
+        onClose={() => setShowPostLikeModal(false)}
+        itemId={post._id}
+        type="post"
+      />
+
+      <LikeUsersModal
+        isOpen={showCommentLikeModal}
+        onClose={() => setShowCommentLikeModal(false)}
+        itemId={selectedCommentId}
+        type="comment"
       />
     </div>
   );

@@ -357,6 +357,12 @@ export default function ProfilePage({ onMenuClick }) {
       });
       const data = await res.json();
 
+      if (res.status === 403) {
+        toast.error(data.error || 'Spotify entegrasyonu için yetkiniz bulunmamaktadır.');
+        setIsConnectingSpotify(false);
+        return;
+      }
+
       if (data.authUrl) {
         window.location.href = data.authUrl;
       }
@@ -786,55 +792,62 @@ export default function ProfilePage({ onMenuClick }) {
           </p>
         </div>
 
-        {/* Spotify Entegrasyonu */}
-        <div className="mb-6 mt-6">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3 px-1">Spotify Entegrasyonu</h2>
-          <div className="bg-white border border-gray-100 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${isSpotifyConnected ? 'bg-green-100' : 'bg-gray-100'}`}>
-                  <Music size={20} className={isSpotifyConnected ? 'text-green-600' : 'text-gray-400'} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-1">
-                    <span>Spotify Hesabı</span>
-                    {isSpotifyConnected && (
-                      <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">Bağlı</span>
-                    )}
+        {/* Spotify Entegrasyonu - Sadece Beta Kullanıcılar */}
+        {profile?.betaFeatures?.spotifyIntegration && (
+          <div className="mb-6 mt-6">
+            <div className="flex items-center gap-2 mb-3 px-1">
+              <h2 className="text-sm font-semibold text-gray-900">Spotify Entegrasyonu</h2>
+              <span className="text-[10px] bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">
+                Beta
+              </span>
+            </div>
+            <div className="bg-white border border-gray-100 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isSpotifyConnected ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    <Music size={20} className={isSpotifyConnected ? 'text-green-600' : 'text-gray-400'} />
                   </div>
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-1">
+                      <span>Spotify Hesabı</span>
+                      {isSpotifyConnected && (
+                        <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">Bağlı</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {isSpotifyConnected
+                        ? 'Şu an dinlediğin şarkı profilinde görünecek'
+                        : 'Spotify hesabını bağla, dinlediklerini paylaş'}
+                    </p>
+                  </div>
+                </div>
+                {isSpotifyConnected ? (
+                  <button
+                    onClick={handleDisconnectSpotify}
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition"
+                  >
+                    Bağlantıyı Kes
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConnectSpotify}
+                    disabled={isConnectingSpotify}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isConnectingSpotify ? 'Bağlanıyor...' : 'Bağla'}
+                  </button>
+                )}
+              </div>
+              {isSpotifyConnected && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
                   <p className="text-xs text-gray-500">
-                    {isSpotifyConnected
-                      ? 'Şu an dinlediğin şarkı profilinde görünecek'
-                      : 'Spotify hesabını bağla, dinlediklerini paylaş'}
+                    Public profilin ziyaret edildiğinde, Spotify'da aktif olarak dinlediğin şarkı görüntülenecek.
                   </p>
                 </div>
-              </div>
-              {isSpotifyConnected ? (
-                <button
-                  onClick={handleDisconnectSpotify}
-                  className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition"
-                >
-                  Bağlantıyı Kes
-                </button>
-              ) : (
-                <button
-                  onClick={handleConnectSpotify}
-                  disabled={isConnectingSpotify}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isConnectingSpotify ? 'Bağlanıyor...' : 'Bağla'}
-                </button>
               )}
             </div>
-            {isSpotifyConnected && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs text-gray-500">
-                  Public profilin ziyaret edildiğinde, Spotify'da aktif olarak dinlediğin şarkı görüntülenecek.
-                </p>
-              </div>
-            )}
           </div>
-        </div>
+        )}
 
         {/* Sürüm Notları Butonu */}
         <div className="mt-6">
