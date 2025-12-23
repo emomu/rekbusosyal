@@ -1,12 +1,67 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const cheerio = require('cheerio');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
+
+// Spotify embed sayfasından preview URL çekme fonksiyonu
+async function fetchPreviewUrlFromEmbed(trackId) {
+  try {
+    const embedUrl = `https://open.spotify.com/embed/track/${trackId}`;
+    const response = await axios.get(embedUrl);
+    const html = response.data;
+
+    // HTML'den script tag'lerini parse et
+    const $ = cheerio.load(html);
+    const scripts = $('script');
+
+    for (let i = 0; i < scripts.length; i++) {
+      const scriptContent = $(scripts[i]).html();
+      if (scriptContent && scriptContent.includes('audioPreview')) {
+        try {
+          // JSON formatındaki script içeriğini parse et
+          const jsonMatch = scriptContent.match(/(\{.*\})/s);
+          if (jsonMatch) {
+            const jsonData = JSON.parse(jsonMatch[1]);
+            // audioPreview değerini recursive olarak bul
+            const audioPreview = findNodeValue(jsonData, 'audioPreview');
+            if (audioPreview && audioPreview.url) {
+              return audioPreview.url;
+            }
+          }
+        } catch (e) {
+          // JSON parse hatası, sonraki script'e geç
+          continue;
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Preview URL fetch error for track:', trackId, error.message);
+    return null;
+  }
+}
+
+// JSON objesinde recursive olarak node değerini bulma
+function findNodeValue(obj, targetKey) {
+  if (typeof obj !== 'object' || obj === null) return null;
+
+  if (targetKey in obj) {
+    return obj[targetKey];
+  }
+
+  for (const key in obj) {
+    const result = findNodeValue(obj[key], targetKey);
+    if (result !== null) return result;
+  }
+
+  return null;
+}
 
 // Spotify'a yönlendir
 router.get('/auth', authMiddleware, (req, res) => {
@@ -61,16 +116,28 @@ router.get('/search', authMiddleware, async (req, res) => {
       }
     });
 
-    const tracks = searchResponse.data.tracks.items.map(track => ({
-      id: track.id,
-      name: track.name,
-      artist: track.artists.map(a => a.name).join(', '),
-      album: track.album.name,
-      albumArt: track.album.images[0]?.url,
-      previewUrl: track.preview_url,
-      spotifyUrl: track.external_urls.spotify,
-      duration: track.duration_ms
-    }));
+    // Şarkıları map'le ve preview URL yoksa embed'den çek
+    const tracks = await Promise.all(
+      searchResponse.data.tracks.items.map(async (track) => {
+        let previewUrl = track.preview_url;
+
+        // API'dan preview URL gelmediyse, embed sayfasından çekmeyi dene
+        if (!previewUrl) {
+          previewUrl = await fetchPreviewUrlFromEmbed(track.id);
+        }
+
+        return {
+          id: track.id,
+          name: track.name,
+          artist: track.artists.map(a => a.name).join(', '),
+          album: track.album.name,
+          albumArt: track.album.images[0]?.url,
+          previewUrl: previewUrl,
+          spotifyUrl: track.external_urls.spotify,
+          duration: track.duration_ms
+        };
+      })
+    );
 
     res.json({ tracks });
   } catch (error) {
