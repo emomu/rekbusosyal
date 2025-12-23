@@ -12,6 +12,7 @@ import { CommentsShimmer } from './LoadingShimmer';
 import MediaUploadDialog from './MediaUploadDialog';
 import GiphyPicker from './GiphyPicker';
 import MediaDisplay from './MediaDisplay';
+import SpotifyTrackDisplay from './SpotifyTrackDisplay';
 
 // --- LIKE BUTONU BİLEŞENİ (Dokunulmadı, aynen korundu) ---
 const LikeButton = ({ isLiked, likeCount, onClick }) => {
@@ -651,6 +652,13 @@ export default function PostDetailPage() {
         ) : (
           <div className="text-gray-900 text-xl leading-normal whitespace-pre-wrap mb-4 font-normal">
             {renderWithMentions(post.content)}
+          </div>
+        )}
+
+        {/* Spotify Track Display */}
+        {post.spotifyTrack && (
+          <div className="mb-4">
+            <SpotifyTrackDisplay track={post.spotifyTrack} compact={false} />
           </div>
         )}
 

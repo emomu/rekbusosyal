@@ -195,8 +195,15 @@ export default function SpotifyTrackPicker({ isOpen, onClose, onSelect }) {
 
                     {/* Track Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 truncate group-hover:text-green-600 transition">
-                        {track.name}
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-gray-900 truncate group-hover:text-green-600 transition">
+                          {track.name}
+                        </div>
+                        {!track.previewUrl && (
+                          <span className="shrink-0 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                            Önizleme yok
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-600 truncate">{track.artist}</div>
                       <div className="text-xs text-gray-400 truncate">{track.album}</div>
@@ -214,12 +221,6 @@ export default function SpotifyTrackPicker({ isOpen, onClose, onSelect }) {
                       <ExternalLink size={18} className="text-green-600" />
                     </a>
                   </div>
-
-                  {!track.previewUrl && (
-                    <div className="mt-2 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">
-                      Preview mevcut değil
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

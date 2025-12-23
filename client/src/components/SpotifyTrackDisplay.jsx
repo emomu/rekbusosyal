@@ -118,7 +118,7 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
             <div className="text-xs text-gray-600 truncate">{track.artist}</div>
 
             {/* Progress Bar */}
-            {track.previewUrl && (
+            {track.previewUrl ? (
               <div className="mt-2">
                 <div
                   className="h-1 bg-green-200 rounded-full cursor-pointer overflow-hidden"
@@ -137,6 +137,10 @@ export default function SpotifyTrackDisplay({ track, compact = false }) {
                     {formatTime(duration || 30)}
                   </span>
                 </div>
+              </div>
+            ) : (
+              <div className="mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">
+                Önizleme yok
               </div>
             )}
           </div>
