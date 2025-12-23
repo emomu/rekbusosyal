@@ -48,13 +48,12 @@ router.get('/search', authMiddleware, async (req, res) => {
 
     const accessToken = tokenResponse.data.access_token;
 
-    // Şarkı ara
+    // Şarkı ara (market parametresi kaldırıldı - daha fazla preview için)
     const searchResponse = await axios.get('https://api.spotify.com/v1/search', {
       params: {
         q: q,
         type: 'track',
-        limit: 10,
-        market: 'TR'
+        limit: 10
       },
       headers: {
         'Authorization': `Bearer ${accessToken}`
