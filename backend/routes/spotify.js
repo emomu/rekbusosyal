@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const axios = require('axios');
+const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
@@ -13,8 +14,8 @@ const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 async function fetchPreviewUrlFromEmbed(trackId) {
   try {
     const embedUrl = `https://open.spotify.com/embed/track/${trackId}`;
-    const response = await axios.get(embedUrl);
-    const html = response.data;
+    const response = await fetch(embedUrl);
+    const html = await response.text();
 
     // HTML'den script tag'lerini parse et
     const $ = cheerio.load(html);
