@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLoaderData, useNavigate, useParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, Calendar, Lock, User, MessageSquare } from 'lucide-react';
+import { ChevronLeft, Calendar, Lock, User, MessageSquare, Music, ExternalLink } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import FollowButton from './FollowButton';
@@ -31,6 +31,8 @@ export default function PublicProfilePage() {
   const [loadingConfessions, setLoadingConfessions] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [spotifyData, setSpotifyData] = useState(null);
+  const [loadingSpotify, setLoadingSpotify] = useState(true);
 
   const isOwnProfile = currentUsername === username;
 
@@ -146,6 +148,37 @@ export default function PublicProfilePage() {
       fetchUserConfessions(currentProfile._id, 1);
     }
   }, [activeTab, currentProfile, isFollowing, isOwnProfile]);
+
+  // Spotify şu an dinlenen şarkıyı çek
+  useEffect(() => {
+    const fetchSpotifyData = async () => {
+      if (!username) return;
+
+      try {
+        setLoadingSpotify(true);
+        const res = await fetch(`${API_URL}/api/spotify/currently-playing/${username}`);
+        const data = await res.json();
+
+        if (data.isPlaying) {
+          setSpotifyData(data.track);
+        } else {
+          setSpotifyData(null);
+        }
+      } catch (err) {
+        console.error('Spotify veri çekme hatası:', err);
+        setSpotifyData(null);
+      } finally {
+        setLoadingSpotify(false);
+      }
+    };
+
+    fetchSpotifyData();
+
+    // Her 30 saniyede bir güncelle
+    const interval = setInterval(fetchSpotifyData, 30000);
+
+    return () => clearInterval(interval);
+  }, [username]);
 
   // --- Takip İşlemleri ---
   const handleFollow = async (userId) => {
@@ -285,6 +318,43 @@ export default function PublicProfilePage() {
               )}
             </div>
             {currentProfile.bio && <p className="text-gray-700 text-sm mb-2 leading-relaxed whitespace-pre-wrap">{currentProfile.bio}</p>}
+
+            {/* Spotify Şu An Dinleniyor */}
+            {!loadingSpotify && spotifyData && (
+              <a
+                href={spotifyData.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-3 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg flex items-center gap-3 hover:from-green-100 hover:to-emerald-100 transition group"
+              >
+                <div className="relative">
+                  {spotifyData.albumArt ? (
+                    <img
+                      src={spotifyData.albumArt}
+                      alt={spotifyData.album}
+                      className="w-12 h-12 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-green-200 rounded flex items-center justify-center">
+                      <Music size={24} className="text-green-600" />
+                    </div>
+                  )}
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1">
+                    <Music size={10} className="text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <Music size={12} className="text-green-600" />
+                    <span className="text-xs text-green-600 font-medium">Şu an dinliyor</span>
+                  </div>
+                  <div className="font-semibold text-sm text-gray-900 truncate">{spotifyData.name}</div>
+                  <div className="text-xs text-gray-600 truncate">{spotifyData.artist}</div>
+                </div>
+                <ExternalLink size={16} className="text-green-600 group-hover:translate-x-0.5 transition-transform shrink-0" />
+              </a>
+            )}
+
             <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
               <div className="flex items-center gap-1">
                 <Calendar size={13} />

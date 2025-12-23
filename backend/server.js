@@ -91,6 +91,7 @@ const Notification = require('./models/Notification');
 const VersionNote = require('./models/VersionNote');
 
 const versionNotesRouter = require('./routes/versionNotes');
+const spotifyRouter = require('./routes/spotify');
 
 const app = express();
 
@@ -198,6 +199,7 @@ const passwordResetLimiter = rateLimit({
 // --- Resend Email Servisi ---
 const resend = new Resend(process.env.RESEND_API_KEY);
 app.use('/api/version-notes', versionNotesRouter);
+app.use('/api/spotify', spotifyRouter);
 // Email servis kontrolü
 if (!process.env.RESEND_API_KEY) {
   console.log('⚠️ RESEND_API_KEY bulunamadı. Email gönderilemeyecek.');

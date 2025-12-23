@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X, Trash2, FileText } from 'lucide-react';
+import { Camera, User, Lock, Mail, Calendar, Edit2, Check, X, Trash2, FileText, Music } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { API_URL } from '../config/api';
@@ -32,6 +32,8 @@ export default function ProfilePage({ onMenuClick }) {
   const [success, setSuccess] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSpotifyConnected, setIsSpotifyConnected] = useState(false);
+  const [isConnectingSpotify, setIsConnectingSpotify] = useState(false);
 
   const token = localStorage.getItem('token');
 
@@ -49,10 +51,28 @@ export default function ProfilePage({ onMenuClick }) {
           setNewUsername(data.username);
           setBio(data.bio || '');
           setIsPrivate(data.isPrivate || false);
+          setIsSpotifyConnected(data.spotify?.isConnected || false);
         }
       })
       .catch(err => setError('Profil yüklenemedi'));
   }, [token]);
+
+  // Spotify callback'den dönen sonucu kontrol et
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const spotifyStatus = params.get('spotify');
+
+    if (spotifyStatus === 'success') {
+      toast.success('Spotify hesabın başarıyla bağlandı!');
+      setIsSpotifyConnected(true);
+      // URL'den parametreyi kaldır
+      window.history.replaceState({}, '', '/ayarlar');
+    } else if (spotifyStatus === 'error') {
+      toast.error('Spotify bağlantısı başarısız oldu. Lütfen tekrar dene.');
+      // URL'den parametreyi kaldır
+      window.history.replaceState({}, '', '/ayarlar');
+    }
+  }, []);
 
   // Profil resmi dosyadan yükle
   const handleFileUpload = async (e) => {
@@ -325,6 +345,47 @@ export default function ProfilePage({ onMenuClick }) {
       }
     } catch (err) {
       setError('Bir hata oluştu');
+    }
+  };
+
+  // Spotify bağla
+  const handleConnectSpotify = async () => {
+    try {
+      setIsConnectingSpotify(true);
+      const res = await fetch(`${API_URL}/api/spotify/auth`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch (err) {
+      toast.error('Spotify bağlantısı başlatılamadı');
+      setIsConnectingSpotify(false);
+    }
+  };
+
+  // Spotify bağlantısını kaldır
+  const handleDisconnectSpotify = async () => {
+    if (!confirm('Spotify hesabını bağlantısını kaldırmak istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/spotify/disconnect`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        setIsSpotifyConnected(false);
+        toast.success('Spotify bağlantısı kaldırıldı');
+      } else {
+        toast.error('Bir hata oluştu');
+      }
+    } catch (err) {
+      toast.error('Bir hata oluştu');
     }
   };
 
@@ -719,6 +780,56 @@ export default function ProfilePage({ onMenuClick }) {
             <strong>Güvenlik:</strong> Profil bilgileriniz güvenli şekilde saklanmaktadır.
             Şifrenizi kimseyle paylaşmayın.
           </p>
+        </div>
+
+        {/* Spotify Entegrasyonu */}
+        <div className="mb-6 mt-6">
+          <h2 className="text-sm font-semibold text-gray-900 mb-3 px-1">Spotify Entegrasyonu</h2>
+          <div className="bg-white border border-gray-100 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${isSpotifyConnected ? 'bg-green-100' : 'bg-gray-100'}`}>
+                  <Music size={20} className={isSpotifyConnected ? 'text-green-600' : 'text-gray-400'} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-1">
+                    <span>Spotify Hesabı</span>
+                    {isSpotifyConnected && (
+                      <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">Bağlı</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {isSpotifyConnected
+                      ? 'Şu an dinlediğin şarkı profilinde görünecek'
+                      : 'Spotify hesabını bağla, dinlediklerini paylaş'}
+                  </p>
+                </div>
+              </div>
+              {isSpotifyConnected ? (
+                <button
+                  onClick={handleDisconnectSpotify}
+                  className="px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition"
+                >
+                  Bağlantıyı Kes
+                </button>
+              ) : (
+                <button
+                  onClick={handleConnectSpotify}
+                  disabled={isConnectingSpotify}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isConnectingSpotify ? 'Bağlanıyor...' : 'Bağla'}
+                </button>
+              )}
+            </div>
+            {isSpotifyConnected && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs text-gray-500">
+                  Public profilin ziyaret edildiğinde, Spotify'da aktif olarak dinlediğin şarkı görüntülenecek.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sürüm Notları Butonu */}

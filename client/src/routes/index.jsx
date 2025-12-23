@@ -7,6 +7,7 @@ import ErrorPage from '../pages/ErrorPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import UnauthorizedPage from '../pages/UnauthorizedPage';
 import MaintenancePage from '../pages/MaintenancePage';
+import SpotifyErrorPage from '../pages/SpotifyErrorPage';
 import MaintenanceWrapper from '../components/MaintenanceWrapper';
 import LoginPage from '../components/LoginPage';
 import ResetPasswordPage from '../components/ResetPasswordPage';
@@ -155,6 +156,10 @@ const router = createBrowserRouter([
       {
         path: '/hata',
         element: <ErrorPage />
+      },
+      {
+        path: '/spotify-hata',
+        element: <SpotifyErrorPage />
       },
       {
         path: '/yetkisiz',

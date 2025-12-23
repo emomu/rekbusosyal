@@ -40,6 +40,16 @@ const UserSchema = new mongoose.Schema({
     type: String,
     enum: ['founder', 'developer', 'bug_hunter', 'admin', 'moderator', 'supporter', 'verified']
   }],
+
+  // Spotify Integration
+  spotify: {
+    spotifyId: { type: String },
+    accessToken: { type: String },
+    refreshToken: { type: String },
+    tokenExpiresAt: { type: Date },
+    isConnected: { type: Boolean, default: false }
+  },
+
   createdAt: { type: Date, default: Date.now }
 });
 
