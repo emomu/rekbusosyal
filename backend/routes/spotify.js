@@ -48,12 +48,13 @@ router.get('/search', authMiddleware, async (req, res) => {
 
     const accessToken = tokenResponse.data.access_token;
 
-    // Şarkı ara (market parametresi kaldırıldı - daha fazla preview için)
+    // Şarkı ara (market=US parametresi eklendi - daha fazla preview için)
     const searchResponse = await axios.get('https://api.spotify.com/v1/search', {
       params: {
         q: q,
         type: 'track',
-        limit: 10
+        limit: 20,
+        market: 'TR' // ABD pazarı preview oranı daha yüksek
       },
       headers: {
         'Authorization': `Bearer ${accessToken}`
