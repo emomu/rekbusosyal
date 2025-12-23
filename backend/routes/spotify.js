@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const axios = require('axios');
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 const User = require('../models/User');
@@ -89,37 +88,35 @@ router.get('/search', authMiddleware, async (req, res) => {
 
   try {
     // Client Credentials token al (kullanıcı bağımsız)
-    const tokenResponse = await axios.post(
-      'https://accounts.spotify.com/api/token',
-      new URLSearchParams({
-        grant_type: 'client_credentials',
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
-        }
-      }
-    );
-
-    const accessToken = tokenResponse.data.access_token;
-
-    // Şarkı ara (market=US parametresi eklendi - daha fazla preview için)
-    const searchResponse = await axios.get('https://api.spotify.com/v1/search', {
-      params: {
-        q: q,
-        type: 'track',
-        limit: 20,
-        market: 'TR' // ABD pazarı preview oranı daha yüksek
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
       },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+      })
+    });
+
+    const tokenData = await tokenResponse.json();
+    const accessToken = tokenData.access_token;
+
+    // Şarkı ara (market=TR parametresi ile)
+    const searchUrl = `https://api.spotify.com/v1/search?` +
+      `q=${encodeURIComponent(q)}&type=track&limit=20&market=TR`;
+
+    const searchResponse = await fetch(searchUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
     });
 
+    const searchData = await searchResponse.json();
+
     // Şarkıları map'le ve preview URL yoksa embed'den çek
     const tracks = await Promise.all(
-      searchResponse.data.tracks.items.map(async (track) => {
+      searchData.tracks.items.map(async (track) => {
         let previewUrl = track.preview_url;
 
         // API'dan preview URL gelmediyse, embed sayfasından çekmeyi dene
@@ -142,7 +139,7 @@ router.get('/search', authMiddleware, async (req, res) => {
 
     res.json({ tracks });
   } catch (error) {
-    console.error('Spotify search error:', error.response?.data || error.message);
+    console.error('Spotify search error:', error.message);
     res.status(500).json({ error: 'Arama sırasında bir hata oluştu' });
   }
 });
@@ -167,29 +164,29 @@ router.get('/callback', async (req, res) => {
 
   try {
     // Access token al
-    const tokenResponse = await axios.post(
-      'https://accounts.spotify.com/api/token',
-      new URLSearchParams({
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
+      },
+      body: new URLSearchParams({
         grant_type: 'authorization_code',
         code: code,
         redirect_uri: SPOTIFY_REDIRECT_URI,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
-        }
-      }
-    );
+      })
+    });
 
-    const { access_token, refresh_token, expires_in } = tokenResponse.data;
+    const tokenData = await tokenResponse.json();
+    const { access_token, refresh_token, expires_in } = tokenData;
 
     // Spotify kullanıcı bilgilerini al
-    const userResponse = await axios.get('https://api.spotify.com/v1/me', {
+    const userResponse = await fetch('https://api.spotify.com/v1/me', {
       headers: { 'Authorization': `Bearer ${access_token}` }
     });
 
-    const spotifyId = userResponse.data.id;
+    const userData = await userResponse.json();
+    const spotifyId = userData.id;
 
     // User'ı güncelle
     await User.findByIdAndUpdate(userId, {
@@ -204,14 +201,7 @@ router.get('/callback', async (req, res) => {
 
     res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=success`);
   } catch (error) {
-    console.error('Spotify callback error:', error.response?.data || error.message);
-
-    // Redirect URI hatası kontrolü
-    if (error.response?.data?.error === 'invalid_grant' ||
-        error.response?.data?.error_description?.includes('redirect_uri')) {
-      return res.redirect(`${process.env.CLIENT_URL}/spotify-hata`);
-    }
-
+    console.error('Spotify callback error:', error.message);
     res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=error`);
   }
 });
@@ -239,26 +229,25 @@ router.post('/disconnect', authMiddleware, async (req, res) => {
 // Access token yenile
 async function refreshAccessToken(refreshToken) {
   try {
-    const response = await axios.post(
-      'https://accounts.spotify.com/api/token',
-      new URLSearchParams({
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
+      },
+      body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken,
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
-        }
-      }
-    );
+      })
+    });
 
+    const data = await response.json();
     return {
-      accessToken: response.data.access_token,
-      expiresIn: response.data.expires_in
+      accessToken: data.access_token,
+      expiresIn: data.expires_in
     };
   } catch (error) {
-    console.error('Token refresh error:', error.response?.data || error.message);
+    console.error('Token refresh error:', error.message);
     throw error;
   }
 }
@@ -295,15 +284,21 @@ router.get('/currently-playing/:username', async (req, res) => {
     }
 
     // Şu an dinlenen şarkıyı al
-    const response = await axios.get('https://api.spotify.com/v1/me/player/currently-playing', {
+    const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
 
-    if (response.status === 204 || !response.data || !response.data.is_playing) {
+    if (response.status === 204 || !response.ok) {
       return res.json({ isPlaying: false });
     }
 
-    const track = response.data.item;
+    const data = await response.json();
+
+    if (!data || !data.is_playing) {
+      return res.json({ isPlaying: false });
+    }
+
+    const track = data.item;
 
     res.json({
       isPlaying: true,
@@ -314,15 +309,11 @@ router.get('/currently-playing/:username', async (req, res) => {
         albumArt: track.album.images[0]?.url,
         url: track.external_urls.spotify,
         duration: track.duration_ms,
-        progress: response.data.progress_ms
+        progress: data.progress_ms
       }
     });
   } catch (error) {
-    if (error.response?.status === 401) {
-      // Unauthorized, token geçersiz
-      return res.json({ isPlaying: false });
-    }
-    console.error('Currently playing error:', error.response?.data || error.message);
+    console.error('Currently playing error:', error.message);
     res.json({ isPlaying: false });
   }
 });
