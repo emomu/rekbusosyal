@@ -1,13 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Music, Play, Pause, ExternalLink } from 'lucide-react';
+import { Music, Play, Pause, ExternalLink, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ensureHttps } from '../utils/imageUtils';
 
 export default function SpotifyTrackDisplay({ track, compact = false, initialProgress = null, listeningAlong = [] }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [showListeningModal, setShowListeningModal] = useState(false);
   const audioRef = useRef(null);
   const startTimeRef = useRef(null);
   const trackIdRef = useRef(null);
+  const navigate = useNavigate();
 
   // Track değiştiğinde veya ilk yükleme
   useEffect(() => {
@@ -133,20 +137,26 @@ export default function SpotifyTrackDisplay({ track, compact = false, initialPro
 
             {/* Listening Along - Discord gibi */}
             {listeningAlong && listeningAlong.length > 0 && (
-              <div className="flex items-center gap-1">
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowListeningModal(true);
+                }}
+                className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition"
+                title="Aynı şarkıyı dinleyenler"
+              >
                 <div className="flex -space-x-2">
                   {listeningAlong.slice(0, 3).map((user, idx) => (
                     <img
                       key={idx}
-                      src={user.profilePicture || '/default-avatar.png'}
+                      src={ensureHttps(user.profilePicture) || '/default-avatar.png'}
                       alt={user.fullName}
                       className="w-5 h-5 rounded-full border-2 border-green-50 object-cover"
-                      title={user.fullName}
                     />
                   ))}
                 </div>
                 <span className="text-[10px] text-green-600 font-medium">
-                  +{listeningAlong.length} dinliyor
+                  +{listeningAlong.length}
                 </span>
               </div>
             )}
@@ -308,6 +318,35 @@ export default function SpotifyTrackDisplay({ track, compact = false, initialPro
                   {formatTime(duration || 30)}
                 </span>
               </div>
+
+              {/* Listening Along - Full mode */}
+              {listeningAlong && listeningAlong.length > 0 && (
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowListeningModal(true);
+                  }}
+                  className="mt-3 flex items-center gap-2 cursor-pointer hover:bg-green-100 px-3 py-2 rounded-lg transition"
+                  title="Aynı şarkıyı dinleyenler"
+                >
+                  <div className="flex -space-x-2">
+                    {listeningAlong.slice(0, 5).map((user, idx) => (
+                      <img
+                        key={idx}
+                        src={ensureHttps(user.profilePicture) || '/default-avatar.png'}
+                        alt={user.fullName}
+                        className="w-6 h-6 rounded-full border-2 border-white object-cover"
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm text-green-700 font-medium">
+                    {listeningAlong.length === 1
+                      ? `${listeningAlong[0].fullName} de dinliyor`
+                      : `${listeningAlong.length} kişi de dinliyor`
+                    }
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="mt-3 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg inline-block">
@@ -327,6 +366,73 @@ export default function SpotifyTrackDisplay({ track, compact = false, initialPro
           <ExternalLink size={20} />
         </a>
       </div>
+
+      {/* Listening Along Modal */}
+      {showListeningModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setShowListeningModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users size={20} className="text-green-600" />
+                <h3 className="text-lg font-bold text-gray-900">Aynı Şarkıyı Dinleyenler</h3>
+              </div>
+              <button
+                onClick={() => setShowListeningModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="divide-y divide-gray-100">
+                {listeningAlong.map((user, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      navigate(`/${user.username}`);
+                      setShowListeningModal(false);
+                    }}
+                    className="p-4 hover:bg-gray-50 cursor-pointer transition flex items-center gap-3"
+                  >
+                    {user.profilePicture ? (
+                      <img
+                        src={ensureHttps(user.profilePicture)}
+                        alt={user.fullName}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+                        <span className="text-white font-bold text-lg">
+                          {user.fullName?.charAt(0)?.toUpperCase() || 'U'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{user.fullName}</p>
+                      <p className="text-sm text-gray-500 truncate">@{user.username}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-green-600">
+                      <Music size={14} />
+                      <span className="text-xs font-medium">Dinliyor</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
