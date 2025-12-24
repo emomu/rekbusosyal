@@ -412,11 +412,17 @@ export default function AppLayout() {
                 onClick={() => navigate(`/kullanici/${currentUserInfo.username}`)}
                 className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition"
               >
-                <img
-                  src={currentUserInfo.profilePicture || 'https://via.placeholder.com/150'}
-                  alt={currentUserInfo.username}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-blue-500"
-                />
+                {currentUserInfo.profilePicture ? (
+                  <img
+                    src={currentUserInfo.profilePicture}
+                    alt={currentUserInfo.username}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-blue-500"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center border-2 border-blue-500">
+                    <User size={24} className="text-gray-500" />
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="font-bold text-gray-900">{currentUserInfo.fullName}</div>
                   <div className="text-sm text-gray-500">@{currentUserInfo.username}</div>

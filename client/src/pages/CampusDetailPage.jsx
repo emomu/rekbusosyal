@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLoaderData, useNavigate, useOutletContext } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { ChevronLeft, MessageSquare, Lock, Send, Heart, Trash2 } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Lock, Send, Heart, Trash2, User } from 'lucide-react';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import CampusRating from '../components/CampusRating';
@@ -314,11 +314,17 @@ export default function CampusDetailPage() {
                 return (
                   <div key={comment._id} className="p-5 hover:bg-gray-50 transition rounded-xl">
                     <div className="flex items-start gap-3 mb-2">
-                      <img
-                        src={comment.author?.profilePicture || 'https://via.placeholder.com/40'}
-                        className="w-10 h-10 bg-gray-200 rounded-full object-cover border border-gray-200"
-                        alt={comment.author?.username}
-                      />
+                      {comment.author?.profilePicture ? (
+                        <img
+                          src={comment.author.profilePicture}
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                          alt={comment.author?.username}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center border border-gray-300">
+                          <User size={20} className="text-gray-500" />
+                        </div>
+                      )}
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 flex-wrap">
