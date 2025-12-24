@@ -430,6 +430,63 @@ export default function AppLayout() {
               </div>
             )}
 
+            {/* Search Section */}
+            <div className="p-4 border-b border-gray-100">
+              <div className="relative">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Kullanıcı ara..."
+                  value={searchQuery}
+                  onChange={handleSearch}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-100 rounded-full text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 transition"
+                />
+
+                {/* Search Results Dropdown */}
+                {(searchResults.length > 0 || isSearching) && (
+                  <div className="absolute top-full mt-2 w-full bg-white rounded-lg shadow-lg border border-gray-200 max-h-80 overflow-y-auto z-50">
+                    {isSearching ? (
+                      <div className="p-4 text-center text-gray-500 text-sm">
+                        Aranıyor...
+                      </div>
+                    ) : (
+                      searchResults.map((user) => (
+                        <div
+                          key={user._id}
+                          onClick={() => {
+                            handleSearchResultClick(user.username);
+                            setIsMobileMenuOpen(false);
+                          }}
+                          className="p-3 hover:bg-gray-50 cursor-pointer flex items-center gap-3 transition"
+                        >
+                          {user.profilePicture ? (
+                            <img
+                              src={user.profilePicture}
+                              alt={user.username}
+                              className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center border border-gray-300">
+                              <User size={20} className="text-gray-500" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900 text-sm">{user.fullName}</div>
+                            <span className="text-xs text-gray-500">@{user.username}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    {!isSearching && searchResults.length === 0 && searchQuery.length >= 2 && (
+                      <div className="p-4 text-center text-gray-500 text-sm">
+                        Sonuç bulunamadı.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Navigation Links */}
             <nav className="p-4 space-y-2">
               <NavLink
