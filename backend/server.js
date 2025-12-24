@@ -92,6 +92,8 @@ const VersionNote = require('./models/VersionNote');
 
 const versionNotesRouter = require('./routes/versionNotes');
 const spotifyRouter = require('./routes/spotify');
+const eventsRouter = require('./routes/events');
+const communitiesRouter = require('./routes/communities');
 
 const app = express();
 
@@ -200,6 +202,8 @@ const passwordResetLimiter = rateLimit({
 const resend = new Resend(process.env.RESEND_API_KEY);
 app.use('/api/version-notes', versionNotesRouter);
 app.use('/api/spotify', spotifyRouter);
+app.use('/api/events', eventsRouter);
+app.use('/api/communities', communitiesRouter);
 // Email servis kontrolü
 if (!process.env.RESEND_API_KEY) {
   console.log('⚠️ RESEND_API_KEY bulunamadı. Email gönderilemeyecek.');
@@ -415,6 +419,27 @@ app.post('/api/posts', auth, cooldown('post'), upload.array('media', 4), async (
     let savedPost = await newPost.save();
     // Kaydedilen postu yazar bilgisiyle birlikte geri döndür
     savedPost = await savedPost.populate('author', 'username profilePicture badges fullName');
+
+    // Duyuru hesabından mı atıldı kontrol et
+    const community = await Community.findOne({ announcementAccount: req.userId });
+    if (community) {
+      // Kulübün tüm üyelerine bildirim gönder (posttaki kişi hariç)
+      const memberIds = community.members.filter(memberId => memberId.toString() !== req.userId);
+
+      // Toplu bildirim oluştur
+      const notifications = memberIds.map(memberId => ({
+        recipient: memberId,
+        sender: req.userId,
+        type: 'announcement_post',
+        post: savedPost._id,
+        read: false
+      }));
+
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+        console.log(`📢 ${community.name} duyuru hesabından post atıldı - ${notifications.length} üyeye bildirim gönderildi`);
+      }
+    }
 
     res.status(201).json(savedPost);
   } catch (err) {
@@ -2007,6 +2032,17 @@ app.post('/api/users/:userId/follow', async (req, res) => {
     targetUser.followers.push(currentUserId);
 
     await Promise.all([currentUser.save(), targetUser.save()]);
+
+    // Duyuru hesabı mı kontrol et
+    const community = await Community.findOne({ announcementAccount: userId });
+    if (community) {
+      // Kullanıcıyı kulübün üyesi yap (eğer değilse)
+      if (!community.members.includes(currentUserId)) {
+        community.members.push(currentUserId);
+        await community.save();
+        console.log(`📢 User ${currentUserId} otomatik olarak ${community.name} kulübüne eklendi (duyuru hesabı takibi)`);
+      }
+    }
 
     // Takip bildirimi oluştur (açık hesaplar için)
     await Notification.create({

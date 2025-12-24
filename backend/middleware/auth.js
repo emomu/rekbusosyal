@@ -19,6 +19,7 @@ const auth = (req, res, next) => {
         const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
         req.userId = decoded.id; // request objesine kullanıcı id'sini ekle
         req.userRole = decoded.role; // Role'ü de request'e ekle
+        req.user = { userId: decoded.id, role: decoded.role }; // Tutarlılık için req.user objesi
         next();
     } catch (error) {
         // Check if token expired

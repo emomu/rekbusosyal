@@ -14,8 +14,8 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion', 'comment_reply', 'version_update'
-    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'comment_reply', 'suggestion', 'version_update'],
+    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion', 'comment_reply', 'version_update', 'announcement_post'
+    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'comment_reply', 'suggestion', 'version_update', 'announcement_post'],
     required: true
   },
   post: {

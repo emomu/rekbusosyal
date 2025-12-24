@@ -11,6 +11,14 @@ const CommunitySchema = new mongoose.Schema({
   imageUrl: { type: String },
   manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Kulüp yöneticisi
   members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Üyeler
+
+  // Kulübün özel announcement hesabı
+  announcementAccount: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
   votes: {
     positive: { type: Number, default: 0 },
     neutral: { type: Number, default: 0 },

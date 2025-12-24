@@ -16,7 +16,10 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
   const [processingIds, setProcessingIds] = useState([]);
 
   useEffect(() => {
-    fetchNotifications(1);
+    // Sadece bildirimler yoksa fetch et (AppLayout zaten ilk yüklemeyi yapar)
+    if (notifications.length === 0) {
+      fetchNotifications(1);
+    }
   }, []);
 
   const fetchNotifications = async (page = 1) => {
@@ -218,6 +221,14 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         onClose();
         break;
 
+      case 'announcement_post':
+        // Duyuru bildirimi - ilgili post'a git
+        if (notification.post?._id) {
+          onNavigateToPost(notification.post._id);
+          onClose(); // Bildirim panelini kapat
+        }
+        break;
+
       default:
         break;
     }
@@ -242,6 +253,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return <Star size={20} className="text-yellow-500" />;
       case 'version_update':
         return <Gift size={20} className="text-indigo-500" />;
+      case 'announcement_post': // YENİ: Duyuru gönderisi
+        return <Bell size={20} className="text-blue-600" />;
       default:
         return <Bell size={20} className="text-gray-500" />;
     }
@@ -268,6 +281,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return `Günün önerisi: ${senderName} kullanıcısının popüler gönderisine göz at!`;
       case 'version_update':
         return `Yeni sürüm geldi! ${notification.version || ''} sürümündeki yenilikleri keşfet.`;
+      case 'announcement_post': // YENİ
+        return `${senderName} yeni bir duyuru paylaştı`;
       default:
         return 'Yeni bir bildirim';
     }

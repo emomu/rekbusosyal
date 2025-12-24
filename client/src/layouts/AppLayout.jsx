@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { Outlet, useLocation, NavLink, useNavigate, useNavigation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Home, MessageSquare, User, MapPin, Search, LogOut, Settings, Shield, X, Bell } from 'lucide-react';
+import { Home, MessageSquare, User, MapPin, Search, LogOut, Settings, Shield, X, Bell, Calendar } from 'lucide-react';
 import Lottie from 'lottie-react';
 import { logout } from '../store/slices/authSlice';
 import { API_URL } from '../config/api';
@@ -13,7 +13,7 @@ import NotificationPermissionPrompt from '../components/NotificationPermissionPr
 import { ToastContainer } from '../components/Toast';
 import CookieConsent from '../components/CookieConsent';
 import { setActiveTab, setSelectedImage, removeToast } from '../store/slices/uiSlice';
-import { setUnreadCount } from '../store/slices/notificationsSlice';
+import { setUnreadCount, setNotifications, setPagination } from '../store/slices/notificationsSlice';
 import loaderAnimation from '../assets/loader.json';
 import {
   shouldShowPermissionPrompt,
@@ -66,6 +66,7 @@ export default function AppLayout() {
       '/itiraflar': 'itiraflar',
       '/kampusler': 'kampusler',
       '/topluluklar': 'topluluklar',
+      '/takvim': 'takvim',
       '/ayarlar': 'profil',
       '/admin': 'admin',
       '/surum-notlari': 'versionNotes'
@@ -105,31 +106,38 @@ export default function AppLayout() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Poll for new notifications and show browser notifications
+  // Fetch initial notifications and poll for updates
   useEffect(() => {
     if (!token) return;
 
     let isFirstFetch = true;
 
-    // Initial fetch
+    // Fetch notifications with count
     const fetchNotifications = async () => {
       try {
-        const res = await api.get('/api/notifications/unread-count');
-        const data = await res.json();
-        const newCount = data.count || 0;
+        // Fetch both notifications list and unread count
+        const [notifRes, countRes] = await Promise.all([
+          api.get('/api/notifications?page=1&limit=20'),
+          api.get('/api/notifications/unread-count')
+        ]);
 
-        // İlk fetch'te sadece ref'i güncelle, bildirim gösterme
+        const notifData = await notifRes.json();
+        const countData = await countRes.json();
+        const newCount = countData.count || 0;
+
+        // İlk fetch'te bildirimleri Redux'a yükle
         if (isFirstFetch) {
+          if (notifData.notifications) {
+            dispatch(setNotifications(notifData.notifications));
+            dispatch(setPagination(notifData.pagination));
+          }
           previousUnreadCountRef.current = newCount;
           isFirstFetch = false;
         } else {
           // Sonraki fetch'lerde: yeni bildirim varsa göster
           const previousCount = previousUnreadCountRef.current;
           if (newCount > previousCount && newCount > 0 && canShowNotification()) {
-            // New notification detected! Fetch latest notification to show browser notification
-            const notifRes = await api.get('/api/notifications?page=1&limit=1');
-            const notifData = await notifRes.json();
-
+            // New notification detected! Show browser notification
             if (notifData.notifications && notifData.notifications.length > 0) {
               const latestNotification = notifData.notifications[0];
               // Show browser notification only if it's unread
@@ -138,20 +146,25 @@ export default function AppLayout() {
               }
             }
           }
+          // Bildirimleri her seferinde güncelle (yeni bildirimler için)
+          if (notifData.notifications) {
+            dispatch(setNotifications(notifData.notifications));
+            dispatch(setPagination(notifData.pagination));
+          }
           previousUnreadCountRef.current = newCount;
         }
 
-        // Her zaman Redux state'i güncelle
+        // Her zaman unread count'u güncelle
         dispatch(setUnreadCount(newCount));
       } catch (err) {
         console.error('Error polling notifications:', err);
       }
     };
 
-    // Fetch immediately
+    // Fetch immediately on mount
     fetchNotifications();
 
-    // Poll every 10 seconds (daha responsive)
+    // Poll every 10 seconds
     const pollInterval = setInterval(fetchNotifications, 10000);
 
     return () => clearInterval(pollInterval);
@@ -298,6 +311,20 @@ export default function AppLayout() {
           </NavLink>
 
           <NavLink
+            to="/takvim"
+            className={({ isActive }) =>
+              `flex items-center gap-3 p-3 rounded-lg transition ${
+                isActive
+                  ? 'bg-blue-900 text-white font-semibold'
+                  : 'hover:bg-gray-100 text-gray-700'
+              }`
+            }
+          >
+            <Calendar size={22} />
+            <span>Takvim</span>
+          </NavLink>
+
+          <NavLink
             to="/ayarlar"
             className={({ isActive }) =>
               `flex items-center gap-3 p-3 rounded-lg transition ${
@@ -310,6 +337,22 @@ export default function AppLayout() {
             <Settings size={22} />
             <span>Ayarlar</span>
           </NavLink>
+
+          {(userRole === 'club_manager' || userRole === 'admin') && (
+            <NavLink
+              to="/club-panel"
+              className={({ isActive }) =>
+                `flex items-center gap-3 p-3 rounded-lg transition ${
+                  isActive
+                    ? 'bg-blue-900 text-white font-semibold'
+                    : 'hover:bg-gray-100 text-gray-700'
+                }`
+              }
+            >
+              <User size={22} />
+              <span>Kulüp Paneli</span>
+            </NavLink>
+          )}
 
           {(userRole === 'admin' || userRole === 'moderator') && (
             <NavLink
@@ -538,6 +581,18 @@ export default function AppLayout() {
               </NavLink>
 
               <NavLink
+                to="/takvim"
+                className={({ isActive }) =>
+                  `w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                    isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                  }`
+                }
+              >
+                <Calendar size={22} />
+                <span>Takvim</span>
+              </NavLink>
+
+              <NavLink
                 to="/ayarlar"
                 className={({ isActive }) =>
                   `w-full flex items-center gap-3 p-3 rounded-lg transition ${
@@ -548,6 +603,20 @@ export default function AppLayout() {
                 <Settings size={22} />
                 <span>Ayarlar</span>
               </NavLink>
+
+              {(userRole === 'club_manager' || userRole === 'admin') && (
+                <NavLink
+                  to="/club-panel"
+                  className={({ isActive }) =>
+                    `w-full flex items-center gap-3 p-3 rounded-lg transition ${
+                      isActive ? 'bg-blue-900 text-white' : 'hover:bg-gray-100 text-gray-700'
+                    }`
+                  }
+                >
+                  <User size={22} />
+                  <span>Kulüp Paneli</span>
+                </NavLink>
+              )}
 
               {(userRole === 'admin' || userRole === 'moderator') && (
                 <NavLink

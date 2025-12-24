@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User, Ban, Award, Menu, ArrowLeft, Settings, Wrench, AlertTriangle } from 'lucide-react';
+import { Users, Megaphone, MapPin, MessageSquare, FileText, TrendingUp, Shield, X, Plus, Edit, Trash2, Package, User, Ban, Award, Menu, ArrowLeft, Settings, Wrench, AlertTriangle, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { API_URL } from '../config/api';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
@@ -10,6 +11,7 @@ import UserBadges from './UserBadges';
 
 export default function AdminPanel() {
   const navigate = useNavigate();
+  const { userRole } = useSelector((state) => state.auth);
   const [activeSection, setActiveSection] = useState('users');
   const [users, setUsers] = useState([]);
   const [advertisements, setAdvertisements] = useState([]);
@@ -18,6 +20,7 @@ export default function AdminPanel() {
   const [comments, setComments] = useState([]);
   const [posts, setPosts] = useState([]);
   const [versionNotes, setVersionNotes] = useState([]);
+  const [events, setEvents] = useState([]);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
 
@@ -58,6 +61,7 @@ export default function AdminPanel() {
         loadComments(),
         loadPosts(),
         loadVersionNotes(),
+        loadEvents(),
         loadMaintenanceStatus()
       ]);
       setInitialLoading(false);
@@ -167,6 +171,35 @@ export default function AdminPanel() {
     } catch (err) { console.error(err); }
   };
 
+  const loadEvents = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/events?limit=100`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEvents(data.events || []);
+      }
+    } catch (err) { console.error(err); }
+  };
+
+  const deleteEvent = async (eventId) => {
+    if (!window.confirm('Bu etkinliği silmek istediğinizden emin misiniz?')) return;
+    try {
+      const res = await fetch(`${API_URL}/api/events/${eventId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setEvents(events.filter(e => e._id !== eventId));
+        alert('Etkinlik silindi');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Etkinlik silinirken bir hata oluştu');
+    }
+  };
+
   // Kullanıcı rolü güncelle
   const updateUserRole = async (userId, newRole) => {
     try {
@@ -226,6 +259,15 @@ export default function AdminPanel() {
 
   // Kullanıcıyı banla
   const banUser = async (userId) => {
+    // Banlanacak kullanıcıyı bul
+    const targetUser = users.find(u => u._id === userId);
+
+    // Moderatör admin veya moderator banlayamaz
+    if (userRole === 'moderator' && (targetUser?.role === 'admin' || targetUser?.role === 'moderator')) {
+      alert('Moderatörler admin veya diğer moderatörleri banlayamaz');
+      return;
+    }
+
     const reason = prompt('Ban nedeni:');
     if (!reason) return;
 
@@ -258,6 +300,15 @@ export default function AdminPanel() {
 
   // Kullanıcının banını kaldır
   const unbanUser = async (userId) => {
+    // Banlanacak kullanıcıyı bul
+    const targetUser = users.find(u => u._id === userId);
+
+    // Moderatör admin veya moderator'ın banını kaldıramaz
+    if (userRole === 'moderator' && (targetUser?.role === 'admin' || targetUser?.role === 'moderator')) {
+      alert('Moderatörler admin veya diğer moderatörlerin banını kaldıramaz');
+      return;
+    }
+
     if (!confirm('Bu kullanıcının banını kaldırmak istediğinize emin misiniz?')) return;
 
     try {
@@ -288,6 +339,12 @@ export default function AdminPanel() {
 
   // Kullanıcı badge'lerini güncelle
   const updateUserBadges = async (userId, badges) => {
+    // Moderatörler badge veremez
+    if (userRole === 'moderator') {
+      alert('Moderatörler rozet veremez. Bu yetki sadece adminlere aittir.');
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/admin/users/${userId}/badges`, {
         method: 'PUT',
@@ -317,6 +374,12 @@ export default function AdminPanel() {
 
   // Beta özellik toggle
   const toggleBetaFeature = async (userId, feature, enabled) => {
+    // Moderatörler beta özellik veremez
+    if (userRole === 'moderator') {
+      alert('Moderatörler beta özellik veremez. Bu yetki sadece adminlere aittir.');
+      return;
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/admin/users/${userId}/beta`, {
         method: 'PUT',
@@ -536,6 +599,7 @@ export default function AdminPanel() {
           <AdminMenuItem id="ads" icon={Megaphone} label="Reklamlar" badge={advertisements.length} />
           <AdminMenuItem id="campuses" icon={MapPin} label="Kampüsler" badge={campuses.length} />
           <AdminMenuItem id="communities" icon={Users} label="Topluluklar" badge={communities.length} />
+          <AdminMenuItem id="events" icon={Calendar} label="Etkinlikler" badge={events.length} />
           <AdminMenuItem id="moderation" icon={MessageSquare} label="Yorumlar" badge={comments.length} />
           <AdminMenuItem id="posts" icon={FileText} label="Postlar" badge={posts.length} />
           <AdminMenuItem id="versions" icon={Package} label="Sürüm Notları" badge={versionNotes.length} />
@@ -559,13 +623,14 @@ export default function AdminPanel() {
                 {activeSection === 'ads' && 'Reklamlar'}
                 {activeSection === 'campuses' && 'Kampüsler'}
                 {activeSection === 'communities' && 'Topluluklar'}
+                {activeSection === 'events' && 'Etkinlikler'}
                 {activeSection === 'moderation' && 'Yorumlar'}
                 {activeSection === 'posts' && 'Postlar'}
                 {activeSection === 'versions' && 'Sürüm Notları'}
                 {activeSection === 'settings' && 'Sistem Ayarları'}
               </h2>
             </div>
-            {(activeSection === 'ads' || activeSection === 'campuses' || activeSection === 'communities') && (
+            {(activeSection === 'ads' || activeSection === 'campuses' || activeSection === 'communities' || activeSection === 'events') && (
               <button
                 onClick={() => openModal(activeSection)}
                 className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 md:px-4 rounded-lg hover:bg-blue-700 transition text-sm md:text-base"
@@ -859,6 +924,65 @@ export default function AdminPanel() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Etkinlikler */}
+          {activeSection === 'events' && (
+            <div className="space-y-4">
+              {events.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                  <Calendar size={48} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-600">Henüz etkinlik yok</p>
+                </div>
+              ) : (
+                events.map(event => (
+                  <div key={event._id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900">{event.title}</h3>
+                        {event.description && (
+                          <p className="text-sm text-gray-600 mt-1">{event.description}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                            {event.community?.name || 'Kulüp'}
+                          </span>
+                          <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-700">
+                            {event.category}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-3 space-y-1">
+                          <div>Başlangıç: {new Date(event.startDate).toLocaleDateString('tr-TR', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</div>
+                          <div>Bitiş: {new Date(event.endDate).toLocaleDateString('tr-TR', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}</div>
+                          {event.location && <div>Konum: {event.location}</div>}
+                          <div>{event.attendees?.length || 0} katılımcı</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <button
+                          onClick={() => deleteEvent(event._id)}
+                          className="text-red-600 hover:text-red-700 p-2 hover:bg-red-50 rounded-lg transition"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
@@ -1362,7 +1486,8 @@ export default function AdminPanel() {
                 )}
               </div>
 
-              {/* Badge Management */}
+              {/* Badge Management - Sadece Admin */}
+              {userRole === 'admin' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">Rozet Yönetimi</label>
                 <div className="grid grid-cols-2 gap-3">
@@ -1406,8 +1531,10 @@ export default function AdminPanel() {
                   })}
                 </div>
               </div>
+              )}
 
-              {/* Beta Features Management */}
+              {/* Beta Features Management - Sadece Admin */}
+              {userRole === 'admin' && (
               <div className="pt-4 border-t border-gray-200">
                 <label className="block text-sm font-medium text-gray-700 mb-3">Beta Özellikleri</label>
                 <div className="space-y-3">
@@ -1440,27 +1567,31 @@ export default function AdminPanel() {
                   Not: Spotify Development Mode 25 kullanıcı ile sınırlıdır. Bu özelliği dikkatli kullanın.
                 </p>
               </div>
+              )}
             </div>
 
             <div className="p-6 border-t border-gray-200 flex gap-3">
-              {selectedUser.isBanned ? (
-                <button
-                  onClick={() => {
-                    unbanUser(selectedUser._id);
-                  }}
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-medium"
-                >
-                  Banı Kaldır
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    banUser(selectedUser._id);
-                  }}
-                  className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium"
-                >
-                  Kullanıcıyı Banla
-                </button>
+              {/* Ban butonları - Moderatör admin/moderator banlayamaz */}
+              {!(userRole === 'moderator' && (selectedUser.role === 'admin' || selectedUser.role === 'moderator')) && (
+                selectedUser.isBanned ? (
+                  <button
+                    onClick={() => {
+                      unbanUser(selectedUser._id);
+                    }}
+                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-medium"
+                  >
+                    Banı Kaldır
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      banUser(selectedUser._id);
+                    }}
+                    className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium"
+                  >
+                    Kullanıcıyı Banla
+                  </button>
+                )
               )}
               <button
                 onClick={() => setShowUserDetails(false)}
