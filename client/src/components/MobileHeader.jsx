@@ -3,7 +3,7 @@ import { Menu, Bell } from 'lucide-react';
 
 export default function MobileHeader({ onMenuClick, onNotificationsClick, unreadCount = 0 }) {
   return (
-    <div className="md:hidden sticky top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-gray-200 z-30 px-4 py-3">
+    <div className="md:hidden sticky top-0 left-0 right-0 bg-white/95 backdrop-blur-md border-b border-gray-200 z-30 px-4 py-3 relative">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tighter text-blue-900">
           KBÜ<span className="text-red-600">Sosyal</span>.

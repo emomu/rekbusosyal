@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Gift, Star } from 'lucide-react';
+import { X, Heart, UserPlus, UserCheck, MessageSquare, Bell, Gift, Star, Sparkles } from 'lucide-react';
+import ChristmasCardModal from './ChristmasCardModal';
 import Lottie from 'lottie-react';
 import loaderAnimation from '../assets/loader.json';
 import { setNotifications, appendNotifications, setPagination, setUnreadCount, markAsRead, markAllAsRead, deleteNotification, setLoading } from '../store/slices/notificationsSlice';
@@ -14,6 +15,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
   const [loadingMore, setLoadingMore] = useState(false);
   // İşlem yapılan bildirimlerin ID'lerini tutmak için (butonları disable etmek için)
   const [processingIds, setProcessingIds] = useState([]);
+  // Yılbaşı kartı modal state
+  const [selectedCardId, setSelectedCardId] = useState(null);
 
   useEffect(() => {
     // Sadece bildirimler yoksa fetch et (AppLayout zaten ilk yüklemeyi yapar)
@@ -229,6 +232,14 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         }
         break;
 
+      case 'christmas_card':
+        // Yılbaşı kartı - modal aç
+        if (notification.christmasCard) {
+          setSelectedCardId(notification.christmasCard);
+          handleMarkAsRead(notification._id);
+        }
+        break;
+
       default:
         break;
     }
@@ -255,6 +266,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return <Gift size={20} className="text-indigo-500" />;
       case 'announcement_post': // YENİ: Duyuru gönderisi
         return <Bell size={20} className="text-blue-600" />;
+      case 'christmas_card': // YENİ: Yılbaşı kartı
+        return <Sparkles size={20} className="text-red-600" />;
       default:
         return <Bell size={20} className="text-gray-500" />;
     }
@@ -283,6 +296,8 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         return `Yeni sürüm geldi! ${notification.version || ''} sürümündeki yenilikleri keşfet.`;
       case 'announcement_post': // YENİ
         return `${senderName} yeni bir duyuru paylaştı`;
+      case 'christmas_card': // YENİ
+        return `${senderName} sana yılbaşı kartı gönderdi! 🎄`;
       default:
         return 'Yeni bir bildirim';
     }
@@ -458,6 +473,14 @@ export default function NotificationsPage({ onClose, onNavigateToProfile, onNavi
         )}
       </div>
       </div>
+
+      {/* Christmas Card Modal */}
+      {selectedCardId && (
+        <ChristmasCardModal
+          cardId={selectedCardId}
+          onClose={() => setSelectedCardId(null)}
+        />
+      )}
     </>
   );
 }

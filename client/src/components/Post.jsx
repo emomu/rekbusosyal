@@ -182,10 +182,25 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
                     <UserBadges badges={post.author.badges} size="sm" />
                   )}
                 </div>
-                <div className="flex items-center gap-1 text-gray-500 text-sm">
+                <div className="flex items-center gap-1 text-gray-500 text-sm flex-wrap">
                   <span>@{post.author?.username || 'anonim'}</span>
                   <span>·</span>
                   <span>{timeAgo(post.createdAt)}</span>
+                  {post.specialTag && (
+                    <>
+                      <span>·</span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${
+                        post.specialTag === 'kayip' ? 'bg-red-100 text-red-700' :
+                        post.specialTag === 'tavsiye' ? 'bg-blue-100 text-blue-700' :
+                        post.specialTag === 'ariyorum' ? 'bg-green-100 text-green-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {post.specialTag === 'kayip' && '🔍 Kayıp'}
+                        {post.specialTag === 'tavsiye' && '💡 Tavsiye'}
+                        {post.specialTag === 'ariyorum' && '🔎 Arıyorum'}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 

@@ -14,8 +14,8 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion', 'comment_reply', 'version_update', 'announcement_post'
-    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'comment_reply', 'suggestion', 'version_update', 'announcement_post'],
+    // YENİ TİPLER EKLENDİ: 'comment_like', 'suggestion', 'comment_reply', 'version_update', 'announcement_post', 'christmas_card'
+    enum: ['follow_request', 'follow_accept', 'like', 'mention', 'comment', 'comment_like', 'comment_reply', 'suggestion', 'version_update', 'announcement_post', 'christmas_card'],
     required: true
   },
   post: {
@@ -41,6 +41,11 @@ const notificationSchema = new mongoose.Schema({
   },
   link: {
     type: String
+  },
+  // Yılbaşı kartı için
+  christmasCard: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ChristmasCard'
   },
   isRead: {
     type: Boolean,

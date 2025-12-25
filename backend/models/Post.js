@@ -5,6 +5,7 @@ const PostSchema = new mongoose.Schema({
   author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', select: false }, // Anonimlik için select false
   isAnonymous: { type: Boolean, default: true },
   category: { type: String, enum: ['Geyik', 'İtiraf', 'Ders', 'Yemekhane'], default: 'Geyik' },
+  specialTag: { type: String, enum: ['kayip', 'tavsiye', 'ariyorum'], default: null }, // Özel komut etiketleri
   likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Kimler beğendi
   viewCount: { type: Number, default: 0 },
   score: { type: Number, default: 0 }, // Algoritma için hesaplanmış skor

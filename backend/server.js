@@ -94,6 +94,7 @@ const versionNotesRouter = require('./routes/versionNotes');
 const spotifyRouter = require('./routes/spotify');
 const eventsRouter = require('./routes/events');
 const communitiesRouter = require('./routes/communities');
+const christmasCardsRouter = require('./routes/christmasCards');
 
 const app = express();
 
@@ -204,6 +205,7 @@ app.use('/api/version-notes', versionNotesRouter);
 app.use('/api/spotify', spotifyRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/communities', communitiesRouter);
+app.use('/api/christmas-cards', christmasCardsRouter);
 // Email servis kontrolü
 if (!process.env.RESEND_API_KEY) {
   console.log('⚠️ RESEND_API_KEY bulunamadı. Email gönderilemeyecek.');
@@ -412,6 +414,7 @@ app.post('/api/posts', auth, cooldown('post'), upload.array('media', 4), async (
       author: req.userId, // middleware'den gelen kullanıcı ID'si
       isAnonymous: false, // Normal postlar anonim değildir
       category: 'Geyik', // Varsayılan kategori
+      specialTag: req.body.specialTag || null, // Özel komut etiketi (kayip, tavsiye, ariyorum)
       media: mediaFiles,
       spotifyTrack: spotifyTrack
     });

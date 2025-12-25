@@ -69,33 +69,41 @@ export const requestNotificationPermission = async () => {
  * @returns {Notification|null} The notification instance or null
  */
 export const showNotification = ({ title, body, icon, tag, data = {} }) => {
+  console.log('🔔 showNotification called:', { title, body, icon, tag });
+
   if (!isNotificationSupported()) {
-    console.warn('Browser notifications not supported');
+    console.warn('❌ Browser notifications not supported');
     return null;
   }
 
-  if (Notification.permission !== 'granted') {
-    console.warn('Notification permission not granted');
+  const permission = Notification.permission;
+  console.log('🔔 Notification permission:', permission);
+
+  if (permission !== 'granted') {
+    console.warn('❌ Notification permission not granted, current:', permission);
     return null;
   }
 
   try {
+    console.log('✅ Creating browser notification...');
     const notification = new Notification(title, {
       body,
-      icon: icon || '/logo.svg',
-      badge: '/logo.svg',
+      icon: icon || window.location.origin + '/logo.svg',
+      badge: window.location.origin + '/logo.svg',
       tag: tag || `notification-${Date.now()}`,
       data,
       requireInteraction: false, // Auto-close after a few seconds
       silent: false,
     });
 
+    console.log('✅ Browser notification created successfully');
+
     // Store last notification time to prevent spam
     localStorage.setItem(LAST_NOTIFICATION_TIME_KEY, Date.now().toString());
 
     return notification;
   } catch (error) {
-    console.error('Error showing notification:', error);
+    console.error('❌ Error showing notification:', error);
     return null;
   }
 };
@@ -105,13 +113,19 @@ export const showNotification = ({ title, body, icon, tag, data = {} }) => {
  * @param {Object} notification - App notification object
  */
 export const showNotificationForAppNotification = (notification) => {
-  if (!notification) return null;
+  console.log('📱 showNotificationForAppNotification called:', notification);
+
+  if (!notification) {
+    console.warn('❌ No notification object provided');
+    return null;
+  }
 
   // Get notification title and body based on type
   const { title, body } = getNotificationContent(notification);
+  console.log('📱 Notification content:', { title, body, type: notification.type });
 
   // Get sender profile picture or use default
-  const icon = notification.sender?.profilePicture || '/logo.svg';
+  const icon = notification.sender?.profilePicture || window.location.origin + '/logo.svg';
 
   // Create unique tag to prevent duplicates
   const tag = `app-notification-${notification._id}`;
@@ -132,11 +146,14 @@ export const showNotificationForAppNotification = (notification) => {
 
   // Add click handler to navigate to relevant page
   if (browserNotification) {
+    console.log('✅ Browser notification created, adding click handler');
     browserNotification.onclick = () => {
       window.focus();
       handleNotificationClick(notification);
       browserNotification.close();
     };
+  } else {
+    console.warn('❌ Browser notification was not created');
   }
 
   return browserNotification;
@@ -193,6 +210,16 @@ const getNotificationContent = (notification) => {
       return {
         title: 'Yeni Sürüm',
         body: notification.version ? `${notification.version} sürümündeki yenilikleri keşfet` : 'Yeni sürüm yayınlandı!',
+      };
+    case 'christmas_card':
+      return {
+        title: '🎄 Yılbaşı Kartı',
+        body: `${senderName} sana yılbaşı kartı gönderdi!`,
+      };
+    case 'announcement_post':
+      return {
+        title: 'Yeni Duyuru',
+        body: `${senderName} yeni bir duyuru paylaştı`,
       };
     default:
       return {

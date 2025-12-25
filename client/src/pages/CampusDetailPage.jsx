@@ -119,9 +119,48 @@ export default function CampusDetailPage() {
     }
   };
 
+  // Handle send Christmas card
+  const handleSendChristmasCard = async (username, message) => {
+    try {
+      const res = await fetch(`${API_URL}/api/christmas-cards/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          recipientUsername: username,
+          message
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(`🎄 ${data.message}`);
+        dispatch(setCommentInput(''));
+      } else {
+        alert(`❌ ${data.error}`);
+      }
+    } catch (err) {
+      console.error('Christmas card send error:', err);
+      alert('Yılbaşı kartı gönderilirken bir hata oluştu');
+    }
+  };
+
   // Handle send comment
   const handleSendComment = async () => {
     if (!commentInput.trim()) return;
+
+    // Check for /yilbasi command
+    const christmasCardMatch = commentInput.match(/^\/yilbasi\s+(@?\w+)\s+(.+)$/);
+
+    if (christmasCardMatch) {
+      const [, username, message] = christmasCardMatch;
+      await handleSendChristmasCard(username, message);
+      return;
+    }
+
     try {
       const url = `${API_URL}/api/campus/${campus._id}/comments`;
       console.log('🔍 URL:', url);

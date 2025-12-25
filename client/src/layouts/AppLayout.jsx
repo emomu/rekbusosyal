@@ -3,11 +3,12 @@ import { Outlet, useLocation, NavLink, useNavigate, useNavigation } from 'react-
 import { useSelector, useDispatch } from 'react-redux';
 import { Home, MessageSquare, User, MapPin, Search, LogOut, Settings, Shield, X, Bell, Calendar } from 'lucide-react';
 import Lottie from 'lottie-react';
+import Snowfall from 'react-snowfall';
+import XmasTree from 'react-xmas-tree/react';
 import { logout } from '../store/slices/authSlice';
 import { API_URL } from '../config/api';
 import { sanitizeUsername } from '../utils/security';
 import { api } from '../utils/apiClient';
-import MobileHeader from '../components/MobileHeader';
 import NotificationsPage from '../components/NotificationsPage';
 import NotificationPermissionPrompt from '../components/NotificationPermissionPrompt';
 import { ToastContainer } from '../components/Toast';
@@ -123,7 +124,7 @@ export default function AppLayout() {
 
         const notifData = await notifRes.json();
         const countData = await countRes.json();
-        const newCount = countData.count || 0;
+        const newCount = countData.unreadCount || 0;
 
         // İlk fetch'te bildirimleri Redux'a yükle
         if (isFirstFetch) {
@@ -136,13 +137,20 @@ export default function AppLayout() {
         } else {
           // Sonraki fetch'lerde: yeni bildirim varsa göster
           const previousCount = previousUnreadCountRef.current;
+          console.log('🔔 Notification check:', { newCount, previousCount, canShow: canShowNotification() });
+
           if (newCount > previousCount && newCount > 0 && canShowNotification()) {
+            console.log('✅ New notification detected!');
             // New notification detected! Show browser notification
             if (notifData.notifications && notifData.notifications.length > 0) {
               const latestNotification = notifData.notifications[0];
+              console.log('📬 Latest notification:', latestNotification);
               // Show browser notification only if it's unread
               if (!latestNotification.isRead) {
+                console.log('✅ Showing browser notification for unread notification');
                 showNotificationForAppNotification(latestNotification);
+              } else {
+                console.log('⏭️ Latest notification is already read, skipping');
               }
             }
           }
@@ -246,9 +254,164 @@ export default function AppLayout() {
   }, [selectedImage, dispatch]);
 
   return (
-    <div className="h-screen bg-white text-gray-900 font-sans flex justify-center overflow-hidden">
+    <div className="h-screen bg-white text-gray-900 font-sans flex justify-center overflow-hidden relative">
+      {/* SNOWFALL EFFECT */}
+      <Snowfall
+        color="#fef3c7"
+        snowflakeCount={200}
+        radius={[0.5, 3.0]}
+        speed={[0.5, 2.0]}
+        wind={[-0.5, 1.0]}
+        style={{
+          position: 'fixed',
+          width: '100vw',
+          height: '100vh',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          opacity: 0.9
+        }}
+      />
+
+      {/* CHRISTMAS DECORATIONS */}
+      <div className="fixed top-0 left-0 right-0 h-20 pointer-events-none z-50">
+        {/* Christmas Lights String - SVG */}
+        <svg className="w-full h-full absolute top-0" preserveAspectRatio="xMidYMin meet">
+          {/* String/Wire - Starts from top edge */}
+          <path
+            d="M 0,0 Q 60,15 120,0 T 240,0 T 360,0 T 480,0 T 600,0 T 720,0 T 840,0 T 960,0 T 1080,0 T 1200,0 T 1320,0 T 1440,0 T 1560,0 T 1680,0 T 1800,0 T 1920,0 T 2040,0 T 2160,0 T 2280,0 T 2400,0"
+            stroke="#333"
+            strokeWidth="2"
+            fill="none"
+            opacity="0.3"
+          />
+        </svg>
+
+        {/* Colorful Lights - Responsive count: Mobile(10), Tablet(20), Desktop(30) */}
+        <div className="absolute top-0 left-0 right-0 flex justify-around px-2">
+          {[...Array(30)].map((_, i) => {
+            const colors = [
+              { bg: '#ff0000', glow: 'rgba(255, 0, 0, 0.8)' },      // Red
+              { bg: '#00ff00', glow: 'rgba(0, 255, 0, 0.8)' },      // Green
+              { bg: '#0066ff', glow: 'rgba(0, 102, 255, 0.8)' },    // Blue
+              { bg: '#ffdd00', glow: 'rgba(255, 221, 0, 0.8)' },    // Yellow
+              { bg: '#ff00ff', glow: 'rgba(255, 0, 255, 0.8)' },    // Magenta
+              { bg: '#ff6600', glow: 'rgba(255, 102, 0, 0.8)' },    // Orange
+              { bg: '#00ffff', glow: 'rgba(0, 255, 255, 0.8)' },    // Cyan
+            ];
+            const color = colors[i % colors.length];
+
+            // Mobile: show only 10 lights (every 3rd light)
+            // Tablet: show 20 lights (every other light + mobile)
+            // Desktop: show all 30 lights
+            let displayClass = '';
+            if (i % 3 === 0) {
+              displayClass = ''; // Mobile: show every 3rd (10 lights)
+            } else if (i % 2 === 0) {
+              displayClass = 'hidden md:flex'; // Tablet+: show every 2nd (20 lights total)
+            } else {
+              displayClass = 'hidden lg:flex'; // Desktop only: show remaining (30 lights total)
+            }
+
+            return (
+              <div
+                key={i}
+                className={`relative flex-col items-center ${displayClass}`}
+                style={{
+                  animation: `twinkle ${3 + (i % 3) * 1}s ease-in-out infinite`,
+                  animationDelay: `${i * 0.15}s`
+                }}
+              >
+                {/* Wire connection from top */}
+                <div
+                  className="w-0.5 bg-gray-700 opacity-40"
+                  style={{
+                    height: `${Math.sin(i * 0.6) * 3 + 6}px`
+                  }}
+                />
+
+                {/* LED Light - Modern flat design */}
+                <div
+                  className="w-2 h-3 rounded-sm relative overflow-hidden"
+                  style={{
+                    backgroundColor: color.bg,
+                    boxShadow: `0 0 12px ${color.glow}, 0 0 20px ${color.glow}, 0 0 25px ${color.glow}`,
+                    border: `1px solid ${color.bg}`,
+                  }}
+                >
+                  {/* LED shine effect - diagonal gradient */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `linear-gradient(135deg, rgba(255,255,255,0.6) 0%, transparent 50%)`,
+                    }}
+                  />
+                  {/* LED bottom connector */}
+                  <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-gray-800 rounded-b" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* CSS Animations for Christmas decorations */}
+      <style>{`
+        @keyframes twinkle {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.3;
+            transform: scale(0.95);
+          }
+        }
+
+        @keyframes gentle-bounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+
+        @keyframes spin-slow {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        .animate-gentle-bounce {
+          animation: gentle-bounce 3s ease-in-out infinite;
+        }
+
+        .animate-spin-slow {
+          animation: spin-slow 4s linear infinite;
+        }
+
+        /* XmasTree z-index override - bildirimlerinin arkasında kalması için */
+        .tree-container {
+          z-index: 10 !important;
+        }
+      `}</style>
+
+      {/* Christmas Tree - Using react-xmas-tree */}
+      <div className="hidden lg:block" style={{ zIndex: 10 }}>
+        <XmasTree
+          containerClass="!fixed !bottom-5 !right-30 !left-auto"
+          lightColors={['#004400ff', '#004400ff', '#004400ff', '#007000ff', '#007500ff']}
+          starColor="#ffd700"
+        />
+      </div>
+
+      {/* Mobile Christmas Tree - REMOVED */}
+
       {/* LEFT SIDEBAR - Fixed on desktop, hidden on mobile */}
-      <aside className="w-64 hidden md:flex flex-col h-full border-r border-gray-200 p-6 flex-shrink-0">
+      <aside className="w-64 hidden md:flex flex-col h-full border-r border-gray-200 p-6 flex-shrink-0 relative bg-white">
         <h1 className="text-2xl font-bold tracking-tighter mb-8 text-blue-900">
           KBÜ<span className="text-red-600">Sosyal</span>.
         </h1>
@@ -439,7 +602,7 @@ export default function AppLayout() {
           {/* Menu Panel */}
           <div className="md:hidden fixed top-0 right-0 bottom-0 w-80 bg-white z-50 shadow-2xl animate-slide-in-right overflow-y-auto">
             {/* Menu Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+            <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-gray-200 p-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">Menü</h2>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -669,13 +832,13 @@ export default function AppLayout() {
       </main>
 
       {/* RIGHT SEARCH PANEL - Fixed on large screens only */}
-      <aside className="w-80 hidden lg:block p-6 h-full overflow-y-auto flex-shrink-0">
+      <aside className="w-80 hidden lg:block p-6 h-full overflow-y-auto flex-shrink-0 relative bg-white">
         <div className="relative mb-6">
           <Search className="absolute left-3 top-3 text-gray-400" size={18} />
           <input
             type="text"
             placeholder="Ara..."
-            className="w-full bg-gray-100 p-2.5 pl-10 rounded-full text-sm outline-none focus:ring-2 focus:ring-blue-100"
+            className="w-full bg-gray-100 p-2.5 pl-10 rounded-full text-sm outline-none focus:ring-2 focus:ring-red-100"
             value={searchQuery}
             onChange={handleSearch}
           />

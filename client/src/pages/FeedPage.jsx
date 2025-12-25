@@ -113,6 +113,124 @@ export default function FeedPage() {
   const [spotifyPickerOpen, setSpotifyPickerOpen] = useState(false);
   const [selectedSpotifyTrack, setSelectedSpotifyTrack] = useState(null);
 
+  // Autocomplete states
+  const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
+  const [showUserSuggestions, setShowUserSuggestions] = useState(false);
+  const [userSuggestions, setUserSuggestions] = useState([]);
+  const [mentionSearchQuery, setMentionSearchQuery] = useState('');
+  const [cursorPosition, setCursorPosition] = useState(0);
+
+  // Available commands
+  const availableCommands = [
+    {
+      command: '/yilbasi',
+      description: 'Kullanıcıya yılbaşı kartı gönder',
+      usage: '/yilbasi @kullaniciadi mesaj',
+      icon: '🎄'
+    },
+    {
+      command: '/kayip',
+      description: 'Kayıp eşya ilanı oluştur',
+      usage: '/kayip Kırmızı çanta kaybettim...',
+      icon: '🔍'
+    },
+    {
+      command: '/tavsiye',
+      description: 'Tavsiye iste (film, kitap, ders vb.)',
+      usage: '/tavsiye Film önerir misiniz?',
+      icon: '💡'
+    },
+    {
+      command: '/ariyorum',
+      description: 'Bir şey arıyorum (ders notu, kitap vb.)',
+      usage: '/ariyorum Matematik 101 ders notları',
+      icon: '🔎'
+    }
+  ];
+
+  // Handle text input change with autocomplete
+  const handleInputChange = (e) => {
+    const text = e.target.value;
+    const position = e.target.selectionStart;
+
+    dispatch(setNewPostContent(text));
+    setCursorPosition(position);
+
+    // Check for command suggestions (/)
+    if (text.startsWith('/') && !text.includes(' ')) {
+      setShowCommandSuggestions(true);
+      setShowUserSuggestions(false);
+    } else if (text.startsWith('/')) {
+      setShowCommandSuggestions(false);
+    } else {
+      setShowCommandSuggestions(false);
+    }
+
+    // Check for mention suggestions (@)
+    const textBeforeCursor = text.substring(0, position);
+    const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtSymbol !== -1) {
+      const textAfterAt = textBeforeCursor.substring(lastAtSymbol + 1);
+
+      // Only show suggestions if @ is at start of word (after space or at beginning)
+      const charBeforeAt = lastAtSymbol > 0 ? textBeforeCursor[lastAtSymbol - 1] : ' ';
+      const isValidMention = charBeforeAt === ' ' || lastAtSymbol === 0;
+
+      if (isValidMention && !textAfterAt.includes(' ')) {
+        setMentionSearchQuery(textAfterAt);
+        setShowUserSuggestions(true);
+        setShowCommandSuggestions(false);
+
+        // Search for users
+        if (textAfterAt.length >= 1) {
+          searchUsers(textAfterAt);
+        }
+      } else {
+        setShowUserSuggestions(false);
+      }
+    } else {
+      setShowUserSuggestions(false);
+    }
+  };
+
+  // Search users for mentions
+  const searchUsers = async (query) => {
+    try {
+      const res = await fetch(`${API_URL}/api/search/users?q=${encodeURIComponent(query)}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setUserSuggestions(Array.isArray(data) ? data.slice(0, 5) : []);
+      }
+    } catch (error) {
+      console.error('User search error:', error);
+    }
+  };
+
+  // Insert command
+  const insertCommand = (command) => {
+    dispatch(setNewPostContent(command.usage));
+    setShowCommandSuggestions(false);
+  };
+
+  // Insert mention
+  const insertMention = (username) => {
+    const textBeforeCursor = newPostContent.substring(0, cursorPosition);
+    const textAfterCursor = newPostContent.substring(cursorPosition);
+    const lastAtSymbol = textBeforeCursor.lastIndexOf('@');
+
+    const newText =
+      textBeforeCursor.substring(0, lastAtSymbol + 1) +
+      username + ' ' +
+      textAfterCursor;
+
+    dispatch(setNewPostContent(newText));
+    setShowUserSuggestions(false);
+  };
+
   // Load initial data from loader into Redux
   useEffect(() => {
     if (loaderData && loaderData.posts) {
@@ -241,15 +359,74 @@ export default function FeedPage() {
   };
 
   // Create new post with media support
+  // Handle Christmas card command
+  const handleSendChristmasCard = async (username, message) => {
+    try {
+      const res = await fetch(`${API_URL}/api/christmas-cards/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          recipientUsername: username,
+          message
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        dispatch(addToast({ message: `🎄 ${data.message}`, type: 'success' }));
+        dispatch(setNewPostContent(''));
+        setShowCommandSuggestions(false);
+        setShowUserSuggestions(false);
+      } else {
+        dispatch(addToast({ message: `❌ ${data.error}`, type: 'error' }));
+      }
+    } catch (err) {
+      console.error('Christmas card send error:', err);
+      dispatch(addToast({ message: 'Yılbaşı kartı gönderilirken bir hata oluştu', type: 'error' }));
+    }
+  };
+
   const handleCreatePost = async () => {
     if (!newPostContent.trim() || isSubmitting) return;
+
+    // Check for /yilbasi command
+    const christmasCardMatch = newPostContent.match(/^\/yilbasi\s+(@?\w+)\s+(.+)$/);
+    if (christmasCardMatch) {
+      const [, username, message] = christmasCardMatch;
+      await handleSendChristmasCard(username, message);
+      return;
+    }
+
+    // Check for special commands and add tags
+    let postContent = newPostContent;
+    let specialTag = null;
+
+    if (newPostContent.startsWith('/kayip ')) {
+      postContent = newPostContent.replace('/kayip ', '');
+      specialTag = 'kayip';
+    } else if (newPostContent.startsWith('/tavsiye ')) {
+      postContent = newPostContent.replace('/tavsiye ', '');
+      specialTag = 'tavsiye';
+    } else if (newPostContent.startsWith('/ariyorum ')) {
+      postContent = newPostContent.replace('/ariyorum ', '');
+      specialTag = 'ariyorum';
+    }
 
     setIsSubmitting(true);
     setUploadProgress(0);
 
     try {
       const formData = new FormData();
-      formData.append('content', newPostContent);
+      formData.append('content', postContent);
+
+      // Add special tag if exists
+      if (specialTag) {
+        formData.append('specialTag', specialTag);
+      }
 
       selectedMedia.forEach((media) => {
         if (media.file) {
@@ -479,8 +656,8 @@ export default function FeedPage() {
       )}
 
       <MobileHeader
-        onMenuClick={setIsMobileMenuOpen}
-        onNotificationsClick={setShowNotifications}
+        onMenuClick={() => setIsMobileMenuOpen(true)}
+        onNotificationsClick={() => setShowNotifications(true)}
         unreadCount={unreadCount}
       />
 
@@ -509,14 +686,86 @@ export default function FeedPage() {
         {/* Input & Actions Area */}
         <div className="flex-1">
           
-          {/* Text Input */}
-          <textarea
-            className="w-full resize-none outline-none text-lg text-gray-900 placeholder-gray-400 bg-transparent min-h-[60px] py-1"
-            placeholder="Kampüste neler oluyor?"
-            rows={2}
-            value={newPostContent}
-            onChange={(e) => dispatch(setNewPostContent(e.target.value))}
-          />
+          {/* Text Input with Autocomplete */}
+          <div className="relative">
+            <textarea
+              className="w-full resize-none outline-none text-lg text-gray-900 placeholder-gray-400 bg-transparent min-h-[60px] py-1"
+              placeholder="Kampüste neler oluyor?  /komut , @kullaniciadi"
+              rows={2}
+              value={newPostContent}
+              onChange={handleInputChange}
+              style={{
+                color: newPostContent.startsWith('/') ? '#dc2626' : newPostContent.includes('@') ? '#2563eb' : '#111827'
+              }}
+            />
+
+            {/* Command Suggestions Dropdown */}
+            {showCommandSuggestions && (
+              <div className="absolute top-full left-0 mt-2 w-full max-w-md bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                <div className="p-2 bg-gradient-to-r from-red-50 to-green-50 border-b border-gray-200">
+                  <p className="text-xs font-semibold text-gray-700 flex items-center gap-2">
+                    <span className="text-red-600">⚡</span>
+                    Özel Komutlar
+                  </p>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {availableCommands.map((cmd, index) => (
+                    <button
+                      key={index}
+                      onClick={() => insertCommand(cmd)}
+                      className="w-full p-3 hover:bg-gradient-to-r hover:from-red-50 hover:to-green-50 transition flex items-start gap-3 text-left border-b border-gray-100 last:border-0"
+                    >
+                      <span className="text-2xl flex-shrink-0">{cmd.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-red-600 text-sm">{cmd.command}</div>
+                        <div className="text-xs text-gray-600 mt-0.5">{cmd.description}</div>
+                        <div className="text-xs text-gray-400 mt-1 font-mono bg-gray-100 px-2 py-1 rounded inline-block">
+                          {cmd.usage}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* User Mentions Dropdown */}
+            {showUserSuggestions && userSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 mt-2 w-full max-w-md bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                <div className="p-2 bg-blue-50 border-b border-gray-200">
+                  <p className="text-xs font-semibold text-gray-700 flex items-center gap-2">
+                    <span className="text-blue-600">@</span>
+                    Kullanıcı Önerileri
+                  </p>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {userSuggestions.map((user) => (
+                    <button
+                      key={user._id}
+                      onClick={() => insertMention(user.username)}
+                      className="w-full p-3 hover:bg-blue-50 transition flex items-center gap-3 text-left border-b border-gray-100 last:border-0"
+                    >
+                      {user.profilePicture ? (
+                        <img
+                          src={user.profilePicture}
+                          alt={user.username}
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
+                          <User size={20} className="text-blue-600" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-gray-900 text-sm truncate">{user.fullName}</div>
+                        <div className="text-xs text-blue-600">@{user.username}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Selected Media Preview - UPDATED: FLEX + SQUARE THUMBNAILS (w-28 h-28) */}
           {selectedMedia.length > 0 && (
