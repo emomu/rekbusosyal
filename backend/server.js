@@ -257,6 +257,11 @@ app.get('/api/search/users', auth, async (req, res) => {
   }
 });
 // --- ROTALAR ---
+// SECURITY: Sitemap disabled to prevent information disclosure
+// Sosyal medya platformlarında sitemap kullanımı güvenlik riski oluşturur:
+// - Tüm kullanıcı listesi ifşa olur
+// - Private/public ayrımı yapılamaz
+// - Post ID'leri enumeration'a açık hale gelir
 app.get('/sitemap.xml', async (req, res) => {
   res.header('Content-Type', 'application/xml');
   res.header('Content-Encoding', 'gzip');
@@ -265,49 +270,18 @@ app.get('/sitemap.xml', async (req, res) => {
     const smStream = new SitemapStream({ hostname: 'https://www.kbusosyal.com' });
     const pipeline = smStream.pipe(createGzip());
 
-    // 1. STATİK SAYFALAR
+    // SADECE STATİK SAYFALAR (Login gerektirmeyen public sayfalar)
     smStream.write({ url: '/', changefreq: 'daily', priority: 1.0 });
-    smStream.write({ url: '/login', changefreq: 'monthly', priority: 0.5 });
-    smStream.write({ url: '/register', changefreq: 'monthly', priority: 0.6 });
+    smStream.write({ url: '/giris', changefreq: 'monthly', priority: 0.5 });
+    smStream.write({ url: '/kayit', changefreq: 'monthly', priority: 0.6 });
+    smStream.write({ url: '/hakkimizda', changefreq: 'monthly', priority: 0.4 });
+    smStream.write({ url: '/gizlilik', changefreq: 'monthly', priority: 0.3 });
+    smStream.write({ url: '/kullanim-kosullari', changefreq: 'monthly', priority: 0.3 });
 
-    // 2. DİNAMİK: POSTLAR
-    const posts = await Post.find({ isAnonymous: false, category: 'Geyik' })
-                            .select('_id updatedAt')
-                            .sort({ createdAt: -1 })
-                            .limit(1000);
-    
-    posts.forEach(post => {
-      smStream.write({
-        url: `/post/${post._id}`,
-        changefreq: 'weekly',
-        priority: 0.8,
-        lastmod: post.updatedAt ? post.updatedAt.toISOString() : new Date().toISOString()
-      });
-    });
-
-    // 3. DİNAMİK: KULLANICI PROFİLLERİ
-    const users = await User.find({ isPrivate: false })
-                            .select('username updatedAt')
-                            .limit(500);
-
-    users.forEach(user => {
-        smStream.write({
-            url: `/user/${user.username}`,
-            changefreq: 'weekly',
-            priority: 0.7,
-            lastmod: user.updatedAt ? user.updatedAt.toISOString() : new Date().toISOString()
-        });
-    });
-
-    // 4. DİNAMİK: KAMPÜSLER
-    const campuses = await Campus.find().select('_id name');
-    campuses.forEach(campus => {
-      smStream.write({
-        url: `/campus/${campus._id}`,
-        changefreq: 'monthly',
-        priority: 0.6
-      });
-    });
+    // DİNAMİK İÇERİK SİTEMAP'E EKLENMİYOR (Güvenlik)
+    // - Kullanıcı profilleri eklenmez (privacy)
+    // - Postlar eklenmez (enumeration riski)
+    // - Kampüsler eklenmez (internal data)
 
     smStream.end();
     pipeline.pipe(res).on('error', (e) => { throw e });
