@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
+const crypto = require('crypto');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 
@@ -12,6 +13,22 @@ const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI;
 // In-memory store for currently listening users
 // Format: { trackId: [{ userId, username, fullName, profilePicture, startedAt }] }
 const listeningUsers = new Map();
+
+// SECURITY: In-memory store for OAuth state tokens (CSRF protection)
+// Format: { stateToken: { userId, createdAt } }
+const oauthStates = new Map();
+
+// Clean up expired state tokens every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  const EXPIRY = 10 * 60 * 1000; // 10 minutes
+
+  for (const [stateToken, data] of oauthStates.entries()) {
+    if ((now - data.createdAt) > EXPIRY) {
+      oauthStates.delete(stateToken);
+    }
+  }
+}, 10 * 60 * 1000);
 
 // Clean up old listening sessions every minute
 setInterval(() => {
@@ -94,15 +111,23 @@ router.get('/auth', authMiddleware, async (req, res) => {
       });
     }
 
+    // SECURITY: Generate cryptographically secure random state token for CSRF protection
+    const stateToken = crypto.randomBytes(32).toString('hex');
+
+    // Store state token with user ID and timestamp
+    oauthStates.set(stateToken, {
+      userId: req.userId,
+      createdAt: Date.now()
+    });
+
     const scope = 'user-read-currently-playing user-read-playback-state';
-    const state = req.userId; // User ID'yi state olarak kullanıyoruz
 
     const authUrl = `https://accounts.spotify.com/authorize?` +
       `client_id=${SPOTIFY_CLIENT_ID}` +
       `&response_type=code` +
       `&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}` +
       `&scope=${encodeURIComponent(scope)}` +
-      `&state=${state}` +
+      `&state=${stateToken}` +
       `&show_dialog=true`; // Her seferinde hesap seçimi istenir
 
     res.json({ authUrl });
@@ -181,7 +206,6 @@ router.get('/search', authMiddleware, async (req, res) => {
 // Spotify callback
 router.get('/callback', async (req, res) => {
   const { code, state, error } = req.query;
-  const userId = state; // state'den user ID'yi alıyoruz
 
   // Spotify'dan gelen hata kontrolü (redirect_uri_mismatch gibi)
   if (error) {
@@ -192,9 +216,33 @@ router.get('/callback', async (req, res) => {
     return res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=error`);
   }
 
-  if (!code) {
+  if (!code || !state) {
+    console.error('Spotify callback: Missing code or state parameter');
     return res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=error`);
   }
+
+  // SECURITY: Validate state token to prevent CSRF attacks
+  const stateData = oauthStates.get(state);
+
+  if (!stateData) {
+    console.error('Spotify callback: Invalid or expired state token');
+    return res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=error&reason=invalid_state`);
+  }
+
+  // SECURITY: Check if state token is expired (10 minutes max)
+  const now = Date.now();
+  const STATE_EXPIRY = 10 * 60 * 1000; // 10 minutes
+
+  if ((now - stateData.createdAt) > STATE_EXPIRY) {
+    oauthStates.delete(state);
+    console.error('Spotify callback: Expired state token');
+    return res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=error&reason=expired_state`);
+  }
+
+  const userId = stateData.userId;
+
+  // SECURITY: Delete state token after use (one-time use only)
+  oauthStates.delete(state);
 
   try {
     // Access token al
@@ -212,6 +260,12 @@ router.get('/callback', async (req, res) => {
     });
 
     const tokenData = await tokenResponse.json();
+
+    if (!tokenData.access_token) {
+      console.error('Spotify token error:', tokenData);
+      return res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=error&reason=token_failed`);
+    }
+
     const { access_token, refresh_token, expires_in } = tokenData;
 
     // Spotify kullanıcı bilgilerini al
@@ -221,6 +275,13 @@ router.get('/callback', async (req, res) => {
 
     const userData = await userResponse.json();
     const spotifyId = userData.id;
+
+    // SECURITY: Verify user exists before updating
+    const user = await User.findById(userId);
+    if (!user) {
+      console.error('Spotify callback: User not found:', userId);
+      return res.redirect(`${process.env.CLIENT_URL}/ayarlar?spotify=error&reason=user_not_found`);
+    }
 
     // User'ı güncelle
     await User.findByIdAndUpdate(userId, {
