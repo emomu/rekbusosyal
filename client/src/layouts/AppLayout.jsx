@@ -16,6 +16,7 @@ import CookieConsent from '../components/CookieConsent';
 import { setActiveTab, setSelectedImage, removeToast } from '../store/slices/uiSlice';
 import { setUnreadCount, setNotifications, setPagination } from '../store/slices/notificationsSlice';
 import loaderAnimation from '../assets/loader.json';
+import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import {
   shouldShowPermissionPrompt,
   showNotificationForAppNotification,
@@ -37,6 +38,10 @@ export default function AppLayout() {
 
   // Check if navigation is in loading state
   const isNavigating = navigation.state === 'loading';
+
+  // Scroll restoration for main content area
+  const mainContentRef = useRef(null);
+  useScrollRestoration(mainContentRef);
 
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -811,7 +816,7 @@ export default function AppLayout() {
       )}
 
       {/* CENTER CONTENT AREA - Scrollable, changes with routes */}
-      <main className="flex-1 max-w-2xl w-full border-r border-gray-200 h-full overflow-y-auto relative flex-shrink-0">
+      <main ref={mainContentRef} className="flex-1 max-w-2xl w-full border-r border-gray-200 h-full overflow-y-auto relative flex-shrink-0">
         {/* Global Navigation Loading Bar */}
         {isNavigating && (
           <div className="absolute top-0 left-0 right-0 z-50 h-1 bg-blue-100 overflow-hidden">

@@ -3410,13 +3410,36 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), upload.single
     await comment.populate('author', 'username profilePicture fullName badges');
 
     // 3. Bildirim: Post Sahibine (Kendi postu değilse)
+    console.log('🔔 Bildirim kontrolü:', {
+      postAuthor: post.author,
+      postAuthorType: typeof post.author,
+      userId,
+      isAnonymous: post.isAnonymous,
+      shouldSendNotif: post.author && userId.toString() !== post.author.toString() && !post.isAnonymous
+    });
+
     if (post.author && userId.toString() !== post.author.toString() && !post.isAnonymous) {
+      console.log('📨 Bildirim gönderiliyor:', {
+        recipient: post.author,
+        sender: userId,
+        type: 'comment',
+        postId
+      });
+
       await Notification.create({
         recipient: post.author,
         sender: userId,
         type: 'comment',
         post: postId,
         comment: comment._id
+      });
+
+      console.log('✅ Bildirim başarıyla oluşturuldu');
+    } else {
+      console.log('❌ Bildirim gönderilmedi - Sebep:', {
+        noAuthor: !post.author,
+        ownPost: post.author && userId.toString() === post.author.toString(),
+        anonymous: post.isAnonymous
       });
     }
 
