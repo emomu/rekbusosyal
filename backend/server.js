@@ -1680,6 +1680,12 @@ app.put('/api/profile/username', async (req, res) => {
     const user = await User.findById(decoded.id);
     if (!user) return res.status(404).json({ error: "Kullanıcı bulunamadı" });
 
+    // SECURITY: Validate username with enhanced checks
+    const usernameValidation = validateUsername(newUsername);
+    if (!usernameValidation.valid) {
+      return res.status(400).json({ error: usernameValidation.error });
+    }
+
     // Kullanıcı adı daha önce alınmış mı?
     const existingUser = await User.findOne({ username: newUsername });
     if (existingUser && existingUser._id.toString() !== user._id.toString()) {
