@@ -13,10 +13,11 @@ const cooldowns = new Map();
 
 // Cooldown süreleri (milisaniye cinsinden)
 const COOLDOWN_TIMES = {
-  post: 30000,        // 30 saniye - Normal postlar
-  confession: 60000,  // 60 saniye - İtiraflar (daha hassas)
-  comment: 20000,     // 20 saniye - Yorumlar
-  vote: 5000          // 5 saniye - Oylar (spam önleme)
+  post: 30000,           // 30 saniye - Normal postlar
+  confession: 60000,     // 60 saniye - İtiraflar (daha hassas)
+  comment: 20000,        // 20 saniye - Yorumlar
+  vote: 5000,            // 5 saniye - Oylar (spam önleme)
+  christmasCard: 60000   // 60 saniye - Yılbaşı kartları (spam önleme)
 };
 
 const cooldownMiddleware = (type) => {

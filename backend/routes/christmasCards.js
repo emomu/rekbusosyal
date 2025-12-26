@@ -4,9 +4,11 @@ const ChristmasCard = require('../models/ChristmasCard');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
+const cooldown = require('../middleware/cooldown');
 
 // Yılbaşı kartı gönder
-router.post('/send', authMiddleware, async (req, res) => {
+// SECURITY: Rate limited to prevent spam (1 card per minute)
+router.post('/send', authMiddleware, cooldown('christmasCard'), async (req, res) => {
   try {
     const { recipientUsername, message } = req.body;
 
@@ -30,6 +32,22 @@ router.post('/send', authMiddleware, async (req, res) => {
     // Kendine kart gönderemez
     if (recipient._id.toString() === req.userId) {
       return res.status(400).json({ error: 'Kendine yılbaşı kartı gönderemezsin' });
+    }
+
+    // SECURITY: Aynı kişiye bugün zaten kart gönderilmiş mi kontrol et (spam önleme)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const existingCard = await ChristmasCard.findOne({
+      sender: req.userId,
+      recipient: recipient._id,
+      createdAt: { $gte: today }
+    });
+
+    if (existingCard) {
+      return res.status(400).json({
+        error: 'Bu kullanıcıya bugün zaten bir yılbaşı kartı gönderdin. Yarın tekrar deneyebilirsin.'
+      });
     }
 
     // Yılbaşı kartını oluştur
