@@ -1618,6 +1618,8 @@ app.post('/api/profile/picture', auth, (req, res) => {
 });
 
 // Profil resmi URL ile güncelle veya kaldır
+// SECURITY: This endpoint is ONLY for removing profile pictures
+// Upload must be done via POST /api/profile/picture with file upload
 app.put('/api/profile/picture', auth, async (req, res) => {
   try {
     const { profilePicture } = req.body;
@@ -1625,6 +1627,18 @@ app.put('/api/profile/picture', auth, async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ error: "Kullanıcı bulunamadı" });
+    }
+
+    // SECURITY: Only allow null (removal) - block all other values
+    // This prevents base64, XSS, and arbitrary URL injection
+    if (profilePicture !== null && profilePicture !== undefined) {
+      console.warn('🚨 SECURITY: Attempted profile picture injection blocked:', {
+        userId: req.userId,
+        attemptedValue: typeof profilePicture === 'string' ? profilePicture.substring(0, 100) : profilePicture
+      });
+      return res.status(400).json({
+        error: "Profil resmi yüklemek için dosya yükleme kullanın. Bu endpoint sadece silme içindir."
+      });
     }
 
     // Delete old profile picture from Cloudinary if exists
@@ -1640,13 +1654,13 @@ app.put('/api/profile/picture', auth, async (req, res) => {
       }
     }
 
-    // Update or remove profile picture
-    user.profilePicture = profilePicture || null;
+    // Only allow removal (set to null)
+    user.profilePicture = null;
     await user.save();
 
     res.json({
-      message: profilePicture ? "Profil resmi güncellendi" : "Profil resmi kaldırıldı",
-      profilePicture: user.profilePicture
+      message: "Profil resmi kaldırıldı",
+      profilePicture: null
     });
   } catch (err) {
     console.error('Profile picture update error:', err);
