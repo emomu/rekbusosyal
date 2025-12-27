@@ -350,6 +350,15 @@ export default function ConfessionsPage() {
 
         xhr.open('POST', `${API_URL}/api/confessions`);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        // SECURITY: Send Spotify token for verification
+        if (selectedSpotifyTrack) {
+          const spotifyToken = localStorage.getItem('spotify_access_token');
+          if (spotifyToken) {
+            xhr.setRequestHeader('X-Spotify-Token', spotifyToken);
+          }
+        }
+
         xhr.send(formData);
       });
 

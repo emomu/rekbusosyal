@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 // CRITICAL: JWT_SECRET must be loaded from environment variables for security
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -8,7 +9,7 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
@@ -17,9 +18,24 @@ const auth = (req, res, next) => {
 
         // SECURITY: Specify algorithm to prevent algorithm confusion attacks
         const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
-        req.userId = decoded.id; // request objesine kullanıcı id'sini ekle
-        req.userRole = decoded.role; // Role'ü de request'e ekle
-        req.user = { userId: decoded.id, role: decoded.role }; // Tutarlılık için req.user objesi
+
+        // CRITICAL SECURITY FIX: Always verify role from database, NEVER trust JWT payload
+        // This prevents JWT manipulation attacks where attacker modifies role claim
+        const user = await User.findById(decoded.id).select('role isBanned');
+
+        if (!user) {
+            return res.status(404).send({ error: 'Kullanıcı bulunamadı' });
+        }
+
+        // SECURITY: Check if user is banned
+        if (user.isBanned) {
+            return res.status(403).send({ error: 'Hesabınız yasaklandı' });
+        }
+
+        // Use role from DATABASE, not from JWT token
+        req.userId = decoded.id;
+        req.userRole = user.role; // ✅ From database
+        req.user = { userId: decoded.id, role: user.role }; // ✅ From database
         next();
     } catch (error) {
         // Check if token expired

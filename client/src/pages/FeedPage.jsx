@@ -512,6 +512,15 @@ export default function FeedPage() {
 
         xhr.open('POST', `${API_URL}/api/posts`);
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        // SECURITY: Send Spotify token for verification
+        if (selectedSpotifyTrack) {
+          const spotifyToken = localStorage.getItem('spotify_access_token');
+          if (spotifyToken) {
+            xhr.setRequestHeader('X-Spotify-Token', spotifyToken);
+          }
+        }
+
         xhr.send(formData);
       });
 

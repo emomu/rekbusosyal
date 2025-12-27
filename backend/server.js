@@ -310,16 +310,6 @@ app.get('/api/posts', async (req, res) => {
       Post.countDocuments({ isAnonymous: false, category: 'Geyik' })
     ]);
 
-    // DEBUG: Find position of specific post
-    const allPosts = await Post.find({ isAnonymous: false, category: 'Geyik' })
-      .sort({ createdAt: -1 })
-      .select('_id createdAt')
-      .lean();
-    const postIndex = allPosts.findIndex(p => p._id.toString() === '69380fdb3839c649e21e739f');
-    const postPage = postIndex >= 0 ? Math.floor(postIndex / limit) + 1 : -1;
-    console.log('🔍 Post pozisyonu:', postIndex >= 0 ? `${postIndex + 1}. sırada, Sayfa ${postPage}` : 'BULUNAMADI');
-    console.log('📊 Toplam Geyik post sayısı:', totalCount, '| İstek yapılan sayfa:', page);
-
     // Add comment count to each post
     const postsWithCommentCount = await Promise.all(
       posts.map(async (post) => {
@@ -383,13 +373,50 @@ app.post('/api/posts', auth, cooldown('post'), upload.array('media', 4), async (
       }
     }
 
-    // Parse Spotify track if provided
+    // Parse and VALIDATE Spotify track if provided
     let spotifyTrack = null;
     if (req.body.spotifyTrack) {
       try {
-        spotifyTrack = JSON.parse(req.body.spotifyTrack);
+        const trackData = JSON.parse(req.body.spotifyTrack);
+
+        // SECURITY: Validate Spotify track ID format (22 alphanumeric characters)
+        if (!trackData.id || !/^[a-zA-Z0-9]{22}$/.test(trackData.id)) {
+          return res.status(400).json({ error: 'Geçersiz Spotify track ID formatı' });
+        }
+
+        // SECURITY: Verify track exists via Spotify API
+        try {
+          const spotifyToken = req.headers['x-spotify-token'];
+          if (!spotifyToken) {
+            return res.status(400).json({ error: 'Spotify authentication required' });
+          }
+
+          const verifyResponse = await fetch(`https://api.spotify.com/v1/tracks/${trackData.id}`, {
+            headers: { 'Authorization': `Bearer ${spotifyToken}` }
+          });
+
+          if (!verifyResponse.ok) {
+            console.error('Spotify track verification failed:', verifyResponse.status);
+            return res.status(400).json({ error: 'Spotify şarkısı doğrulanamadı. Lütfen geçerli bir şarkı seçin.' });
+          }
+
+          // Use data from Spotify API, NOT from client
+          const verifiedTrack = await verifyResponse.json();
+          spotifyTrack = {
+            id: verifiedTrack.id,
+            name: verifiedTrack.name,
+            artists: verifiedTrack.artists.map(a => a.name),
+            albumArt: verifiedTrack.album.images[0]?.url || null,
+            previewUrl: verifiedTrack.preview_url,
+            externalUrl: verifiedTrack.external_urls.spotify
+          };
+        } catch (verifyError) {
+          console.error("Spotify verification error:", verifyError);
+          return res.status(400).json({ error: 'Spotify şarkısı doğrulanamadı' });
+        }
       } catch (parseError) {
         console.error("Spotify track parse error:", parseError);
+        return res.status(400).json({ error: 'Geçersiz Spotify track verisi' });
       }
     }
 
@@ -521,13 +548,50 @@ app.post('/api/confessions', auth, cooldown('confession'), upload.array('media',
       }
     }
 
-    // Parse Spotify track if provided
+    // Parse and VALIDATE Spotify track if provided
     let spotifyTrack = null;
     if (req.body.spotifyTrack) {
       try {
-        spotifyTrack = JSON.parse(req.body.spotifyTrack);
+        const trackData = JSON.parse(req.body.spotifyTrack);
+
+        // SECURITY: Validate Spotify track ID format (22 alphanumeric characters)
+        if (!trackData.id || !/^[a-zA-Z0-9]{22}$/.test(trackData.id)) {
+          return res.status(400).json({ error: 'Geçersiz Spotify track ID formatı' });
+        }
+
+        // SECURITY: Verify track exists via Spotify API
+        try {
+          const spotifyToken = req.headers['x-spotify-token'];
+          if (!spotifyToken) {
+            return res.status(400).json({ error: 'Spotify authentication required' });
+          }
+
+          const verifyResponse = await fetch(`https://api.spotify.com/v1/tracks/${trackData.id}`, {
+            headers: { 'Authorization': `Bearer ${spotifyToken}` }
+          });
+
+          if (!verifyResponse.ok) {
+            console.error('Spotify track verification failed:', verifyResponse.status);
+            return res.status(400).json({ error: 'Spotify şarkısı doğrulanamadı. Lütfen geçerli bir şarkı seçin.' });
+          }
+
+          // Use data from Spotify API, NOT from client
+          const verifiedTrack = await verifyResponse.json();
+          spotifyTrack = {
+            id: verifiedTrack.id,
+            name: verifiedTrack.name,
+            artists: verifiedTrack.artists.map(a => a.name),
+            albumArt: verifiedTrack.album.images[0]?.url || null,
+            previewUrl: verifiedTrack.preview_url,
+            externalUrl: verifiedTrack.external_urls.spotify
+          };
+        } catch (verifyError) {
+          console.error("Spotify verification error:", verifyError);
+          return res.status(400).json({ error: 'Spotify şarkısı doğrulanamadı' });
+        }
       } catch (parseError) {
         console.error("Spotify track parse error:", parseError);
+        return res.status(400).json({ error: 'Geçersiz Spotify track verisi' });
       }
     }
 
