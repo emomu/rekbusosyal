@@ -638,8 +638,42 @@ export default function FeedPage() {
     });
   };
 
+  // Scroll pozisyonunu kaydet ve geri yükle
+  const containerRef = React.useRef(null);
+  const hasRestoredScroll = React.useRef(false);
+
+  useEffect(() => {
+    // Sadece bir kez scroll pozisyonunu geri yükle (post detayından geri gelince)
+    const savedScrollPos = sessionStorage.getItem('feedScrollPos');
+    if (savedScrollPos && containerRef.current && posts.length > 0 && !hasRestoredScroll.current) {
+      // Postlar render olduktan sonra scroll pozisyonunu geri yükle
+      setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = parseInt(savedScrollPos, 10);
+          hasRestoredScroll.current = true;
+        }
+      }, 100);
+    }
+  }, [posts.length]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Scroll her değiştiğinde pozisyonu kaydet
+    const handleScroll = () => {
+      sessionStorage.setItem('feedScrollPos', container.scrollTop.toString());
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
-    <div ref={postsRefresh.containerRef} className="relative overflow-y-auto h-full">
+    <div ref={(el) => {
+      containerRef.current = el;
+      postsRefresh.containerRef.current = el;
+    }} className="relative overflow-y-auto h-full">
       {/* Pull-to-refresh indicator */}
       {postsRefresh.pullDistance > 0 && (
         <div

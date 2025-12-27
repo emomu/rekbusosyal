@@ -310,6 +310,16 @@ app.get('/api/posts', async (req, res) => {
       Post.countDocuments({ isAnonymous: false, category: 'Geyik' })
     ]);
 
+    // DEBUG: Find position of specific post
+    const allPosts = await Post.find({ isAnonymous: false, category: 'Geyik' })
+      .sort({ createdAt: -1 })
+      .select('_id createdAt')
+      .lean();
+    const postIndex = allPosts.findIndex(p => p._id.toString() === '69380fdb3839c649e21e739f');
+    const postPage = postIndex >= 0 ? Math.floor(postIndex / limit) + 1 : -1;
+    console.log('🔍 Post pozisyonu:', postIndex >= 0 ? `${postIndex + 1}. sırada, Sayfa ${postPage}` : 'BULUNAMADI');
+    console.log('📊 Toplam Geyik post sayısı:', totalCount, '| İstek yapılan sayfa:', page);
+
     // Add comment count to each post
     const postsWithCommentCount = await Promise.all(
       posts.map(async (post) => {
