@@ -24,6 +24,14 @@ const PostSchema = new mongoose.Schema({
     spotifyUrl: { type: String }, // Spotify'da açma linki
     duration: { type: Number } // Şarkı süresi (ms)
   },
+  // SECURITY: Event reference for announcement posts
+  // Only populated when post is created by announcement account for an event
+  // Backend verifies: 1) User is announcement account 2) Event exists 3) User owns the community
+  eventReference: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    default: null
+  },
   createdAt: { type: Date, default: Date.now }
 });
 

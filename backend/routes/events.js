@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Event = require('../models/Event');
 const Community = require('../models/Community');
+const Post = require('../models/Post');
 const authMiddleware = require('../middleware/auth');
 
 // Tüm etkinlikleri listele (gelecek etkinlikler)
@@ -97,6 +98,41 @@ router.post('/', authMiddleware, async (req, res) => {
     const populatedEvent = await Event.findById(newEvent._id)
       .populate('community', 'name imageUrl')
       .populate('createdBy', 'fullName username profilePicture');
+
+    // SECURITY: Auto-post ONLY if community has announcement account
+    // Post will be created from announcement account automatically
+    console.log('🔍 Auto-post Check:', {
+      hasAnnouncementAccount: !!community.announcementAccount,
+      announcementAccountId: community.announcementAccount?.toString(),
+      currentUserId: req.user.userId,
+      communityName: community.name
+    });
+
+    if (community.announcementAccount) {
+      try {
+        console.log('✅ Creating announcement post from:', community.announcementAccount.toString());
+
+        // SECURITY: Always use announcement account for event cards
+        // This ensures consistent branding and prevents fake event cards
+        const announcementPost = new Post({
+          content: ``, // Basit içerik, detaylar event kartında
+          author: community.announcementAccount, // ✅ ALWAYS announcement account
+          isAnonymous: false,
+          category: 'Geyik',
+          eventReference: newEvent._id // SECURITY: Link to actual event
+        });
+
+        await announcementPost.save();
+        console.log('✅ Event announcement post created:', announcementPost._id);
+        console.log('📢 Post will appear in feed from announcement account');
+      } catch (postError) {
+        console.error('❌ Error creating announcement post:', postError);
+        // Don't fail event creation if post fails
+      }
+    } else {
+      console.log('⚠️ Community has no announcement account - no auto-post created');
+      console.log('💡 Tip: Assign an announcement account to', community.name, 'to enable auto-posts');
+    }
 
     res.status(201).json(populatedEvent);
   } catch (error) {

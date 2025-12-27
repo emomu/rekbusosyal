@@ -303,6 +303,13 @@ app.get('/api/posts', async (req, res) => {
     const [posts, totalCount] = await Promise.all([
       Post.find({ isAnonymous: false, category: 'Geyik' })
         .populate('author', 'username profilePicture badges fullName')
+        .populate({
+          path: 'eventReference',
+          populate: {
+            path: 'community',
+            select: 'name imageUrl'
+          }
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -474,6 +481,13 @@ app.get('/api/confessions', async (req, res) => {
       Post.find({ category: 'İtiraf' })
         .select('+author')
         .populate('author', 'username profilePicture badges fullName')
+        .populate({
+          path: 'eventReference',
+          populate: {
+            path: 'community',
+            select: 'name imageUrl'
+          }
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -695,6 +709,13 @@ app.get('/api/posts/:id', auth, async (req, res) => {
     const post = await Post.findById(req.params.id)
       .select('+author') // author field'ı dahil et
       .populate('author', 'username profilePicture badges fullName')
+      .populate({
+        path: 'eventReference',
+        populate: {
+          path: 'community',
+          select: 'name imageUrl'
+        }
+      })
       .lean();
 
     if (!post) {

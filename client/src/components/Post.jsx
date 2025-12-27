@@ -6,6 +6,7 @@ import LikeButton from './LikeButton';
 import UserBadges from './UserBadges';
 import MediaDisplay from './MediaDisplay';
 import SpotifyTrackDisplay from './SpotifyTrackDisplay';
+import EventCard from './EventCard';
 import LikeUsersModal from './LikeUsersModal';
 import { setSelectedImage, addToast } from '../store/slices/uiSlice';
 import { API_URL } from '../config/api';
@@ -276,6 +277,13 @@ export default function Post({ post, onLike, onDelete, onUpdate, showMoreHorizon
             {!isEditing && post.spotifyTrack && (
               <div className="mt-3" onClick={(e) => e.stopPropagation()}>
                 <SpotifyTrackDisplay track={post.spotifyTrack} compact={true} />
+              </div>
+            )}
+
+            {/* Event Card - SECURITY: Only shown if eventReference exists and is populated */}
+            {!isEditing && post.eventReference && (
+              <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                <EventCard event={post.eventReference} />
               </div>
             )}
 

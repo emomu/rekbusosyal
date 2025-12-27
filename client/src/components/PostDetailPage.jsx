@@ -13,6 +13,7 @@ import MediaUploadDialog from './MediaUploadDialog';
 import GiphyPicker from './GiphyPicker';
 import MediaDisplay from './MediaDisplay';
 import SpotifyTrackDisplay from './SpotifyTrackDisplay';
+import EventCard from './EventCard';
 import LikeUsersModal from './LikeUsersModal';
 
 // --- LIKE BUTONU BİLEŞENİ ---
@@ -694,6 +695,13 @@ export default function PostDetailPage() {
         {post.spotifyTrack && (
           <div className="mb-4">
             <SpotifyTrackDisplay track={post.spotifyTrack} compact={false} />
+          </div>
+        )}
+
+        {/* Event Card - SECURITY: Only shown if eventReference exists and is populated */}
+        {post.eventReference && (
+          <div className="mb-4">
+            <EventCard event={post.eventReference} />
           </div>
         )}
 
