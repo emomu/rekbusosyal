@@ -159,6 +159,13 @@ router.get('/search', authMiddleware, async (req, res) => {
     });
 
     const tokenData = await tokenResponse.json();
+
+    // Check if token request failed
+    if (!tokenData.access_token) {
+      console.error('Spotify token error:', tokenData);
+      return res.status(500).json({ error: 'Spotify API anahtarları eksik veya hatalı' });
+    }
+
     const accessToken = tokenData.access_token;
 
     // Şarkı ara (market=TR parametresi ile)
@@ -172,6 +179,12 @@ router.get('/search', authMiddleware, async (req, res) => {
     });
 
     const searchData = await searchResponse.json();
+
+    // Check if Spotify API returned an error
+    if (!searchData.tracks || !searchData.tracks.items) {
+      console.error('Spotify API error:', searchData);
+      return res.status(500).json({ error: 'Spotify araması başarısız oldu' });
+    }
 
     // Şarkıları map'le ve preview URL yoksa embed'den çek
     const tracks = await Promise.all(

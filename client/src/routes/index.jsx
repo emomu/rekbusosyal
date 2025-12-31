@@ -20,6 +20,7 @@ const CampusDetailPage = lazy(() => import('../pages/CampusDetailPage'));
 const CommunitiesListPage = lazy(() => import('../pages/CommunitiesListPage'));
 const CommunityDetailPage = lazy(() => import('../pages/CommunityDetailPage'));
 const CalendarPage = lazy(() => import('../pages/CalendarPage'));
+const EventDetailPage = lazy(() => import('../pages/EventDetailPage'));
 const ClubManagerPanel = lazy(() => import('../pages/ClubManagerPanel'));
 const SettingsPage = lazy(() => import('../pages/SettingsPage'));
 const PostDetailPage = lazy(() => import('../components/PostDetailPage'));
@@ -121,6 +122,10 @@ const router = createBrowserRouter([
       {
         path: 'takvim',
         element: <CalendarPage />
+      },
+      {
+        path: 'etkinlik/:eventId',
+        element: <EventDetailPage />
       },
       {
         path: 'ayarlar',

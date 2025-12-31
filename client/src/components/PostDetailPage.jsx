@@ -825,10 +825,27 @@ export default function PostDetailPage() {
                 ref={commentInputRef}
                 type="text"
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value.length <= 256) {
+                    setNewComment(e.target.value);
+                  }
+                }}
                 placeholder="Yanıtını gönder"
                 className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
+                maxLength={256}
               />
+              {/* Character Counter */}
+              {newComment.length > 0 && (
+                <div className="flex justify-end mt-1">
+                  <span className={`text-xs font-medium ${
+                    newComment.length > 240 ? 'text-red-600' :
+                    newComment.length > 200 ? 'text-yellow-600' :
+                    'text-gray-400'
+                  }`}>
+                    {newComment.length}/256
+                  </span>
+                </div>
+              )}
 
               {/* Selected media preview */}
               {selectedMedia && (

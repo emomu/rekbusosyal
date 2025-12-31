@@ -36,7 +36,7 @@ const EventCard = ({ event }) => {
 
   const handleClick = (e) => {
     e.stopPropagation();
-    navigate(`/takvim?eventId=${event._id}`);
+    navigate(`/etkinlik/${event._id}`);
   };
 
   return (

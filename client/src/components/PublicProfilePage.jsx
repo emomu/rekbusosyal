@@ -15,6 +15,7 @@ import { useProfileNavigate } from '../hooks/useSmartNavigate';
 import MediaDisplay from './MediaDisplay';
 import SpotifyTrackDisplay from './SpotifyTrackDisplay';
 import FollowersModal from './FollowersModal';
+import EventCard from './EventCard';
 
 export default function PublicProfilePage() {
   const navigate = useNavigate();
@@ -466,6 +467,13 @@ export default function PublicProfilePage() {
                         {post.spotifyTrack && (
                           <div className="mb-3" onClick={(e) => e.stopPropagation()}>
                             <SpotifyTrackDisplay track={post.spotifyTrack} compact={true} />
+                          </div>
+                        )}
+
+                        {/* Event Card */}
+                        {post.eventReference && (
+                          <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+                            <EventCard event={post.eventReference} />
                           </div>
                         )}
 

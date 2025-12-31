@@ -22,6 +22,7 @@ const { adminAuth, strictAdminAuth } = require('./middleware/adminAuth');
 const cooldown = require('./middleware/cooldown');
 const { voteCooldown } = require('./middleware/cooldown');
 const maintenanceMode = require('./middleware/maintenanceMode');
+const { validateContent, validateFileUpload } = require('./utils/security');
 
 // Multer configuration for file uploads
 const multer = require('multer');
@@ -343,7 +344,23 @@ app.get('/api/posts', async (req, res) => {
 // Post Atma (Sadece giriş yapmış kullanıcılar) - 30 saniye cooldown - with media support
 app.post('/api/posts', auth, cooldown('post'), upload.array('media', 4), async (req, res) => {
   try {
+    // SECURITY: Validate and sanitize content
+    const contentValidation = validateContent(req.body.content, 256);
+    if (!contentValidation.valid) {
+      return res.status(400).json({ error: contentValidation.error });
+    }
+
     const mediaFiles = [];
+
+    // SECURITY: Validate uploaded files with magic number check
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const fileValidation = validateFileUpload(file.buffer, file.mimetype);
+        if (!fileValidation.valid) {
+          return res.status(400).json({ error: `Dosya doğrulama hatası: ${fileValidation.error}` });
+        }
+      }
+    }
 
     // Upload media files to Cloudinary if any
     if (req.files && req.files.length > 0) {
@@ -427,8 +444,9 @@ app.post('/api/posts', auth, cooldown('post'), upload.array('media', 4), async (
       }
     }
 
+    // SECURITY: Use sanitized content
     const newPost = new Post({
-      content: req.body.content,
+      content: contentValidation.sanitized,
       author: req.userId, // middleware'den gelen kullanıcı ID'si
       isAnonymous: false, // Normal postlar anonim değildir
       category: 'Geyik', // Varsayılan kategori
@@ -524,8 +542,24 @@ app.post('/api/confessions', auth, cooldown('confession'), upload.array('media',
   // FormData sends boolean as string, convert to boolean
   const isAnonymous = req.body.isAnonymous === 'true' || req.body.isAnonymous === true;
 
+  // SECURITY: Validate and sanitize content
+  const contentValidation = validateContent(content, 256);
+  if (!contentValidation.valid) {
+    return res.status(400).json({ error: contentValidation.error });
+  }
+
   try {
     const mediaFiles = [];
+
+    // SECURITY: Validate uploaded files with magic number check
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const fileValidation = validateFileUpload(file.buffer, file.mimetype);
+        if (!fileValidation.valid) {
+          return res.status(400).json({ error: `Dosya doğrulama hatası: ${fileValidation.error}` });
+        }
+      }
+    }
 
     // Upload media files to Cloudinary if any
     if (req.files && req.files.length > 0) {
@@ -609,8 +643,9 @@ app.post('/api/confessions', auth, cooldown('confession'), upload.array('media',
       }
     }
 
+    // SECURITY: Use sanitized content
     const newConfession = new Post({
-      content,
+      content: contentValidation.sanitized,
       isAnonymous,
       category: 'İtiraf',
       author: isAnonymous ? null : req.userId,
@@ -2016,6 +2051,13 @@ app.get('/api/users/:userId/posts', async (req, res) => {
     const [posts, totalCount] = await Promise.all([
       Post.find({ author: userId, isAnonymous: false, category: 'Geyik' })
         .populate('author', 'username profilePicture badges')
+        .populate({
+          path: 'eventReference',
+          populate: {
+            path: 'community',
+            select: 'name imageUrl'
+          }
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -3472,16 +3514,26 @@ app.get('/api/posts/:postId/comments', async (req, res) => {
   }
 });
 
-// 2. Yorum Yap (POST) - with media support (1 image or gif)
+// 2. Yorum Yap (POST) - with media support (1 image or gif) + SECURITY
 app.post('/api/posts/:postId/comments', auth, cooldown('comment'), upload.single('media'), async (req, res) => {
   try {
     const { content } = req.body;
     const postId = req.params.postId;
     const userId = req.userId;
 
-    // Validasyonlar
-    if (!content || content.trim().length === 0) return res.status(400).json({ message: 'İçerik boş olamaz' });
-    if (content.length > 500) return res.status(400).json({ message: 'Yorum çok uzun' });
+    // SECURITY: Validate and sanitize content
+    const contentValidation = validateContent(content, 256);
+    if (!contentValidation.valid) {
+      return res.status(400).json({ message: contentValidation.error });
+    }
+
+    // SECURITY: Validate file upload if present
+    if (req.file) {
+      const fileValidation = validateFileUpload(req.file.buffer, req.file.mimetype);
+      if (!fileValidation.valid) {
+        return res.status(400).json({ message: fileValidation.error });
+      }
+    }
 
     const post = await Post.findById(postId);
     if (!post) return res.status(404).json({ message: 'Gönderi bulunamadı' });
@@ -3512,8 +3564,9 @@ app.post('/api/posts/:postId/comments', auth, cooldown('comment'), upload.single
 
     // Yorumu Kaydet
     console.log('💾 Kaydedilecek media:', mediaData);
+    // SECURITY: Use sanitized content
     const comment = new Comment({
-      content,
+      content: contentValidation.sanitized,
       author: userId,
       post: postId,
       media: mediaData
@@ -3760,19 +3813,25 @@ app.get('/api/comments/:commentId/likes', auth, async (req, res) => {
   }
 });
 
-// Post a reply to a comment - with media support (1 image or gif)
+// Post a reply to a comment - with media support (1 image or gif) + SECURITY
 app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), upload.single('media'), async (req, res) => {
   try {
     const { content } = req.body;
     const parentCommentId = req.params.commentId;
     const userId = req.userId;
 
-    // Validasyonlar
-    if (!content || content.trim().length === 0) {
-      return res.status(400).json({ message: 'İçerik boş olamaz' });
+    // SECURITY: Validate and sanitize content
+    const contentValidation = validateContent(content, 256);
+    if (!contentValidation.valid) {
+      return res.status(400).json({ message: contentValidation.error });
     }
-    if (content.length > 500) {
-      return res.status(400).json({ message: 'Yorum çok uzun' });
+
+    // SECURITY: Validate file upload if present
+    if (req.file) {
+      const fileValidation = validateFileUpload(req.file.buffer, req.file.mimetype);
+      if (!fileValidation.valid) {
+        return res.status(400).json({ message: fileValidation.error });
+      }
     }
 
     // Parent comment'i bul
@@ -3805,9 +3864,9 @@ app.post('/api/comments/:commentId/replies', auth, cooldown('comment'), upload.s
       mediaData = uploadedMedia;
     }
 
-    // Reply'i kaydet
+    // Reply'i kaydet - SECURITY: Use sanitized content
     const reply = new Comment({
-      content,
+      content: contentValidation.sanitized,
       author: userId,
       post: parentComment.post,
       parentComment: parentCommentId,

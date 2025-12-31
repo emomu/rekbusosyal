@@ -4,6 +4,48 @@ const Event = require('../models/Event');
 const Community = require('../models/Community');
 const Post = require('../models/Post');
 const authMiddleware = require('../middleware/auth');
+const eventRateLimit = require('../middleware/eventRateLimit');
+const { validateContent, validateFileUpload } = require('../utils/security');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+
+// Multer configuration for memory storage
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Sadece resim dosyaları yüklenebilir'), false);
+    }
+  }
+});
+
+// Cloudinary upload helper
+const uploadMediaToCloudinary = (buffer, type = 'image') => {
+  return new Promise((resolve, reject) => {
+    const uploadOptions = {
+      resource_type: type === 'video' ? 'video' : 'image',
+      folder: 'kbu-sosyal/events'
+    };
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      uploadOptions,
+      (error, result) => {
+        if (error) reject(error);
+        else resolve({
+          url: result.secure_url,
+          publicId: result.public_id,
+          type: type
+        });
+      }
+    );
+
+    uploadStream.end(buffer);
+  });
+};
 
 // Tüm etkinlikleri listele (gelecek etkinlikler)
 router.get('/', authMiddleware, async (req, res) => {
@@ -60,10 +102,48 @@ router.get('/:eventId', authMiddleware, async (req, res) => {
   }
 });
 
-// Yeni etkinlik oluştur (sadece club_manager ve admin)
-router.post('/', authMiddleware, async (req, res) => {
+// Yeni etkinlik oluştur (sadece club_manager ve admin) - with media upload + SECURITY
+router.post('/', authMiddleware, eventRateLimit, upload.single('poster'), async (req, res) => {
   try {
-    const { title, description, startDate, endDate, location, communityId, category, imageUrl } = req.body;
+    const { title, description, startDate, endDate, location, communityId, category } = req.body;
+
+    // SECURITY: Validate and sanitize title
+    const titleValidation = validateContent(title, 100);
+    if (!titleValidation.valid) {
+      return res.status(400).json({ error: titleValidation.error });
+    }
+
+    // SECURITY: Validate and sanitize description
+    const descValidation = validateContent(description, 500);
+    if (!descValidation.valid) {
+      return res.status(400).json({ error: descValidation.error });
+    }
+
+    // SECURITY: Validate and sanitize location
+    const locationValidation = validateContent(location, 100);
+    if (!locationValidation.valid) {
+      return res.status(400).json({ error: locationValidation.error });
+    }
+
+    let imageUrl = req.body.imageUrl; // Optional fallback to URL
+
+    // SECURITY: Validate file upload with magic number check
+    if (req.file) {
+      const fileValidation = validateFileUpload(req.file.buffer, req.file.mimetype);
+      if (!fileValidation.valid) {
+        return res.status(400).json({ error: fileValidation.error });
+      }
+
+      console.log(`✅ File validation passed: ${fileValidation.actualType}`);
+
+      try {
+        const uploadedMedia = await uploadMediaToCloudinary(req.file.buffer, 'image');
+        imageUrl = uploadedMedia.url;
+      } catch (uploadError) {
+        console.error('Event poster upload error:', uploadError);
+        return res.status(400).json({ error: 'Etkinlik afişi yüklenirken hata oluştu' });
+      }
+    }
 
     // Kullanıcı yetkisini kontrol et
     if (req.user.role !== 'admin' && req.user.role !== 'club_manager') {
@@ -81,12 +161,13 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Sadece kendi kulübünüz için etkinlik oluşturabilirsiniz' });
     }
 
+    // SECURITY: Use sanitized values
     const newEvent = new Event({
-      title,
-      description,
+      title: titleValidation.sanitized,
+      description: descValidation.sanitized,
       startDate,
       endDate,
-      location,
+      location: locationValidation.sanitized,
       community: communityId,
       category: category || community.category,
       imageUrl,
@@ -115,7 +196,7 @@ router.post('/', authMiddleware, async (req, res) => {
         // SECURITY: Always use announcement account for event cards
         // This ensures consistent branding and prevents fake event cards
         const announcementPost = new Post({
-          content: ``, // Basit içerik, detaylar event kartında
+          content: `📅 Yeni etkinlik: ${titleValidation.sanitized}`, // Event announcement
           author: community.announcementAccount, // ✅ ALWAYS announcement account
           isAnonymous: false,
           category: 'Geyik',

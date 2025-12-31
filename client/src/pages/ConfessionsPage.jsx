@@ -582,9 +582,24 @@ export default function ConfessionsPage() {
             className="w-full resize-none outline-none text-lg text-gray-900 placeholder-gray-400 bg-transparent min-h-[60px] py-1"
             placeholder={isAnonymous ? "Kimse bilmeden içini dök..." : "Kampüste neler oluyor?"}
             value={newConfessionContent}
-            onChange={(e) => dispatch(setNewConfessionContent(e.target.value))}
+            onChange={(e) => {
+              if (e.target.value.length <= 256) {
+                dispatch(setNewConfessionContent(e.target.value));
+              }
+            }}
             rows={2}
+            maxLength={256}
           />
+          {/* Character Counter */}
+          <div className="flex justify-end mt-1">
+            <span className={`text-xs font-medium ${
+              newConfessionContent.length > 240 ? 'text-red-600' :
+              newConfessionContent.length > 200 ? 'text-yellow-600' :
+              'text-gray-400'
+            }`}>
+              {newConfessionContent.length}/256
+            </span>
+          </div>
 
           {/* --- SPOTIFY TRACK PREVIEW --- */}
           {selectedSpotifyTrack && (

@@ -717,10 +717,27 @@ export default function CommentDetailPage() {
                 ref={replyInputRef}
                 type="text"
                 value={newReply}
-                onChange={(e) => setNewReply(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value.length <= 256) {
+                    setNewReply(e.target.value);
+                  }
+                }}
                 placeholder="Cevabını gönder"
                 className="w-full py-1.5 text-base text-gray-900 placeholder:text-gray-500 bg-transparent outline-none"
+                maxLength={256}
               />
+              {/* Character Counter */}
+              {newReply.length > 0 && (
+                <div className="flex justify-end mt-1">
+                  <span className={`text-xs font-medium ${
+                    newReply.length > 240 ? 'text-red-600' :
+                    newReply.length > 200 ? 'text-yellow-600' :
+                    'text-gray-400'
+                  }`}>
+                    {newReply.length}/256
+                  </span>
+                </div>
+              )}
 
               {/* Selected media preview */}
               {selectedMedia && (

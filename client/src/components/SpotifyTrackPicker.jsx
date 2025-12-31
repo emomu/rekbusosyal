@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { Search, Music, X, Play, Pause, ExternalLink, Loader } from 'lucide-react';
 import { API_URL } from '../config/api';
 
@@ -9,7 +10,7 @@ export default function SpotifyTrackPicker({ isOpen, onClose, onSelect }) {
   const [playingTrackId, setPlayingTrackId] = useState(null);
   const audioRef = useRef(null);
   const searchTimeoutRef = useRef(null);
-  const token = localStorage.getItem('token');
+  const token = useSelector((state) => state.auth.token);
 
   // Şarkı ara
   const searchTracks = async (query) => {

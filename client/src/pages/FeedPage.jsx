@@ -736,11 +736,26 @@ export default function FeedPage() {
               placeholder="Kampüste neler oluyor?  /komut , @kullaniciadi"
               rows={2}
               value={newPostContent}
-              onChange={handleInputChange}
+              onChange={(e) => {
+                if (e.target.value.length <= 256) {
+                  handleInputChange(e);
+                }
+              }}
+              maxLength={256}
               style={{
                 color: newPostContent.startsWith('/') ? '#dc2626' : newPostContent.includes('@') ? '#2563eb' : '#111827'
               }}
             />
+            {/* Character Counter */}
+            <div className="flex justify-end mt-1">
+              <span className={`text-xs font-medium ${
+                newPostContent.length > 240 ? 'text-red-600' :
+                newPostContent.length > 200 ? 'text-yellow-600' :
+                'text-gray-400'
+              }`}>
+                {newPostContent.length}/256
+              </span>
+            </div>
 
             {/* Command Suggestions Dropdown */}
             {showCommandSuggestions && (
